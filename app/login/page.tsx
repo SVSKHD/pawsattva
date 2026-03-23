@@ -12,19 +12,11 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   return (
-    <div className="relative min-h-[100dvh] w-full overflow-hidden">
-      {/* Pet Background Image */}
-      <div
-        className="fixed inset-0 w-full h-[100dvh] z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "url('https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=2500&auto=format&fit=crop')",
-        }}
-      >
-        <div className="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px]" />
-      </div>
+    <div className="login-page">
+      {/* Subtle overlay to ensure the login card remains highly legible */}
+      <div className="absolute inset-0 z-0 pointer-events-none bg-black/20 dark:bg-black/40 backdrop-blur-[2px]" />
 
-      <div className="relative z-10 flex min-h-[100dvh] items-center justify-center px-4 py-8 md:px-8">
+      <div className="login-content">
         <Card className="mx-auto w-full max-w-sm border-border/50 bg-background/80 shadow-2xl backdrop-blur-md">
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-4xl font-normal tracking-tight font-[family-name:var(--font-pacifico)]">

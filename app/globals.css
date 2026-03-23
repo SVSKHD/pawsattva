@@ -128,3 +128,25 @@
     @apply font-sans;
   }
 }
+
+.login-page {
+  min-height: 100vh;
+  min-height: 100svh;
+  min-height: 100dvh;
+  width: 100%;
+  background: url('https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=2500&auto=format&fit=crop') center center / cover no-repeat;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  position: relative;
+}
+
+.login-content {
+  min-height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  position: relative;
+  z-index: 10;
+}
