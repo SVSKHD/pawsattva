@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Pacifico } from "next/font/google";
 import "./globals.css";
-import { Header } from "@/components/header";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
@@ -25,6 +24,14 @@ export const metadata: Metadata = {
   description: "Paw Sattva",
 };
 
+import { Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,13 +42,9 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${pacifico.variable} h-full antialiased`}
     >
-      <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
-          <main className="flex-1 flex flex-col">
-            <Header />
-            {children}
-          </main>
+          {children}
         </TooltipProvider>
       </body>
     </html>

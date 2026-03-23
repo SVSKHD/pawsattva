@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,11 +13,28 @@ import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   return (
-    <div className="login-page">
-      {/* Subtle overlay to ensure the login card remains highly legible */}
-      <div className="absolute inset-0 z-0 pointer-events-none bg-black/20 dark:bg-black/40 backdrop-blur-[2px]" />
+    <div className="relative min-h-[100dvh] w-full overflow-hidden">
+      {/* Background Layer strictly fixed to prevent scrolling issues */}
+      <div 
+        className="fixed inset-0 w-full h-[100dvh] bg-cover bg-center bg-no-repeat overflow-hidden z-0"
+        style={{
+          backgroundImage: "url('https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=2500&auto=format&fit=crop')",
+        }}
+      >
+        {/* Subtle overlay */}
+        <div className="absolute inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-[2px] pointer-events-none" />
+      </div>
 
-      <div className="login-content">
+      {/* Header Layer (absolute so it doesn't push the flex layout constraints) */}
+      <div className="absolute top-0 left-0 w-full z-50">
+        <Header />
+      </div>
+
+      {/* Interactive Layer explicitly forced to full viewport height for perfect mathematical centering */}
+      <div 
+        className="relative z-10 w-full flex flex-col justify-center items-center min-h-[100dvh] p-4"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
         <Card className="mx-auto w-full max-w-sm border-border/50 bg-background/80 shadow-2xl backdrop-blur-md">
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-4xl font-normal tracking-tight font-[family-name:var(--font-pacifico)]">
