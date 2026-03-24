@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Paw from "../pawsattva.png"
 
 export default function Home() {
   return (
@@ -6,7 +7,7 @@ export default function Home() {
       <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
         <Image
           className="dark:invert"
-          src="/next.svg"
+          src={Paw}
           alt="Next.js logo"
           width={100}
           height={20}
