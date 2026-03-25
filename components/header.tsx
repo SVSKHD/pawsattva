@@ -30,8 +30,8 @@ export function Header() {
   };
 
   return (
-    <div className="sticky top-0 z-50 w-full pt-4 px-4 pb-2 bg-gradient-to-b from-background/80 to-transparent pointer-events-none">
-      <header className="pointer-events-auto mx-auto w-full max-w-6xl rounded-2xl border border-white/20 dark:border-white/10 bg-white/20 dark:bg-black/20 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] supports-[backdrop-filter]:bg-background/30 transition-all duration-300 ease-in-out">
+    <div className="absolute top-0 z-50 w-full pt-4 px-4 pb-2 bg-gradient-to-b from-background/40 to-transparent pointer-events-none">
+      <header className="pointer-events-auto mx-auto w-full max-w-6xl rounded-2xl border border-white/20 dark:border-white/10 bg-white/20 dark:bg-black/20 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] transition-all duration-300 ease-in-out">
         <div className="flex h-16 items-center px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2 group transition-transform hover:scale-105 duration-300">
             {/* Logo Bubble */}
