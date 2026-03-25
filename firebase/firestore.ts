@@ -7,6 +7,8 @@ import {
   deleteDoc, 
   doc, 
   query, 
+  where,
+  limit,
   orderBy, 
   serverTimestamp,
   Timestamp
@@ -20,12 +22,24 @@ export interface Blog {
   title: string;
   slug: string;
   keywords: string;
+  excerpt?: string;
   content: string;
+  image?: string;
   categoryId: string;
+  authorId?: string;
+  authorName?: string;
   status: 'published' | 'draft';
   date: any;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName?: string;
+  photoURL?: string;
+  admin: boolean;
 }
 
 export interface Category {
@@ -35,6 +49,17 @@ export interface Category {
   status?: 'published' | 'draft';
   createdAt?: Timestamp;
 }
+
+// ── USER OPERATIONS ──────────────────────────────────────────────────────────
+
+export const getAdminUsers = async () => {
+  const usersQuery = query(collection(db, "users"), where("admin", "==", true));
+  const snapshot = await getDocs(usersQuery);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  } as UserProfile));
+};
 
 // ── BLOG OPERATIONS ──────────────────────────────────────────────────────────
 
@@ -78,6 +103,14 @@ export const updateBlog = async (id: string, blog: Partial<Blog>) => {
 export const deleteBlog = async (id: string) => {
   const docRef = doc(db, "blogs", id);
   return await deleteDoc(docRef);
+};
+
+export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
+  const q = query(collection(db, "blogs"), where("slug", "==", slug), limit(1));
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() } as Blog;
 };
 
 // ── CATEGORY OPERATIONS ──────────────────────────────────────────────────────

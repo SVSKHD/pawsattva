@@ -7,6 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { SocialShare } from '@/components/social-share';
+import { getBlogBySlug, getBlogs, Blog } from '@/firebase/firestore';
+import { notFound } from 'next/navigation';
 
 export default async function BlogPostPage({
   params,
@@ -14,54 +16,25 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const blog = await getBlogBySlug(slug);
 
-  // Dummy data for now
-  const blog = {
-    title: "Understanding Pet Nutrition: A Complete Guide",
-    subtitle: "Everything you need to know about feeding your furry friends for a long and healthy life.",
-    author: "Dr. Sarah Mitchell",
-    date: "March 20, 2026",
-    category: "Nutrition",
-    readTime: "8 min read",
-    image: "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop",
-    content: `
-      <p class="text-lg leading-relaxed mb-6">Proper nutrition is the cornerstone of your pet's health. Just like humans, pets require a balanced diet of proteins, fats, carbohydrates, vitamins, and minerals to thrive. However, their specific needs can vary significantly based on their species, age, weight, and activity level.</p>
-      
-      <h2 class="text-2xl font-bold mt-10 mb-4">The Fundamentals of Pet Food</h2>
-      <p class="mb-4">Commercial pet foods are formulated to be complete and balanced. This means they contain every single nutrient your pet requires in the correct proportions. When choosing a food, look for the AAFCO (Association of American Feed Control Officials) statement on the label, which ensures the food meets basic nutritional standards.</p>
-      
-      <blockquote class="border-l-4 border-orange-500 pl-6 py-2 my-8 italic text-xl text-muted-foreground">
-        "A healthy pet starts with a healthy gut. Quality ingredients aren't just a luxury; they're a necessity for longevity."
-      </blockquote>
+  if (!blog) {
+    notFound();
+  }
 
-      <h2 class="text-2xl font-bold mt-10 mb-4">Age-Specific Requirements</h2>
-      <p class="mb-4">Puppies and kittens have vastly different nutritional needs than senior pets. Young animals require more calories and specific nutrients like DHA for brain development and calcium for bone growth. Senior pets, on the other hand, may need fewer calories but higher quality protein to maintain muscle mass.</p>
-      
-      <ul class="list-disc pl-6 mb-6 space-y-2">
-        <li><strong>Puppy/Kitten:</strong> High protein, high fat, DHA for development.</li>
-        <li><strong>Adult:</strong> Balanced maintenance diet.</li>
-        <li><strong>Senior:</strong> Lower calorie, highly digestible protein, joint supplements.</li>
-      </ul>
+  // Fetch some related posts
+  const allBlogs = await getBlogs();
+  const relatedPosts = allBlogs
+    .filter(b => b.id !== blog.id && b.status === "published")
+    .slice(0, 2);
 
-      <h2 class="text-2xl font-bold mt-10 mb-4">Common Nutritional Myths</h2>
-      <p class="mb-4">There's a lot of misinformation out there about pet diets. One common myth is that grain-free is always better. While some pets do have grain sensitivities, most thrive on a diet that includes wholesome grains like brown rice or barley, which provide essential fiber and energy.</p>
-    `,
-    tags: ["Health", "Nutrition", "Dogs", "Cats", "Guide"],
-    relatedPosts: [
-      {
-        title: "5 Tips for Outdoor Activities with Dogs",
-        slug: "outdoor-activities-dogs",
-        image: "https://images.unsplash.com/photo-1551717743-499438096569?q=80&w=800&auto=format&fit=crop",
-        date: "Mar 15, 2026"
-      },
-      {
-        title: "Common Household Hazards for Cats",
-        slug: "cat-hazards",
-        image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800&auto=format&fit=crop",
-        date: "Mar 12, 2026"
-      }
-    ]
+  const calculateReadTime = (content: string) => {
+    const wordsPerMinute = 200;
+    const words = content.trim().split(/\s+/).length || 1;
+    return Math.ceil(words / wordsPerMinute) + " min read";
   };
+
+  const defaultImage = "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop";
 
   return (
 
@@ -69,7 +42,7 @@ export default async function BlogPostPage({
       {/* Hero Header Section */}
       <div className="relative w-full h-[50vh] min-h-[400px]">
         <Image
-          src={blog.image}
+          src={(blog?.image || defaultImage) as string}
           alt={blog.title}
           fill
           className="object-cover"
@@ -87,24 +60,24 @@ export default async function BlogPostPage({
             </Link>
             <div className="max-w-4xl">
               <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-4">
-                {blog.category}
+                {blog.categoryId}
               </Badge>
               <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
                 {blog.title}
               </h1>
               <div className="flex flex-wrap items-center text-white/90 gap-6">
                 <div className="flex items-center">
-                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-3 border-2 border-white">
-                    {blog.author[0]}
+                  <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-3 border-2 border-white text-xl">
+                    {(blog.authorName || "P")[0]}
                   </div>
-                  <span className="font-medium text-lg">{blog.author}</span>
+                  <span className="font-medium text-lg">{blog.authorName || "Paw Sattva Team"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5" />
                   <span>{blog.date}</span>
                 </div>
                 <div className="hidden md:block w-1.5 h-1.5 rounded-full bg-white/40" />
-                <span>{blog.readTime}</span>
+                <span>{calculateReadTime(blog.content)}</span>
               </div>
             </div>
           </div>
@@ -115,9 +88,11 @@ export default async function BlogPostPage({
         <div className="flex flex-col lg:flex-row gap-16">
           {/* Main Content Area */}
           <main className="lg:w-2/3">
-            <p className="text-xl font-medium text-muted-foreground mb-10 italic border-l-4 border-orange-200 pl-6 leading-relaxed">
-              {blog.subtitle}
-            </p>
+            {blog.excerpt && (
+              <p className="text-xl font-medium text-muted-foreground mb-10 italic border-l-4 border-orange-200 pl-6 leading-relaxed">
+                {blog.excerpt}
+              </p>
+            )}
 
             <div
               className="prose prose-lg dark:prose-invert max-w-none text-foreground/80"
@@ -129,10 +104,10 @@ export default async function BlogPostPage({
             {/* Tags & Interaction */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex flex-wrap gap-2">
-                {blog.tags.map(tag => (
-                  <Badge key={tag} variant="secondary" className="px-3 py-1 bg-muted hover:bg-orange-50 transition-colors">
+                {blog.keywords?.split(',').map((tag: string) => (
+                  <Badge key={tag.trim()} variant="secondary" className="px-3 py-1 bg-muted hover:bg-orange-50 transition-colors">
                     <Tag className="w-3 h-3 mr-1.5" />
-                    {tag}
+                    {tag.trim()}
                   </Badge>
                 ))}
               </div>
@@ -166,54 +141,56 @@ export default async function BlogPostPage({
                 <h3 className="text-xl font-bold mb-4">About the Author</h3>
                 <div className="flex items-start gap-4 mb-4">
                   <div className="w-16 h-16 rounded-2xl bg-orange-200 flex items-center justify-center text-orange-700 text-2xl font-bold flex-shrink-0">
-                    SM
+                    {(blog.authorName || "P")[0]}
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg">Dr. Sarah Mitchell</h4>
-                    <p className="text-sm text-muted-foreground">Veterinary Nutritionist</p>
+                    <h4 className="font-bold text-lg">{blog.authorName || "Paw Sattva Team"}</h4>
+                    <p className="text-sm text-muted-foreground">Pet Care Expert</p>
                   </div>
                 </div>
                 <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-                  Dr. Sarah has over 15 years of experience in veterinary medicine, specializing in canine and feline nutrition. She is passionate about helping pet owners make informed choices.
+                  Sharing expert insights and heartfelt advice for a happier, healthier life with your pets.
                 </p>
                 <Button className="w-full bg-orange-500 hover:bg-orange-600 rounded-xl shadow-lg shadow-orange-200">
-                  Follow Dr. Sarah
+                  Follow {blog.authorName?.split(' ')[0] || "Author"}
                 </Button>
               </CardContent>
             </Card>
 
             {/* Related Posts */}
-            <div>
-              <h3 className="text-2xl font-bold mb-8 flex items-center">
-                <span className="w-8 h-1 bg-orange-500 mr-4 rounded-full" />
-                Related Articles
-              </h3>
-              <div className="space-y-6">
-                {blog.relatedPosts.map((post, idx) => (
-                  <Link key={idx} href={`/blog/${post.slug}`} className="group block">
-                    <div className="flex gap-4 items-start">
-                      <div className="relative w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-transparent group-hover:border-orange-500 transition-all">
-                        <Image
-                          src={post.image}
-                          alt={post.title}
-                          fill
-                          className="object-cover"
-                        />
+            {relatedPosts.length > 0 && (
+              <div>
+                <h3 className="text-2xl font-bold mb-8 flex items-center">
+                  <span className="w-8 h-1 bg-orange-500 mr-4 rounded-full" />
+                  Related Articles
+                </h3>
+                <div className="space-y-6">
+                  {relatedPosts.map((post: Blog, idx: number) => (
+                    <Link key={idx} href={`/blog/${post.slug}`} className="group block">
+                      <div className="flex gap-4 items-start">
+                        <div className="relative w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-transparent group-hover:border-orange-500 transition-all">
+                          <Image
+                            src={post.image || defaultImage}
+                            alt={post.title}
+                            fill
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <h4 className="font-bold leading-tight group-hover:text-orange-600 transition-colors">
+                            {post.title}
+                          </h4>
+                          <p className="text-xs text-muted-foreground flex items-center mt-1">
+                            <Calendar className="w-3 h-3 mr-1" />
+                            {post.date}
+                          </p>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <h4 className="font-bold leading-tight group-hover:text-orange-600 transition-colors">
-                          {post.title}
-                        </h4>
-                        <p className="text-xs text-muted-foreground flex items-center mt-1">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          {post.date}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Newsletter Card */}
             <Card className="border-2 border-orange-100 rounded-3xl shadow-xl shadow-black/5 overflow-hidden">

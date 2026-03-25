@@ -88,18 +88,58 @@ const dummyBlogs = [
   }
 ];
 
+import { getBlogs, Blog } from '@/firebase/firestore';
+
 export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredBlogs = dummyBlogs.filter(blog => {
-    const matchesCategory = activeCategory === 'all' || blog.category.toLowerCase() === activeCategory;
+  React.useEffect(() => {
+    const fetchBlogs = async () => {
+      try {
+        const data = await getBlogs();
+        setBlogs(data);
+      } catch (error) {
+        console.error("Error fetching blogs:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBlogs();
+  }, []);
+
+  const filteredBlogs = blogs.filter(blog => {
+    const matchesCategory = activeCategory === 'all' || blog.categoryId === activeCategory;
     const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         blog.excerpt.toLowerCase().includes(searchQuery.toLowerCase());
+                         blog.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const featuredPost = dummyBlogs.find(b => b.featured);
+  const featuredPost = blogs.find(b => b.status === 'published');
+
+  const calculateReadTime = (content: string) => {
+    const wordsPerMinute = 200;
+    const words = content.trim().split(/\s+/).length;
+    return Math.ceil(words / wordsPerMinute) + " min read";
+  };
+
+  const truncateExcerpt = (content: string, length: number = 160) => {
+    const plainText = content.replace(/<[^>]*>/g, '');
+    if (plainText.length <= length) return plainText;
+    return plainText.substring(0, length).trim() + "...";
+  };
+
+  const defaultImage = "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background min-h-screen pb-20">
@@ -138,7 +178,7 @@ export default function BlogPage() {
             <Link href={`/blog/${featuredPost.slug}`} className="group block">
               <div className="relative h-[500px] rounded-[2.5rem] overflow-hidden shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]">
                 <Image
-                  src={featuredPost.image}
+                  src={featuredPost.image || defaultImage}
                   alt={featuredPost.title}
                   fill
                   className="object-cover transition-transform duration-1000 group-hover:scale-105"
@@ -154,14 +194,14 @@ export default function BlogPage() {
                         {featuredPost.title}
                       </h2>
                       <p className="text-lg md:text-xl text-white/80 max-w-2xl line-clamp-2 font-medium">
-                        {featuredPost.excerpt}
+                        {featuredPost.excerpt || truncateExcerpt(featuredPost.content)}
                       </p>
                       <div className="flex flex-wrap items-center text-white/90 gap-6 pt-4">
                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 text-white font-bold">
-                              {featuredPost.author[0]}
+                            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center border border-white/30 text-white font-bold text-xl">
+                              {(featuredPost.authorName || "P")[0]}
                             </div>
-                            <span className="font-semibold">{featuredPost.author}</span>
+                            <span className="font-semibold">{featuredPost.authorName || "Paw Sattva Team"}</span>
                          </div>
                          <div className="flex items-center gap-2 text-sm md:text-base">
                             <Calendar className="w-4 h-4" />
@@ -169,7 +209,7 @@ export default function BlogPage() {
                          </div>
                          <div className="flex items-center gap-2 text-sm md:text-base">
                             <Clock className="w-4 h-4" />
-                            <span>{featuredPost.readTime}</span>
+                            <span>{calculateReadTime(featuredPost.content)}</span>
                          </div>
                       </div>
                    </div>
@@ -207,7 +247,7 @@ export default function BlogPage() {
 
         {/* Blog Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-          {filteredBlogs.map((blog, idx) => (
+          {filteredBlogs.map((blog) => (
             <Link 
               key={blog.id} 
               href={`/blog/${blog.slug}`} 
@@ -217,14 +257,15 @@ export default function BlogPage() {
                 {/* Image Wrap */}
                 <div className="relative h-64 w-full overflow-hidden">
                   <Image
-                    src={blog.image}
+                    src={blog.image || defaultImage}
                     alt={blog.title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                   />
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-white/80 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg">
-                      {blog.category}
+                      {/* Map categoryId or show Generic */}
+                      {blog.categoryId || "General"}
                     </Badge>
                   </div>
                   {/* Glass Overlay on Hover */}
@@ -244,7 +285,7 @@ export default function BlogPage() {
                     <span className="w-1 h-1 rounded-full bg-orange-300" />
                     <span className="flex items-center gap-1.5">
                        <Clock className="w-3.5 h-3.5" />
-                       {blog.readTime}
+                       {calculateReadTime(blog.content)}
                     </span>
                   </div>
                   
@@ -253,15 +294,15 @@ export default function BlogPage() {
                   </h3>
                   
                   <p className="text-muted-foreground mb-8 line-clamp-3 text-sm leading-relaxed font-medium">
-                    {blog.excerpt}
+                    {blog.excerpt || truncateExcerpt(blog.content)}
                   </p>
 
                   <div className="mt-auto pt-6 border-t border-muted/50 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center text-orange-700 dark:text-orange-300 font-bold text-xs ring-4 ring-orange-50/50 dark:ring-orange-950/20">
-                        {blog.author[0]}
+                        {(blog.authorName || "P")[0]}
                       </div>
-                      <span className="text-xs font-bold text-foreground/80">{blog.author}</span>
+                      <span className="text-xs font-bold text-foreground/80">{blog.authorName || "Paw Sattva Team"}</span>
                     </div>
                     <div className="text-primary font-bold text-xs flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                       Read More <ChevronRight className="w-3.5 h-3.5" />

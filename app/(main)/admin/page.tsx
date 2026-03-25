@@ -32,7 +32,7 @@ import {
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
+import Editor from "@/components/editor"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -65,8 +65,10 @@ import {
   addCategory,
   updateCategory,
   deleteCategory,
+  getAdminUsers,
   Blog,
-  Category
+  Category,
+  UserProfile
 } from "@/firebase/firestore"
 import { serverTimestamp } from "firebase/firestore"
 
@@ -116,6 +118,7 @@ export default function AdminPage() {
 
   const [categories, setCategories] = useState<Category[]>([])
   const [blogs, setBlogs] = useState<Blog[]>([])
+  const [authors, setAuthors] = useState<UserProfile[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   const fetchData = async () => {
@@ -125,6 +128,8 @@ export default function AdminPage() {
       setCategories(cats)
       const blgs = await getBlogs()
       setBlogs(blgs as Blog[])
+      const admins = await getAdminUsers()
+      setAuthors(admins)
     } catch (error) {
       console.error("Error fetching data:", error)
       toast.error("Failed to load data from database.")
@@ -143,8 +148,11 @@ export default function AdminPage() {
   const [blogTitle, setBlogTitle] = useState("")
   const [blogSlug, setBlogSlug] = useState("")
   const [blogKeywords, setBlogKeywords] = useState("")
+  const [blogExcerpt, setBlogExcerpt] = useState("")
+  const [blogImage, setBlogImage] = useState("")
   const [blogContent, setBlogContent] = useState("")
   const [blogCategory, setBlogCategory] = useState("")
+  const [blogAuthorId, setBlogAuthorId] = useState("")
   const [blogStatus, setBlogStatus] = useState<"published" | "draft">("draft")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
 
@@ -165,8 +173,8 @@ export default function AdminPage() {
   const saveDraft = useCallback(() => {
     if (!blogTitle && !blogContent && !blogKeywords && !blogCategory) return
     const draft = {
-      blogTitle, blogSlug, blogKeywords, blogContent,
-      blogCategory, blogStatus, editingBlogId,
+      blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage,
+      blogContent, blogCategory, blogAuthorId, blogStatus, editingBlogId,
       savedAt: new Date().toISOString(),
     }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
@@ -283,12 +291,17 @@ export default function AdminPage() {
     }
 
     try {
+      const selectedAuthor = authors.find(a => a.id === blogAuthorId)
       const blogData = {
         title: blogTitle,
         slug: blogSlug,
         keywords: blogKeywords,
+        excerpt: blogExcerpt,
+        image: blogImage,
         content: blogContent,
         categoryId: blogCategory,
+        authorId: blogAuthorId,
+        authorName: selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
         status: blogStatus as 'published' | 'draft'
       }
 
@@ -305,8 +318,11 @@ export default function AdminPage() {
       setBlogTitle("")
       setBlogSlug("")
       setBlogKeywords("")
+      setBlogExcerpt("")
+      setBlogImage("")
       setBlogContent("")
       setBlogCategory("")
+      setBlogAuthorId("")
       setBlogStatus("draft")
       clearDraft()
       fetchData() // Refresh list
@@ -319,9 +335,12 @@ export default function AdminPage() {
   const handleEditBlog = (blog: Blog) => {
     setBlogTitle(blog.title)
     setBlogSlug(blog.slug)
-    setBlogKeywords(blog.keywords)
+    setBlogKeywords(blog.keywords || "")
+    setBlogExcerpt(blog.excerpt || "")
+    setBlogImage(blog.image || "")
     setBlogContent(blog.content)
     setBlogCategory(blog.categoryId)
+    setBlogAuthorId(blog.authorId || "")
     setBlogStatus(blog.status)
     setEditingBlogId(blog.id)
     // Switch to form tab with transition
@@ -407,7 +426,7 @@ export default function AdminPage() {
     <div className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 md:px-8 md:py-12 space-y-8">
 
       {/* Header */}
-      <div className="flex flex-col gap-2">
+      <div className="mt-20 flex flex-col gap-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 w-fit border border-orange-500/20 text-xs font-semibold tracking-widest uppercase">
           <Settings2 className="w-3.5 h-3.5" />
           Administration
@@ -487,6 +506,7 @@ export default function AdminPage() {
                     <thead>
                       <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
                         <th className="px-6 md:px-8 py-4 font-semibold text-sm">Title & Category</th>
+                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Author</th>
                         <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Status</th>
                         <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Date</th>
                         <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
@@ -504,14 +524,23 @@ export default function AdminPage() {
                                 </span>
                                 <span className="hidden sm:inline text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
                               </div>
-                              <div className="md:hidden mt-2">
-                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${blog.status === 'published'
+                              <div className="md:hidden mt-2 flex flex-col gap-1.5">
+                                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                                  <Users className="w-3 h-3" /> {blog.authorName || "Unknown Author"}
+                                </span>
+                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit ${blog.status === 'published'
                                   ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                                   : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
                                   }`}>
                                   {blog.status}
                                 </div>
                               </div>
+                            </div>
+                          </td>
+                          <td className="hidden md:table-cell px-8 py-5">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
+                              <Users className="w-4 h-4 text-orange-500/60" />
+                              {blog.authorName || "Unknown"}
                             </div>
                           </td>
                           <td className="hidden md:table-cell px-8 py-5">
@@ -688,6 +717,18 @@ export default function AdminPage() {
                           />
                         </div>
                         <div className="space-y-3 group">
+                          <Label htmlFor="image" className="text-base font-semibold text-foreground/90">
+                            Featured Image URL
+                          </Label>
+                          <Input
+                            id="image"
+                            placeholder="https://images.unsplash.com/..."
+                            value={blogImage}
+                            onChange={(e) => setBlogImage(e.target.value)}
+                            className="h-12 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl px-4"
+                          />
+                        </div>
+                        <div className="space-y-3 group">
                           <Label htmlFor="keywords" className="text-base font-semibold text-foreground/90">
                             Keywords (SEO)
                           </Label>
@@ -702,16 +743,27 @@ export default function AdminPage() {
                       </div>
 
                       <div className="space-y-3 group">
+                        <Label htmlFor="excerpt" className="text-base font-semibold text-foreground/90">
+                          Excerpt / Summary
+                        </Label>
+                        <Textarea
+                          id="excerpt"
+                          placeholder="A short summary for the blog list page..."
+                          className="min-h-[100px] resize-y bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-2xl shadow-sm transition-all group-hover:bg-white/60 dark:group-hover:bg-black/60 p-4"
+                          value={blogExcerpt}
+                          onChange={(e) => setBlogExcerpt(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-4 group">
                         <Label htmlFor="content" className="text-base font-semibold text-foreground/90 flex items-center justify-between">
                           Content Body
                           <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Required</span>
                         </Label>
-                        <Textarea
-                          id="content"
-                          placeholder="Write your amazing blog post here..."
-                          className="min-h-[380px] resize-y text-base bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 leading-relaxed rounded-2xl shadow-sm transition-all group-hover:bg-white/60 dark:group-hover:bg-black/60 p-4"
+                        <Editor
                           value={blogContent}
-                          onChange={(e) => setBlogContent(e.target.value)}
+                          onChange={setBlogContent}
+                          placeholder="Write your amazing blog post here..."
                         />
                       </div>
                     </div>
@@ -736,6 +788,25 @@ export default function AdminPage() {
                               {categories.map((cat) => (
                                 <SelectItem key={cat.id} value={cat.id} className="rounded-lg my-1 cursor-pointer">
                                   {cat.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-4 pt-6 mt-6 border-t border-border/40">
+                          <Label htmlFor="author" className="text-sm font-semibold text-foreground/80 flex items-center justify-between">
+                            Author
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Req</span>
+                          </Label>
+                          <Select value={blogAuthorId} onValueChange={setBlogAuthorId}>
+                            <SelectTrigger id="author" className="h-12 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-xl focus:ring-orange-500/30">
+                              <SelectValue placeholder="Select an author" />
+                            </SelectTrigger>
+                            <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
+                              {authors.map((admin) => (
+                                <SelectItem key={admin.id} value={admin.id} className="rounded-lg my-1 cursor-pointer">
+                                  {admin.displayName || admin.email}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -790,8 +861,11 @@ export default function AdminPage() {
                   <Button type="button" variant="outline" className="h-12 px-8 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 backdrop-blur-sm hover:bg-white/80 dark:hover:bg-white/10 font-semibold shadow-sm text-foreground" onClick={() => {
                     setEditingBlogId(null);
                     setBlogTitle("");
+                    setBlogExcerpt("");
+                    setBlogImage("");
                     setBlogContent("");
                     setBlogCategory("");
+                    setBlogAuthorId("");
                     setBlogStatus("draft");
                     startTransition(() => {
                       setActiveTab("blog-list")
