@@ -17,9 +17,39 @@ import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
 import { LogOut, LayoutDashboard, User, Loader2 } from "lucide-react";
 
+import { useEffect, useState, useRef } from "react";
+
 export function Header() {
   const pathname = usePathname();
   const { user, isAdmin, loading } = useAuth();
+  const [isVisible, setIsVisible] = useState(true);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Always show at the top
+      if (window.scrollY < 20) {
+        setIsVisible(true);
+        if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+        return;
+      }
+
+      // Hide while scrolling
+      setIsVisible(false);
+
+      // Show when scroll stops (after 300ms of inactivity)
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+      scrollTimeout.current = setTimeout(() => {
+        setIsVisible(true);
+      }, 300);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    };
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -30,9 +60,12 @@ export function Header() {
   };
 
   return (
-    <div className="absolute top-0 z-50 w-full pt-4 px-4 pb-2 bg-gradient-to-b from-background/40 to-transparent pointer-events-none">
-      <header className="pointer-events-auto mx-auto w-full max-w-6xl rounded-2xl border border-white/20 dark:border-white/10 bg-white/20 dark:bg-black/20 backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.08)] transition-all duration-300 ease-in-out">
-        <div className="flex h-16 items-center px-4 md:px-6">
+    <div
+      className={`mb-5 fixed top-0 left-0 right-0 z-50 px-4 pt-4 transition-all duration-500 ease-in-out ${isVisible ? "translate-y-0 opacity-100" : "-translate-y-32 opacity-0"
+        }`}
+    >
+      <header className="mb-5 pointer-events-auto mx-auto w-full max-w-6xl rounded-full border border-white/10 bg-black/25 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
+        <div className="flex h-16 items-center px-6 md:px-10">
           <Link href="/" className="flex items-center gap-2 group transition-transform hover:scale-105 duration-300">
             {/* Logo Bubble */}
             <Image src={Paw} alt="Logo" width={48} height={48} className="object-contain" />
@@ -92,26 +125,26 @@ export function Header() {
               </div>
             ) : user ? (
               <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-3 pr-1 py-1 rounded-full border border-white/10">
-                 <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
-                       {user.photoURL ? (
-                         <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
-                       ) : (
-                         <User className="w-3.5 h-3.5" />
-                       )}
-                    </div>
-                    <span className="text-xs font-semibold text-foreground truncate max-w-[80px] hidden lg:block">
-                      {user.displayName || user.email?.split('@')[0]}
-                    </span>
-                 </div>
-                 <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSignOut}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
+                    {user.photoURL ? (
+                      <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
+                    ) : (
+                      <User className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold text-foreground truncate max-w-[80px] hidden lg:block">
+                    {user.displayName || user.email?.split('@')[0]}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
               </div>
             ) : (
               <Link href="/login">

@@ -404,7 +404,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="mt-20 flex-1 w-full max-w-6xl mx-auto px-4 py-8 md:px-8 md:py-12 space-y-8">
+    <div className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 md:px-8 md:py-12 space-y-8">
 
       {/* Header */}
       <div className="flex flex-col gap-2">

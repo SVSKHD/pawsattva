@@ -6,9 +6,11 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <main className="relative min-h-screen">
       <Header />
-      <main className="flex-1 flex flex-col">{children}</main>
-    </>
+      <div>
+        {children}
+      </div>
+    </main>
   );
 }

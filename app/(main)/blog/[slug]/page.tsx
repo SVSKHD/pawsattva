@@ -64,6 +64,7 @@ export default async function BlogPostPage({
   };
 
   return (
+
     <div className="bg-background min-h-screen">
       {/* Hero Header Section */}
       <div className="relative w-full h-[50vh] min-h-[400px]">
@@ -77,8 +78,8 @@ export default async function BlogPostPage({
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
         <div className="absolute inset-0 flex items-end">
           <div className="container mx-auto px-4 pb-12">
-            <Link 
-              href="/blog" 
+            <Link
+              href="/blog"
               className="inline-flex items-center text-white/80 hover:text-white mb-6 transition-colors"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
@@ -117,8 +118,8 @@ export default async function BlogPostPage({
             <p className="text-xl font-medium text-muted-foreground mb-10 italic border-l-4 border-orange-200 pl-6 leading-relaxed">
               {blog.subtitle}
             </p>
-            
-            <div 
+
+            <div
               className="prose prose-lg dark:prose-invert max-w-none text-foreground/80"
               dangerouslySetInnerHTML={{ __html: blog.content }}
             />
@@ -146,14 +147,14 @@ export default async function BlogPostPage({
 
             {/* Navigation Buttons */}
             <div className="flex border-t border-b border-muted py-8 mt-12 mb-16">
-               <div className="w-1/2 pr-4 border-r border-muted group cursor-pointer">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold group-hover:text-orange-500 transition-colors">Previous Post</span>
-                  <h4 className="font-bold mt-2 group-hover:underline line-clamp-1 italic">Why Mental Stimulation is Key for Indoor Cats</h4>
-               </div>
-               <div className="w-1/2 pl-4 text-right group cursor-pointer">
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold group-hover:text-orange-500 transition-colors">Next Post</span>
-                  <h4 className="font-bold mt-2 group-hover:underline line-clamp-1 italic">Essential Vaccinations for Your New Puppy</h4>
-               </div>
+              <div className="w-1/2 pr-4 border-r border-muted group cursor-pointer">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold group-hover:text-orange-500 transition-colors">Previous Post</span>
+                <h4 className="font-bold mt-2 group-hover:underline line-clamp-1 italic">Why Mental Stimulation is Key for Indoor Cats</h4>
+              </div>
+              <div className="w-1/2 pl-4 text-right group cursor-pointer">
+                <span className="text-xs uppercase tracking-widest text-muted-foreground font-bold group-hover:text-orange-500 transition-colors">Next Post</span>
+                <h4 className="font-bold mt-2 group-hover:underline line-clamp-1 italic">Essential Vaccinations for Your New Puppy</h4>
+              </div>
             </div>
           </main>
 
@@ -216,15 +217,15 @@ export default async function BlogPostPage({
 
             {/* Newsletter Card */}
             <Card className="border-2 border-orange-100 rounded-3xl shadow-xl shadow-black/5 overflow-hidden">
-                <div className="h-2 bg-orange-500" />
-                <CardContent className="p-8">
-                    <h3 className="text-xl font-bold mb-2">Join our Newsletter</h3>
-                    <p className="text-sm text-muted-foreground mb-6">Get the latest pet care tips and guides delivered to your inbox.</p>
-                    <div className="space-y-3">
-                        <input className="w-full px-4 py-3 rounded-xl border border-muted bg-muted/50 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Email address" />
-                        <Button className="w-full rounded-xl bg-orange-500 hover:bg-orange-600">Subscribe</Button>
-                    </div>
-                </CardContent>
+              <div className="h-2 bg-orange-500" />
+              <CardContent className="p-8">
+                <h3 className="text-xl font-bold mb-2">Join our Newsletter</h3>
+                <p className="text-sm text-muted-foreground mb-6">Get the latest pet care tips and guides delivered to your inbox.</p>
+                <div className="space-y-3">
+                  <input className="w-full px-4 py-3 rounded-xl border border-muted bg-muted/50 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Email address" />
+                  <Button className="w-full rounded-xl bg-orange-500 hover:bg-orange-600">Subscribe</Button>
+                </div>
+              </CardContent>
             </Card>
           </aside>
         </div>
