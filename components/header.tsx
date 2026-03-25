@@ -64,7 +64,7 @@ export function Header() {
       className={`mb-5 fixed top-0 left-0 right-0 z-50 px-4 pt-4 transition-all duration-500 ease-in-out ${isVisible ? "translate-y-0 opacity-100" : "-translate-y-32 opacity-0"
         }`}
     >
-      <header className="mb-5 pointer-events-auto mx-auto w-full max-w-6xl rounded-full border border-white/10 bg-black/25 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.28)]">
+      <header className="pointer-events-auto mx-auto w-full max-w-6xl rounded-4xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition-all duration-300 ease-in-out">
         <div className="flex h-16 items-center px-6 md:px-10">
           <Link href="/" className="flex items-center gap-2 group transition-transform hover:scale-105 duration-300">
             {/* Logo Bubble */}
