@@ -15,11 +15,11 @@ const navLinks = [
 import { useAuth } from "@/components/auth-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, LayoutDashboard, User } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Loader2 } from "lucide-react";
 
 export function Header() {
   const pathname = usePathname();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
 
   const handleSignOut = async () => {
     try {
@@ -85,7 +85,12 @@ export function Header() {
               </Link>
             )}
 
-            {user ? (
+            {loading ? (
+              <div className="flex items-center gap-2 bg-white/5 dark:bg-white/5 pl-3 pr-4 py-1.5 rounded-full border border-white/10 animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Syncing</span>
+              </div>
+            ) : user ? (
               <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-3 pr-1 py-1 rounded-full border border-white/10">
                  <div className="flex items-center gap-2 overflow-hidden">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">

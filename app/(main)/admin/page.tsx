@@ -57,34 +57,18 @@ import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 import { db } from "@/firebase/firebase"
 import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
-  orderBy,
-  serverTimestamp 
-} from "firebase/firestore"
-
-interface Blog {
-  id: string;
-  title: string;
-  slug: string;
-  keywords: string;
-  content: string;
-  categoryId: string;
-  status: 'published' | 'draft';
-  date: any;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  status?: string;
-}
+  getBlogs,
+  addBlog,
+  updateBlog,
+  deleteBlog,
+  getCategories,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  Blog,
+  Category
+} from "@/firebase/firestore"
+import { serverTimestamp } from "firebase/firestore"
 
 const analyticsStats = [
   { label: "Total Users", value: "12,480", change: "+8.2%", up: true, icon: Users, color: "blue" },
@@ -137,20 +121,10 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoadingData(true)
     try {
-      // Fetch categories
-      const categoriesSnap = await getDocs(collection(db, "categories"))
-      const cats = categoriesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category))
+      const cats = await getCategories()
       setCategories(cats)
-
-      // Fetch blogs
-      const blogsQuery = query(collection(db, "blogs"), orderBy("date", "desc"))
-      const blogsSnap = await getDocs(blogsQuery)
-      const blgs = blogsSnap.docs.map(doc => ({ 
-        id: doc.id, 
-        ...doc.data(),
-        date: doc.data().date?.toDate ? doc.data().date.toDate().toISOString().split('T')[0] : doc.data().date 
-      } as Blog))
-      setBlogs(blgs)
+      const blgs = await getBlogs()
+      setBlogs(blgs as Blog[])
     } catch (error) {
       console.error("Error fetching data:", error)
       toast.error("Failed to load data from database.")
@@ -174,14 +148,14 @@ export default function AdminPage() {
   const [blogStatus, setBlogStatus] = useState<"published" | "draft">("draft")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
 
-  if (authLoading || (!isAdmin && !authLoading)) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-vh-[400px]">
-        <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-      </div>
-    )
-  }
+  // Category states
+  const [categoryName, setCategoryName] = useState("")
+  const [categoryDesc, setCategoryDesc] = useState("")
+  const [categoryStatus, setCategoryStatus] = useState<"published" | "draft">("published")
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
 
+  // List filter states
+  const [searchQuery, setSearchQuery] = useState("")
   // ── Auto-Draft helpers ──────────────────────────────────────────────────────
   const hasDraftContent = useCallback(
     () => !!(blogTitle || blogContent || blogKeywords || blogCategory),
@@ -282,6 +256,15 @@ export default function AdminPage() {
       .replace(/^-+|-+$/g, '');
   }
 
+  // ── Protection Check ──────────────────────────────────────────────────────
+  if (authLoading || (!isAdmin && !authLoading)) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-vh-[400px]">
+        <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
+      </div>
+    )
+  }
+
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const title = e.target.value
     setBlogTitle(title)
@@ -290,14 +273,7 @@ export default function AdminPage() {
     }
   }
 
-  // Category states
-  const [categoryName, setCategoryName] = useState("")
-  const [categoryDesc, setCategoryDesc] = useState("")
-  const [categoryStatus, setCategoryStatus] = useState<"published" | "draft">("published")
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
 
-  // List filter states
-  const [searchQuery, setSearchQuery] = useState("")
 
   const handleBlogSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -313,19 +289,15 @@ export default function AdminPage() {
         keywords: blogKeywords,
         content: blogContent,
         categoryId: blogCategory,
-        status: blogStatus,
-        date: editingBlogId ? blogs.find(b => b.id === editingBlogId)?.date : serverTimestamp()
+        status: blogStatus as 'published' | 'draft'
       }
 
       if (editingBlogId) {
-        await updateDoc(doc(db, "blogs", editingBlogId), blogData)
+        await updateBlog(editingBlogId, blogData)
         toast.success(`Blog post "${blogTitle}" has been updated.`)
         setEditingBlogId(null)
       } else {
-        await addDoc(collection(db, "blogs"), {
-          ...blogData,
-          date: serverTimestamp()
-        })
+        await addBlog(blogData)
         toast.success(`Blog post "${blogTitle}" has been saved as ${blogStatus}.`)
       }
 
@@ -360,7 +332,7 @@ export default function AdminPage() {
 
   const handleDeleteBlog = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "blogs", id))
+      await deleteBlog(id)
       toast.success("Blog post has been deleted.")
       fetchData()
     } catch (error) {
@@ -380,15 +352,15 @@ export default function AdminPage() {
       const catData = {
         name: categoryName,
         description: categoryDesc,
-        status: categoryStatus
+        status: categoryStatus as 'published' | 'draft'
       }
 
       if (editingCategoryId) {
-        await updateDoc(doc(db, "categories", editingCategoryId), catData)
+        await updateCategory(editingCategoryId, catData)
         toast.success(`Category "${categoryName}" has been updated.`)
         setEditingCategoryId(null)
       } else {
-        await addDoc(collection(db, "categories"), catData)
+        await addCategory(catData)
         toast.success(`Category "${categoryName}" has been created as ${categoryStatus}.`)
       }
 
@@ -414,7 +386,7 @@ export default function AdminPage() {
 
   const handleDeleteCategory = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "categories", id))
+      await deleteCategory(id)
       toast.success("Category has been deleted.")
       fetchData()
     } catch (error) {
@@ -458,24 +430,24 @@ export default function AdminPage() {
         }}
         className="w-full space-y-6"
       >
-        <TabsList className="inline-flex flex-wrap items-center h-auto bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/8 dark:border-white/10 p-1.5 gap-1 rounded-2xl">
-          <TabsTrigger value="blog-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5">
+        <TabsList className="flex flex-nowrap items-center h-auto bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/8 dark:border-white/10 p-1.5 gap-1 rounded-2xl overflow-x-auto scrollbar-hide w-full max-w-full justify-start md:justify-center md:inline-flex">
+          <TabsTrigger value="blog-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <FileText className="w-4 h-4 mr-1.5" />
             Blogs
           </TabsTrigger>
-          <TabsTrigger value="blog" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5">
+          <TabsTrigger value="blog" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <PlusCircle className="w-4 h-4 mr-1.5" />
             {editingBlogId ? "Edit Blog" : "New Blog"}
           </TabsTrigger>
-          <TabsTrigger value="category-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5">
+          <TabsTrigger value="category-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <FolderPlus className="w-4 h-4 mr-1.5" />
             Categories
           </TabsTrigger>
-          <TabsTrigger value="category" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5">
+          <TabsTrigger value="category" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <PlusCircle className="w-4 h-4 mr-1.5" />
             {editingCategoryId ? "Edit Category" : "New Category"}
           </TabsTrigger>
-          <TabsTrigger value="analytics" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5">
+          <TabsTrigger value="analytics" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <BarChart3 className="w-4 h-4 mr-1.5" />
             Analytics
           </TabsTrigger>
@@ -514,27 +486,35 @@ export default function AdminPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                          <th className="px-8 py-4 font-semibold text-sm">Title & Category</th>
-                          <th className="px-8 py-4 font-semibold text-sm">Status</th>
-                          <th className="px-8 py-4 font-semibold text-sm">Date</th>
-                          <th className="px-8 py-4 font-semibold text-sm text-right">Actions</th>
+                          <th className="px-6 md:px-8 py-4 font-semibold text-sm">Title & Category</th>
+                          <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Status</th>
+                          <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Date</th>
+                          <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/40">
                         {filteredBlogs.length > 0 ? filteredBlogs.map((blog) => (
                           <tr key={blog.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                            <td className="px-8 py-5">
+                            <td className="px-6 md:px-8 py-5">
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-bold text-foreground group-hover:text-orange-600 transition-colors uppercase tracking-tight">{blog.title}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     {getCategoryName(blog.categoryId)} <ChevronRight className="w-3 h-3" />
                                   </span>
-                                  <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
+                                  <span className="hidden sm:inline text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
+                                </div>
+                                <div className="md:hidden mt-2">
+                                  <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${blog.status === 'published'
+                                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                                    : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
+                                    }`}>
+                                    {blog.status}
+                                  </div>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-8 py-5">
+                            <td className="hidden md:table-cell px-8 py-5">
                               <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${blog.status === 'published'
                                 ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
                                 : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
@@ -543,29 +523,29 @@ export default function AdminPage() {
                                 {blog.status}
                               </div>
                             </td>
-                            <td className="px-8 py-5 text-sm text-muted-foreground font-medium">
+                            <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium">
                               {blog.date}
                             </td>
-                            <td className="px-8 py-5 text-right">
+                            <td className="px-6 md:px-8 py-5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-9 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all"
+                                  className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all"
                                   onClick={() => handleEditBlog(blog)}
                                 >
-                                  <Edit className="w-4 h-4 mr-1.5" />
-                                  Edit
+                                  <Edit className="w-4 h-4 md:mr-1.5" />
+                                  <span className="hidden md:inline">Edit</span>
                                 </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-9 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
+                                      className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
                                     >
-                                      <Trash2 className="w-4 h-4 mr-1.5" />
-                                      Delete
+                                      <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                      <span className="hidden md:inline">Delete</span>
                                     </Button>
                                   </AlertDialogTrigger>
 
@@ -840,40 +820,43 @@ export default function AdminPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                          <th className="px-8 py-4 font-semibold text-sm">Category Name</th>
-                          <th className="px-8 py-4 font-semibold text-sm">Description</th>
-                          <th className="px-8 py-4 font-semibold text-sm text-right">Actions</th>
+                          <th className="px-6 md:px-8 py-4 font-semibold text-sm">Category Name</th>
+                          <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Description</th>
+                          <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/40">
                         {categories.map((cat: any) => (
                           <tr key={cat.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                            <td className="px-8 py-5">
+                            <td className="px-6 md:px-8 py-5">
                               <span className="font-bold text-foreground group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cat.name}</span>
+                              <div className="md:hidden mt-1 text-xs text-muted-foreground truncate max-w-[150px]">
+                                {cat.description || "No description"}
+                              </div>
                             </td>
-                            <td className="px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
+                            <td className="hidden md:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
                               {cat.description || "No description provided."}
                             </td>
-                            <td className="px-8 py-5 text-right">
+                            <td className="px-6 md:px-8 py-5 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  className="h-9 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all"
+                                  className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all"
                                   onClick={() => handleEditCategory(cat)}
                                 >
-                                  <Edit className="w-4 h-4 mr-1.5" />
-                                  Edit
+                                  <Edit className="w-4 h-4 md:mr-1.5" />
+                                  <span className="hidden md:inline">Edit</span>
                                 </Button>
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-9 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
+                                      className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
                                     >
-                                      <Trash2 className="w-4 h-4 mr-1.5" />
-                                      Delete
+                                      <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                      <span className="hidden md:inline">Delete</span>
                                     </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
@@ -1047,17 +1030,17 @@ export default function AdminPage() {
                     <table className="w-full text-left">
                       <thead>
                         <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                          <th className="px-8 py-4 font-semibold text-sm">Article</th>
-                          <th className="px-6 py-4 font-semibold text-sm text-center">
-                            <span className="flex items-center justify-center gap-1.5"><Eye className="w-3.5 h-3.5" /> Views</span>
+                          <th className="px-6 md:px-8 py-4 font-semibold text-sm">Article</th>
+                          <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
+                            <span className="flex items-center justify-center gap-1.5"><Eye className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Views</span></span>
                           </th>
-                          <th className="px-6 py-4 font-semibold text-sm text-center">
-                            <span className="flex items-center justify-center gap-1.5"><Heart className="w-3.5 h-3.5 text-rose-500" /> Likes</span>
+                          <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">
+                            <span className="flex items-center justify-center gap-1.5"><Heart className="w-3.5 h-3.5 text-rose-500" /> <span className="hidden md:inline">Likes</span></span>
                           </th>
-                          <th className="px-6 py-4 font-semibold text-sm text-center">
-                            <span className="flex items-center justify-center gap-1.5"><Share2 className="w-3.5 h-3.5 text-blue-500" /> Shares</span>
+                          <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm text-center">
+                            <span className="flex items-center justify-center gap-1.5"><Share2 className="w-3.5 h-3.5 text-blue-500" /> <span className="hidden lg:inline">Shares</span></span>
                           </th>
-                          <th className="px-6 py-4 font-semibold text-sm text-center">Engagement</th>
+                          <th className="px-6 py-4 font-semibold text-sm text-center">Eng.</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/40">
@@ -1066,26 +1049,26 @@ export default function AdminPage() {
                           const engagePct = Math.round(((row.likes + row.shares + row.comments) / total) * 100)
                           return (
                             <tr key={i} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                              <td className="px-8 py-4">
-                                <span className="font-semibold text-foreground group-hover:text-violet-600 transition-colors text-sm">{row.title}</span>
+                              <td className="px-6 md:px-8 py-4">
+                                <span className="font-semibold text-foreground group-hover:text-violet-600 transition-colors text-xs md:text-sm line-clamp-1">{row.title}</span>
                               </td>
-                              <td className="px-6 py-4 text-center text-sm font-medium text-muted-foreground">{row.views.toLocaleString()}</td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="inline-flex items-center gap-1 text-sm font-bold text-rose-600 bg-rose-500/10 px-2.5 py-0.5 rounded-full">
+                              <td className="px-4 md:px-6 py-4 text-center text-xs md:text-sm font-medium text-muted-foreground">{row.views.toLocaleString()}</td>
+                              <td className="hidden sm:table-cell px-6 py-4 text-center">
+                                <span className="inline-flex items-center gap-1 text-xs md:text-sm font-bold text-rose-600 bg-rose-500/10 px-2.5 py-0.5 rounded-full">
                                   <Heart className="w-3 h-3" />{row.likes.toLocaleString()}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="inline-flex items-center gap-1 text-sm font-bold text-blue-600 bg-blue-500/10 px-2.5 py-0.5 rounded-full">
+                              <td className="hidden md:table-cell px-6 py-4 text-center">
+                                <span className="inline-flex items-center gap-1 text-xs md:text-sm font-bold text-blue-600 bg-blue-500/10 px-2.5 py-0.5 rounded-full">
                                   <Share2 className="w-3 h-3" />{row.shares.toLocaleString()}
                                 </span>
                               </td>
-                              <td className="px-6 py-4 text-center">
+                              <td className="px-4 md:px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
-                                  <div className="w-20 h-2 rounded-full bg-muted overflow-hidden">
+                                  <div className="hidden xs:block w-12 md:w-20 h-2 rounded-full bg-muted overflow-hidden">
                                     <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500" style={{ width: `${Math.min(engagePct * 5, 100)}%` }} />
                                   </div>
-                                  <span className="text-xs font-bold text-violet-600">{engagePct}%</span>
+                                  <span className="text-[10px] md:text-xs font-bold text-violet-600">{engagePct}%</span>
                                 </div>
                               </td>
                             </tr>
