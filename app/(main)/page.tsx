@@ -1,6 +1,6 @@
-"use client";
-
 import React from 'react';
+import { Metadata } from 'next';
+import { constructMetadata } from '@/lib/metadata';
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -47,6 +47,11 @@ const latestBlogsSnapshot = [
     slug: "cat-hazards",
   }
 ];
+
+export const metadata: Metadata = constructMetadata({
+  title: "Premium Pet Care & Nutrition",
+  description: "Welcome to Paw Sattva - The ultimate haven for pet wellness, nutrition, and harmony.",
+});
 
 export default function Home() {
   return (

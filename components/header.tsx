@@ -180,8 +180,9 @@ export function Header() {
     </div>
 
     {/* Mobile Bottom Navigation */}
-    <nav className="md:hidden fixed bottom-6 left-4 right-4 z-[60]">
-      <div className="flex items-center justify-around h-16 bg-white/80 backdrop-blur-xl border border-white/20 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] px-4">
+    <nav className={`md:hidden fixed bottom-6 left-4 right-4 z-[60] transition-all duration-500 ease-in-out ${isVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
+      }`}>
+      <div className="flex items-center justify-around h-16 bg-white/40 dark:bg-black/40 backdrop-blur-2xl border border-white/30 dark:border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.15)] px-4">
         <Link
           href="/"
           className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all ${pathname === "/" ? "text-primary" : "text-muted-foreground"

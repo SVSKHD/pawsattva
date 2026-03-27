@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { constructMetadata } from "@/lib/metadata";
 import { Geist_Mono, Pacifico, Montserrat } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,17 +23,13 @@ const pacifico = Pacifico({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Paw Sattva",
-  description: "Paw Sattva",
-};
-
-import { Viewport } from "next";
+export const metadata: Metadata = constructMetadata();
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  themeColor: "#ea580c", // matches primary orange
 };
 
 import { AuthProvider } from "@/components/auth-provider";
