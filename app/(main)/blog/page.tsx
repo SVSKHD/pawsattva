@@ -7,15 +7,9 @@ import { Search, Calendar, User, Clock, ChevronRight, ArrowUpRight } from 'lucid
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SubscriptionForm } from '@/components/subscription-form';
 
-// Dummy Categories
-const categories = [
-  { id: 'all', name: 'All Topics' },
-  { id: 'nutrition', name: 'Nutrition' },
-  { id: 'health', name: 'Health' },
-  { id: 'training', name: 'Training' },
-  { id: 'lifestyle', name: 'Lifestyle' },
-];
+// Static fallback removed, using state instead
 
 // Dummy Blogs
 const dummyBlogs = [
@@ -88,32 +82,37 @@ const dummyBlogs = [
   }
 ];
 
-import { getBlogs, Blog } from '@/firebase/firestore';
+import { getBlogs, Blog, getCategories, Category } from '@/firebase/firestore';
 
 export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [blogs, setBlogs] = useState<Blog[]>([]);
+  const [categories, setCategories] = useState<Category[]>([{ id: 'all', name: 'All Topics' }]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    const fetchBlogs = async () => {
+    const fetchData = async () => {
       try {
-        const data = await getBlogs();
-        setBlogs(data);
+        const [blogsData, categoriesData] = await Promise.all([
+          getBlogs(),
+          getCategories()
+        ]);
+        setBlogs(blogsData);
+        setCategories([{ id: 'all', name: 'All Topics' }, ...categoriesData]);
       } catch (error) {
-        console.error("Error fetching blogs:", error);
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
-    fetchBlogs();
+    fetchData();
   }, []);
 
   const filteredBlogs = blogs.filter(blog => {
     const matchesCategory = activeCategory === 'all' || blog.categoryId === activeCategory;
-    const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         blog.content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      blog.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
@@ -131,7 +130,12 @@ export default function BlogPage() {
     return plainText.substring(0, length).trim() + "...";
   };
 
-  const defaultImage = "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop";
+  const getCategoryName = (categoryId: string) => {
+    const category = categories.find(c => c.id === categoryId);
+    return category ? category.name : "General";
+  };
+
+  const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
   if (loading) {
     return (
@@ -145,10 +149,10 @@ export default function BlogPage() {
     <div className="bg-background min-h-screen pb-20">
       {/* Search Header */}
       <section className="relative h-[400px] flex items-center justify-center overflow-hidden">
-         {/* Animated Background Spheres */}
+        {/* Animated Background Spheres */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-        
+
         <div className="container mx-auto px-4 relative z-10 text-center">
           <Badge className="mb-6 bg-orange-100 text-orange-600 hover:bg-orange-100 border-none px-4 py-1.5 rounded-full text-sm font-bold tracking-wide uppercase">
             Our Blog
@@ -160,9 +164,9 @@ export default function BlogPage() {
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground">
               <Search className="w-5 h-5" />
             </div>
-            <Input 
-              type="text" 
-              placeholder="Search articles, guides, tips..." 
+            <Input
+              type="text"
+              placeholder="Search articles, guides, tips..."
               className="w-full pl-12 h-14 rounded-2xl border-none bg-white/50 dark:bg-black/20 backdrop-blur-xl shadow-xl shadow-black/5 text-lg focus-visible:ring-2 focus-visible:ring-primary/20 transition-all font-medium"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -183,39 +187,40 @@ export default function BlogPage() {
                   fill
                   className="object-cover transition-transform duration-1000 group-hover:scale-105"
                   priority
+                  sizes="100vw"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
-                   <div className="max-w-4xl space-y-4">
-                      <Badge className="bg-orange-500 text-white border-none py-1 px-4 text-sm font-bold uppercase tracking-wider">
-                        Featured Post
-                      </Badge>
-                      <h2 className="text-4xl md:text-6xl font-bold text-white leading-tight drop-shadow-lg group-hover:text-white/90 transition-colors">
-                        {featuredPost.title}
-                      </h2>
-                      <p className="text-lg md:text-xl text-white/80 max-w-2xl line-clamp-2 font-medium">
-                        {featuredPost.excerpt || truncateExcerpt(featuredPost.content)}
-                      </p>
-                      <div className="flex flex-wrap items-center text-white/90 gap-6 pt-4">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center border border-white/30 text-white font-bold text-xl">
-                              {(featuredPost.authorName || "P")[0]}
-                            </div>
-                            <span className="font-semibold">{featuredPost.authorName || "Paw Sattva Team"}</span>
-                         </div>
-                         <div className="flex items-center gap-2 text-sm md:text-base">
-                            <Calendar className="w-4 h-4" />
-                            <span>{featuredPost.date}</span>
-                         </div>
-                         <div className="flex items-center gap-2 text-sm md:text-base">
-                            <Clock className="w-4 h-4" />
-                            <span>{calculateReadTime(featuredPost.content)}</span>
-                         </div>
+                  <div className="max-w-4xl space-y-4">
+                    <Badge className="bg-orange-500 text-white border-none py-1 px-4 text-sm font-bold uppercase tracking-wider">
+                      Featured Post
+                    </Badge>
+                    <h2 className="text-4xl md:text-6xl font-bold text-white leading-tight drop-shadow-lg group-hover:text-white/90 transition-colors">
+                      {featuredPost.title}
+                    </h2>
+                    <p className="text-lg md:text-xl text-white/80 max-w-2xl line-clamp-2 font-medium">
+                      {featuredPost.excerpt || truncateExcerpt(featuredPost.content)}
+                    </p>
+                    <div className="flex flex-wrap items-center text-white/90 gap-6 pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-orange-500 flex items-center justify-center border border-white/30 text-white font-bold text-xl">
+                          {(featuredPost.authorName || "P")[0]}
+                        </div>
+                        <span className="font-semibold">{featuredPost.authorName || "Paw Sattva Team"}</span>
                       </div>
-                   </div>
-                   <div className="hidden md:flex absolute bottom-12 right-12 w-16 h-16 rounded-full bg-white flex items-center justify-center text-black transition-transform duration-500 group-hover:rotate-45 group-hover:scale-110">
-                      <ArrowUpRight className="w-8 h-8" />
-                   </div>
+                      <div className="flex items-center gap-2 text-sm md:text-base">
+                        <Calendar className="w-4 h-4" />
+                        <span>{featuredPost.date}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm md:text-base">
+                        <Clock className="w-4 h-4" />
+                        <span>{calculateReadTime(featuredPost.content)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="hidden md:flex absolute bottom-12 right-12 w-16 h-16 rounded-full bg-white flex items-center justify-center text-black transition-transform duration-500 group-hover:rotate-45 group-hover:scale-110">
+                    <ArrowUpRight className="w-8 h-8" />
+                  </div>
                 </div>
               </div>
             </Link>
@@ -224,33 +229,32 @@ export default function BlogPage() {
 
         {/* Categories / Filter Bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12 border-b border-muted pb-8 px-2">
-           <div className="flex flex-wrap items-center gap-3">
-              {categories.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(cat.id)}
-                  className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border-2 ${
-                    activeCategory === cat.id 
-                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/30" 
-                    : "bg-background text-muted-foreground border-transparent hover:border-muted hover:bg-muted/30"
+          <div className="flex flex-wrap items-center gap-3">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setActiveCategory(cat.id)}
+                className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border-2 ${activeCategory === cat.id
+                  ? "bg-primary text-white border-primary shadow-lg shadow-primary/30"
+                  : "bg-background text-muted-foreground border-transparent hover:border-muted hover:bg-muted/30"
                   }`}
-                >
-                  {cat.name}
-                </button>
-              ))}
-           </div>
-           <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2 bg-muted/20 px-4 py-2 rounded-full border border-muted/30">
-              <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-              Showing {filteredBlogs.length} articles
-           </div>
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2 bg-muted/20 px-4 py-2 rounded-full border border-muted/30">
+            <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
+            Showing {filteredBlogs.length} articles
+          </div>
         </div>
 
         {/* Blog Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
           {filteredBlogs.map((blog) => (
-            <Link 
-              key={blog.id} 
-              href={`/blog/${blog.slug}`} 
+            <Link
+              key={blog.id}
+              href={`/blog/${blog.slug}`}
               className="group block"
             >
               <div className="liquid-card h-full flex flex-col overflow-hidden transition-all duration-500 group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] group-hover:-translate-y-2">
@@ -261,38 +265,38 @@ export default function BlogPage() {
                     alt={blog.title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-white/80 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg">
-                      {/* Map categoryId or show Generic */}
-                      {blog.categoryId || "General"}
+                      {getCategoryName(blog.categoryId)}
                     </Badge>
                   </div>
                   {/* Glass Overlay on Hover */}
                   <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
-                      <div className="h-12 w-12 rounded-full bg-white flex items-center justify-center text-primary scale-0 group-hover:scale-100 transition-transform duration-500 delay-100 shadow-xl">
-                          <ChevronRight className="w-6 h-6" />
-                      </div>
+                    <div className="h-12 w-12 rounded-full bg-white flex items-center justify-center text-primary scale-0 group-hover:scale-100 transition-transform duration-500 delay-100 shadow-xl">
+                      <ChevronRight className="w-6 h-6" />
+                    </div>
                   </div>
                 </div>
 
                 <div className="p-8 flex flex-col flex-grow">
                   <div className="flex items-center gap-4 text-xs font-bold text-primary/70 uppercase tracking-widest mb-4">
                     <span className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400">
-                       <Calendar className="w-3.5 h-3.5" />
-                       {blog.date}
+                      <Calendar className="w-3.5 h-3.5" />
+                      {blog.date}
                     </span>
                     <span className="w-1 h-1 rounded-full bg-orange-300" />
                     <span className="flex items-center gap-1.5">
-                       <Clock className="w-3.5 h-3.5" />
-                       {calculateReadTime(blog.content)}
+                      <Clock className="w-3.5 h-3.5" />
+                      {calculateReadTime(blog.content)}
                     </span>
                   </div>
-                  
+
                   <h3 className="text-2xl font-bold mb-4 line-clamp-2 group-hover:text-primary transition-colors leading-tight">
                     {blog.title}
                   </h3>
-                  
+
                   <p className="text-muted-foreground mb-8 line-clamp-3 text-sm leading-relaxed font-medium">
                     {blog.excerpt || truncateExcerpt(blog.content)}
                   </p>
@@ -324,64 +328,58 @@ export default function BlogPage() {
             <p className="text-muted-foreground max-w-sm mx-auto">
               We couldn't find any articles matching your search query. Try different keywords or browse other categories.
             </p>
-            <Button 
-                variant="outline" 
-                className="mt-8 rounded-full px-8"
-                onClick={() => {setSearchQuery(''); setActiveCategory('all');}}
+            <Button
+              variant="outline"
+              className="mt-8 rounded-full px-8"
+              onClick={() => { setSearchQuery(''); setActiveCategory('all'); }}
             >
-                Clear Filters
+              Clear Filters
             </Button>
           </div>
         )}
 
         {/* CTA Section */}
         <section className="mt-32 relative rounded-[3rem] overflow-hidden bg-primary p-12 md:p-20 text-center md:text-left">
-           <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-              <Image 
-                src="https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop"
-                alt="Pet shadow"
-                fill
-                className="object-cover grayscale"
-              />
-           </div>
-           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
-              <div>
-                <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
-                  Join our pet-loving community
-                </h2>
-                <p className="text-white/80 text-lg font-medium mb-10 max-w-md">
-                  Get exclusive pet care guides, product updates, and special offers delivered straight to your inbox.
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4">
-                   <Input 
-                    type="email" 
-                    placeholder="your@email.com" 
-                    className="h-14 rounded-2xl bg-white/20 border-white/20 text-white placeholder:text-white/50 focus-visible:ring-white/30 text-lg px-6"
-                   />
-                   <Button className="h-14 rounded-2xl bg-white text-primary hover:bg-white/90 font-bold px-10 text-lg shadow-xl shadow-black/10 transition-all hover:scale-105 active:scale-95">
-                     Subscribe
-                   </Button>
+          <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
+            <Image
+              src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=2074&auto=format&fit=crop"
+              alt="Pet shadow"
+              fill
+              className="object-cover grayscale"
+              sizes="50vw"
+            />
+          </div>
+          <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-4xl md:text-5xl font-extrabold text-white mb-6 leading-tight">
+                Join our pet-loving community
+              </h2>
+              <p className="text-white/80 text-lg font-medium mb-10 max-w-md">
+                Get exclusive pet care guides, product updates, and special offers delivered straight to your inbox.
+              </p>
+              <div className="bg-white/10 backdrop-blur-md p-6 md:p-8 rounded-[2rem] border border-white/20 shadow-2xl">
+                <SubscriptionForm />
+              </div>
+            </div>
+            <div className="hidden md:flex justify-center">
+              <div className="relative w-80 h-80 rounded-full border-4 border-white/20 p-4">
+                <div className="w-full h-full rounded-full border-4 border-white/40 p-4 animate-[spin_30s_linear_infinite]">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary shadow-lg text-lg">
+                    🐾
+                  </div>
+                </div>
+                <div className="absolute inset-4 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center">
+                  <Image
+                    src="https://images.unsplash.com/photo-1573435567032-ff5982925350?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                    alt="Join us"
+                    width={200}
+                    height={200}
+                    className="rounded-full object-cover border-4 border-white shadow-2xl"
+                  />
                 </div>
               </div>
-              <div className="hidden md:flex justify-center">
-                 <div className="relative w-80 h-80 rounded-full border-4 border-white/20 p-4">
-                    <div className="w-full h-full rounded-full border-4 border-white/40 p-4 animate-[spin_30s_linear_infinite]">
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary shadow-lg text-lg">
-                           🐾
-                        </div>
-                    </div>
-                    <div className="absolute inset-4 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center">
-                       <Image 
-                        src="https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?q=80&w=800&auto=format&fit=crop"
-                        alt="Join us"
-                        width={200}
-                        height={200}
-                        className="rounded-full object-cover border-4 border-white shadow-2xl"
-                       />
-                    </div>
-                 </div>
-              </div>
-           </div>
+            </div>
+          </div>
         </section>
       </div>
     </div>

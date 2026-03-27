@@ -3,7 +3,7 @@
 import React from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { FaInstagram, FaFacebook, FaTwitter, FaYoutube } from "react-icons/fa";
 import Paw from "../app/pawsattva.png";
 
 export function Footer() {
@@ -44,11 +44,26 @@ export function Footer() {
           <h4 className="font-bold text-lg mb-8 tracking-tight">Connect</h4>
           <p className="text-sm font-medium text-muted-foreground mb-6">Stay updated on our journey to 1M happy tails.</p>
           <div className="flex gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:border-primary hover:text-primary transition-all">
-                <Zap className="w-4 h-4" />
-              </div>
-            ))}
+            {[
+              { icon: FaInstagram, href: "https://instagram.com/pawsattva", label: "Instagram" },
+              { icon: FaFacebook, href: "#", label: "Facebook" },
+              { icon: FaTwitter, href: "#", label: "Twitter" },
+              { icon: FaYoutube, href: "#", label: "Youtube" },
+            ].map((social, i) => {
+              const Icon = social.icon;
+              return (
+                <Link
+                  key={i}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:border-primary hover:text-primary transition-all overflow-hidden"
+                  aria-label={social.label}
+                >
+                  <Icon className="w-4 h-4" />
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>

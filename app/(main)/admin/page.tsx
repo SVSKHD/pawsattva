@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useTransition, useEffect, useRef, useCallback } from "react"
+import NextImage from "next/image"
+import Paw from "../../pawsattva.png"
 import {
   PlusCircle,
   FileText,
@@ -28,7 +30,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Zap,
-  History
+  History,
+  Mail,
+  Phone,
+  Dog
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -40,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
+import { Switch } from "@/components/ui/switch"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +57,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import AdminLoader from "@/components/loader"
 
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
@@ -66,9 +73,14 @@ import {
   updateCategory,
   deleteCategory,
   getAdminUsers,
+  getSubscriptions,
+  getAppUsers,
+  updateUserRole,
+  deleteUser,
   Blog,
   Category,
-  UserProfile
+  UserProfile,
+  Subscription
 } from "@/firebase/firestore"
 import { serverTimestamp } from "firebase/firestore"
 
@@ -98,6 +110,9 @@ const recentEvents = [
   { type: "click", user: "Anil T.", target: "Clicked CTA — Adopt Now", time: "2 hrs 30 min ago", icon: MousePointerClick, color: "orange" },
 ]
 
+
+
+
 const DRAFT_KEY = "pawsattva_blog_draft"
 
 export default function AdminPage() {
@@ -111,6 +126,8 @@ export default function AdminPage() {
     }
   }, [authLoading, isAdmin, router])
 
+
+
   const [activeTab, setActiveTab] = useState("blog-list")
   const [isPending, startTransition] = useTransition()
   const [savedDraft, setSavedDraft] = useState<{ savedAt: string } | null>(null)
@@ -119,6 +136,8 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [blogs, setBlogs] = useState<Blog[]>([])
   const [authors, setAuthors] = useState<UserProfile[]>([])
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [subscribers, setSubscribers] = useState<Subscription[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   const fetchData = async () => {
@@ -126,10 +145,14 @@ export default function AdminPage() {
     try {
       const cats = await getCategories()
       setCategories(cats)
-      const blgs = await getBlogs()
-      setBlogs(blgs as Blog[])
+      const snapshot = await getBlogs()
+      setBlogs(snapshot as Blog[])
       const admins = await getAdminUsers()
       setAuthors(admins)
+      const allUsers = await getAppUsers()
+      setUsers(allUsers)
+      const subs = await getSubscriptions()
+      setSubscribers(subs)
     } catch (error) {
       console.error("Error fetching data:", error)
       toast.error("Failed to load data from database.")
@@ -265,12 +288,8 @@ export default function AdminPage() {
   }
 
   // ── Protection Check ──────────────────────────────────────────────────────
-  if (authLoading || (!isAdmin && !authLoading)) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-vh-[400px]">
-        <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
-      </div>
-    )
+  if (authLoading || (!isAdmin && !authLoading) || loadingData) {
+    return <AdminLoader img={Paw} />
   }
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -422,6 +441,28 @@ export default function AdminPage() {
     return categories.find(c => c.id === id)?.name || "Unknown"
   }
 
+  const handleToggleAdmin = async (userId: string, currentAdmin: boolean) => {
+    try {
+      await updateUserRole(userId, !currentAdmin)
+      toast.success(`User role updated successfully.`)
+      fetchData()
+    } catch (error) {
+      console.error("Error updating user role:", error)
+      toast.error("Failed to update user role.")
+    }
+  }
+
+  const handleDeleteUserAccount = async (userId: string) => {
+    try {
+      await deleteUser(userId)
+      toast.success("User account has been deleted.")
+      fetchData()
+    } catch (error) {
+      console.error("Error deleting user:", error)
+      toast.error("Failed to delete user account.")
+    }
+  }
+
   return (
     <div className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 md:px-8 md:py-12 space-y-8">
 
@@ -469,6 +510,14 @@ export default function AdminPage() {
           <TabsTrigger value="analytics" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <BarChart3 className="w-4 h-4 mr-1.5" />
             Analytics
+          </TabsTrigger>
+          <TabsTrigger value="subscribers" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+            <Users className="w-4 h-4 mr-1.5" />
+            Subscribers
+          </TabsTrigger>
+          <TabsTrigger value="users" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+            <Users className="w-4 h-4 mr-1.5" />
+            Users
           </TabsTrigger>
         </TabsList>
 
@@ -1197,6 +1246,180 @@ export default function AdminPage() {
               </CardContent>
             </Card>
 
+          </TabsContent>
+          <TabsContent value="subscribers" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-2xl font-bold">Pack Subscribers</CardTitle>
+                    <CardDescription className="text-base text-muted-foreground mt-1">
+                      Manage all your pet parent community leads and sign-ups.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
+                        <th className="px-8 py-4 font-semibold text-sm">Subscriber</th>
+                        <th className="px-8 py-4 font-semibold text-sm">Contact Details</th>
+                        <th className="px-8 py-4 font-semibold text-sm">Pet Breed</th>
+                        <th className="px-8 py-4 font-semibold text-sm text-right">Join Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {subscribers.map((sub: Subscription) => (
+                        <tr key={sub.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner group-hover:bg-orange-500 group-hover:text-white transition-all">
+                                {sub.name ? sub.name[0].toUpperCase() : sub.email[0].toUpperCase()}
+                              </div>
+                              <span className="font-bold text-foreground">{sub.name || "Anonymous"}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                                {sub.email}
+                              </div>
+                              {sub.phone && (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <Phone className="w-3.5 h-3.5" />
+                                  {sub.phone}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-2 bg-orange-500/5 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-xl border border-orange-500/10 w-fit font-bold text-xs uppercase tracking-tight">
+                              <Dog className="w-3.5 h-3.5" />
+                              {sub.petBreed || "N/A"}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-sm text-muted-foreground font-medium text-right">
+                            {sub.subscribedAt ? new Date(sub.subscribedAt).toLocaleDateString() : "No Date"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {subscribers.length === 0 && (
+                    <div className="p-20 text-center">
+                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                      <p className="text-muted-foreground font-medium">No subscribers yet.</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
+                <span className="text-sm text-muted-foreground font-medium">Total {subscribers.length} pet parents</span>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="users" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-2xl font-bold">User Management</CardTitle>
+                    <CardDescription className="text-base text-muted-foreground mt-1">
+                      Manage registered users and control administrative access.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
+                        <th className="px-8 py-4 font-semibold text-sm">User</th>
+                        <th className="px-8 py-4 font-semibold text-sm">Email</th>
+                        <th className="px-8 py-4 font-semibold text-sm text-center">Admin Access</th>
+                        <th className="px-8 py-4 font-semibold text-sm text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {users.map((u: UserProfile) => (
+                        <tr key={u.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner group-hover:bg-orange-500 group-hover:text-white transition-all overflow-hidden relative">
+                                {u.photoURL ? (
+                                  <NextImage src={u.photoURL} alt={u.displayName || ""} fill className="object-cover" />
+                                ) : (
+                                  <span>{u.displayName ? u.displayName[0].toUpperCase() : u.email[0].toUpperCase()}</span>
+                                )}
+                              </div>
+                              <span className="font-bold text-foreground">{u.displayName || "Anonymous User"}</span>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                              {u.email}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex items-center justify-center">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold uppercase tracking-tight ${u.admin ? 'text-orange-600' : 'text-muted-foreground'}`}>{u.admin ? "Admin" : "User"}</span>
+                                <Switch
+                                  checked={u.admin}
+                                  onCheckedChange={() => handleToggleAdmin(u.id, u.admin)}
+                                  disabled={u.id === user?.uid} // Don't let user demote themselves
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={u.id === user?.uid}
+                                  className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                  <span className="hidden md:inline">Delete</span>
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-2xl font-bold font-roboto text-destructive">Delete User Account?</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-base text-muted-foreground font-roboto">
+                                    Are you sure you want to permanently delete "{u.displayName || u.email}"? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
+                                  <AlertDialogCancel className="h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0 text-white"
+                                    onClick={() => handleDeleteUserAccount(u.id)}
+                                  >
+                                    Delete User
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
+                <span className="text-sm text-muted-foreground font-medium">Total {users.length} registered users</span>
+              </CardFooter>
+            </Card>
           </TabsContent>
         </div>
       </Tabs>

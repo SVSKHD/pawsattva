@@ -28,7 +28,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   const formats = [
     'header',
     'bold', 'italic', 'underline', 'strike', 'blockquote',
-    'list', 'bullet',
+    'list',
     'link', 'image'
   ];
 

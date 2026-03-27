@@ -50,6 +50,27 @@ export interface Category {
   createdAt?: Timestamp;
 }
 
+export interface Subscription {
+  id: string;
+  email: string;
+  name: string;
+  phone: string;
+  petBreed: string;
+  subscribedAt: any;
+}
+
+export interface PetFeed {
+  id?: string;
+  name: string;
+  phone: string;
+  petBreed: string;
+  petName: string;
+  mealDays: number;
+  reminders: boolean;
+  subscribe: boolean;
+  createdAt?: any;
+}
+
 // ── USER OPERATIONS ──────────────────────────────────────────────────────────
 
 export const getAdminUsers = async () => {
@@ -59,6 +80,24 @@ export const getAdminUsers = async () => {
     id: doc.id,
     ...doc.data(),
   } as UserProfile));
+};
+
+export const getAppUsers = async () => {
+  const snapshot = await getDocs(collection(db, "users"));
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  } as UserProfile));
+};
+
+export const updateUserRole = async (userId: string, isAdmin: boolean) => {
+  const docRef = doc(db, "users", userId);
+  return await updateDoc(docRef, { admin: isAdmin });
+};
+
+export const deleteUser = async (userId: string) => {
+  const docRef = doc(db, "users", userId);
+  return await deleteDoc(docRef);
 };
 
 // ── BLOG OPERATIONS ──────────────────────────────────────────────────────────
@@ -78,7 +117,12 @@ export const getBlog = async (id: string) => {
   const docRef = doc(db, "blogs", id);
   const snapshot = await getDoc(docRef);
   if (snapshot.exists()) {
-    return { id: snapshot.id, ...snapshot.data() } as Blog;
+    const data = snapshot.data();
+    return { 
+      id: snapshot.id, 
+      ...data,
+      date: data.date?.toDate ? data.date.toDate().toISOString().split('T')[0] : data.date
+    } as Blog;
   }
   return null;
 };
@@ -109,8 +153,13 @@ export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
   const q = query(collection(db, "blogs"), where("slug", "==", slug), limit(1));
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
-  const doc = snapshot.docs[0];
-  return { id: doc.id, ...doc.data() } as Blog;
+  const docData = snapshot.docs[0];
+  const data = docData.data();
+  return { 
+    id: docData.id, 
+    ...data,
+    date: data.date?.toDate ? data.date.toDate().toISOString().split('T')[0] : data.date
+  } as Blog;
 };
 
 // ── CATEGORY OPERATIONS ──────────────────────────────────────────────────────
@@ -121,6 +170,15 @@ export const getCategories = async () => {
     id: doc.id,
     ...doc.data(),
   } as Category));
+};
+
+export const getCategory = async (id: string) => {
+  const docRef = doc(db, "categories", id);
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() } as Category;
+  }
+  return null;
 };
 
 export const addCategory = async (category: Omit<Category, "id">) => {
@@ -138,4 +196,32 @@ export const updateCategory = async (id: string, category: Partial<Category>) =>
 export const deleteCategory = async (id: string) => {
   const docRef = doc(db, "categories", id);
   return await deleteDoc(docRef);
+};
+
+// ── SUBSCRIPTION OPERATIONS ──────────────────────────────────────────────────
+
+export const getSubscriptions = async () => {
+  const q = query(collection(db, "subscriptions"), orderBy("subscribedAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    subscribedAt: doc.data().subscribedAt?.toDate ? doc.data().subscribedAt.toDate().toISOString() : doc.data().subscribedAt
+  } as Subscription));
+};
+
+export const addSubscription = async (sub: Omit<Subscription, "id" | "subscribedAt">) => {
+  return await addDoc(collection(db, "subscriptions"), {
+    ...sub,
+    subscribedAt: serverTimestamp(),
+  });
+};
+
+// ── PET FEED OPERATIONS ─────────────────────────────────────────────────────
+
+export const savePetFeed = async (data: PetFeed) => {
+  return await addDoc(collection(db, "petFeeds"), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
 };

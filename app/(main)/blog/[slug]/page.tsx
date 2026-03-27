@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { SocialShare } from '@/components/social-share';
-import { getBlogBySlug, getBlogs, Blog } from '@/firebase/firestore';
+import { SubscriptionForm } from '@/components/subscription-form';
+import { getBlogBySlug, getBlogs, getCategory, Blog } from '@/firebase/firestore';
 import { notFound } from 'next/navigation';
 
 export default async function BlogPostPage({
@@ -17,6 +18,7 @@ export default async function BlogPostPage({
 }) {
   const { slug } = await params;
   const blog = await getBlogBySlug(slug);
+  const category = blog ? await getCategory(blog.categoryId) : null;
 
   if (!blog) {
     notFound();
@@ -34,7 +36,7 @@ export default async function BlogPostPage({
     return Math.ceil(words / wordsPerMinute) + " min read";
   };
 
-  const defaultImage = "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop";
+  const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
   return (
 
@@ -47,6 +49,7 @@ export default async function BlogPostPage({
           fill
           className="object-cover"
           priority
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
         <div className="absolute inset-0 flex items-end">
@@ -60,7 +63,7 @@ export default async function BlogPostPage({
             </Link>
             <div className="max-w-4xl">
               <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-4">
-                {blog.categoryId}
+                {category?.name || "Uncategorized"}
               </Badge>
               <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 leading-tight">
                 {blog.title}
@@ -174,6 +177,7 @@ export default async function BlogPostPage({
                             alt={post.title}
                             fill
                             className="object-cover"
+                            sizes="96px"
                           />
                         </div>
                         <div className="space-y-1">
@@ -198,10 +202,7 @@ export default async function BlogPostPage({
               <CardContent className="p-8">
                 <h3 className="text-xl font-bold mb-2">Join our Newsletter</h3>
                 <p className="text-sm text-muted-foreground mb-6">Get the latest pet care tips and guides delivered to your inbox.</p>
-                <div className="space-y-3">
-                  <input className="w-full px-4 py-3 rounded-xl border border-muted bg-muted/50 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Email address" />
-                  <Button className="w-full rounded-xl bg-orange-500 hover:bg-orange-600">Subscribe</Button>
-                </div>
+                <SubscriptionForm />
               </CardContent>
             </Card>
           </aside>
