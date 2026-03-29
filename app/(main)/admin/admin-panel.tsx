@@ -33,7 +33,10 @@ import {
   History,
   Mail,
   Phone,
-  Dog
+  Dog,
+  ShoppingBag,
+  Clock,
+  IndianRupee
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -84,11 +87,110 @@ import {
 } from "@/firebase/firestore"
 import { serverTimestamp } from "firebase/firestore"
 
+// ── Simulated Users ──────────────────────────────────────────────────────────
+interface SimulatedUser {
+  id: string
+  name: string
+  email: string
+  age: number
+  status: "online" | "offline" | "away"
+  lastActive: string
+  purchases: { item: string; amount: number; date: string }[]
+  totalSpent: number
+  avatar?: string
+}
+
+const simulatedUsers: SimulatedUser[] = [
+  {
+    id: "su-1", name: "Priya Sharma", email: "priya.s@gmail.com", age: 28,
+    status: "online", lastActive: "Just now",
+    avatar: "https://i.pravatar.cc/100?img=5",
+    purchases: [
+      { item: "Premium Puppy Kibble (5kg)", amount: 1850, date: "Mar 28, 2026" },
+      { item: "Organic Cat Treats", amount: 420, date: "Mar 22, 2026" },
+    ],
+    totalSpent: 2270,
+  },
+  {
+    id: "su-2", name: "Arjun Menon", email: "arjun.m@outlook.com", age: 34,
+    status: "online", lastActive: "3 min ago",
+    avatar: "https://i.pravatar.cc/100?img=12",
+    purchases: [
+      { item: "Grain-Free Dog Food (10kg)", amount: 3200, date: "Mar 27, 2026" },
+      { item: "Dental Chews Pack", amount: 680, date: "Mar 18, 2026" },
+      { item: "Interactive Puzzle Toy", amount: 950, date: "Mar 10, 2026" },
+    ],
+    totalSpent: 4830,
+  },
+  {
+    id: "su-3", name: "Meera Kulkarni", email: "meera.k@yahoo.com", age: 22,
+    status: "away", lastActive: "28 min ago",
+    avatar: "https://i.pravatar.cc/100?img=26",
+    purchases: [
+      { item: "Kitten Starter Kit", amount: 2100, date: "Mar 29, 2026" },
+    ],
+    totalSpent: 2100,
+  },
+  {
+    id: "su-4", name: "Rohit Patil", email: "rohit.p@gmail.com", age: 41,
+    status: "offline", lastActive: "2 hrs ago",
+    avatar: "https://i.pravatar.cc/100?img=33",
+    purchases: [
+      { item: "Senior Dog Wellness Pack", amount: 4500, date: "Mar 25, 2026" },
+      { item: "Calming Supplements", amount: 1200, date: "Mar 15, 2026" },
+      { item: "Orthopedic Dog Bed", amount: 3800, date: "Mar 5, 2026" },
+      { item: "Joint Health Treats", amount: 750, date: "Feb 28, 2026" },
+    ],
+    totalSpent: 10250,
+  },
+  {
+    id: "su-5", name: "Divya Reddy", email: "divya.r@hotmail.com", age: 31,
+    status: "online", lastActive: "1 min ago",
+    avatar: "https://i.pravatar.cc/100?img=47",
+    purchases: [
+      { item: "Organic Wet Cat Food (12-pack)", amount: 1440, date: "Mar 26, 2026" },
+      { item: "Cat Scratch Tower", amount: 2600, date: "Mar 12, 2026" },
+    ],
+    totalSpent: 4040,
+  },
+  {
+    id: "su-6", name: "Karan Verma", email: "karan.v@gmail.com", age: 26,
+    status: "away", lastActive: "45 min ago",
+    avatar: "https://i.pravatar.cc/100?img=59",
+    purchases: [
+      { item: "Puppy Training Pads (100-pack)", amount: 890, date: "Mar 24, 2026" },
+    ],
+    totalSpent: 890,
+  },
+  {
+    id: "su-7", name: "Sneha Lakshmi", email: "sneha.l@gmail.com", age: 37,
+    status: "offline", lastActive: "5 hrs ago",
+    avatar: "https://i.pravatar.cc/100?img=44",
+    purchases: [
+      { item: "Premium Fish Oil Supplement", amount: 980, date: "Mar 20, 2026" },
+      { item: "Waterproof Raincoat (Dog)", amount: 1350, date: "Mar 8, 2026" },
+    ],
+    totalSpent: 2330,
+  },
+  {
+    id: "su-8", name: "Anil Tiwari", email: "anil.t@outlook.com", age: 45,
+    status: "offline", lastActive: "1 day ago",
+    avatar: "https://i.pravatar.cc/100?img=60",
+    purchases: [],
+    totalSpent: 0,
+  },
+]
+
+const totalSimulatedRevenue = simulatedUsers.reduce((sum, u) => sum + u.totalSpent, 0)
+const activeUsers = simulatedUsers.filter(u => u.status === "online").length
+const avgAge = Math.round(simulatedUsers.reduce((sum, u) => sum + u.age, 0) / simulatedUsers.length)
+const totalPurchases = simulatedUsers.reduce((sum, u) => sum + u.purchases.length, 0)
+
 const analyticsStats = [
-  { label: "Total Users", value: "12,480", change: "+8.2%", up: true, icon: Users, color: "blue" },
-  { label: "Page Views", value: "98,321", change: "+14.5%", up: true, icon: Eye, color: "purple" },
-  { label: "Total Likes", value: "34,210", change: "+22.1%", up: true, icon: Heart, color: "rose" },
-  { label: "Total Shares", value: "8,940", change: "-3.4%", up: false, icon: Share2, color: "orange" },
+  { label: "Total Users", value: simulatedUsers.length.toLocaleString(), change: "+8.2%", up: true, icon: Users, color: "blue" },
+  { label: "Active Now", value: activeUsers.toString(), change: "+33%", up: true, icon: Eye, color: "purple" },
+  { label: "Total Revenue", value: `₹${totalSimulatedRevenue.toLocaleString("en-IN")}`, change: "+22.1%", up: true, icon: IndianRupee, color: "rose" },
+  { label: "Avg. Age", value: `${avgAge} yrs`, change: "+1.4%", up: true, icon: TrendingUp, color: "orange" },
 ]
 
 const postEngagement = [
@@ -100,16 +202,15 @@ const postEngagement = [
 ]
 
 const recentEvents = [
-  { type: "like", user: "Priya S.", target: "How to Train Your Puppy", time: "2 min ago", icon: Heart, color: "rose" },
-  { type: "share", user: "Arjun M.", target: "Best Food for Cats", time: "11 min ago", icon: Share2, color: "blue" },
-  { type: "signup", user: "Meera K.", target: "New account created", time: "28 min ago", icon: Users, color: "green" },
-  { type: "view", user: "Rohit P.", target: "Puppy Health Guide", time: "45 min ago", icon: Eye, color: "purple" },
-  { type: "like", user: "Divya R.", target: "Cat Behavior Explained", time: "1 hr ago", icon: Heart, color: "rose" },
-  { type: "share", user: "Karan V.", target: "Dog Grooming Basics", time: "1 hr 20 min ago", icon: Share2, color: "blue" },
-  { type: "signup", user: "Sneha L.", target: "New account created", time: "2 hrs ago", icon: Users, color: "green" },
-  { type: "click", user: "Anil T.", target: "Clicked CTA — Adopt Now", time: "2 hrs 30 min ago", icon: MousePointerClick, color: "orange" },
+  { type: "purchase", user: "Priya Sharma", target: "Bought Premium Puppy Kibble (5kg) — ₹1,850", time: "2 min ago", icon: ShoppingBag, color: "green" },
+  { type: "like", user: "Arjun Menon", target: "Liked — How to Train Your Puppy", time: "11 min ago", icon: Heart, color: "rose" },
+  { type: "signup", user: "Meera Kulkarni", target: "New account created", time: "28 min ago", icon: Users, color: "green" },
+  { type: "purchase", user: "Rohit Patil", target: "Bought Senior Dog Wellness Pack — ₹4,500", time: "45 min ago", icon: ShoppingBag, color: "green" },
+  { type: "like", user: "Divya Reddy", target: "Liked — Cat Behavior Explained", time: "1 hr ago", icon: Heart, color: "rose" },
+  { type: "share", user: "Karan Verma", target: "Shared — Dog Grooming Basics", time: "1 hr 20 min ago", icon: Share2, color: "blue" },
+  { type: "signup", user: "Sneha Lakshmi", target: "New account created", time: "2 hrs ago", icon: Users, color: "green" },
+  { type: "click", user: "Anil Tiwari", target: "Clicked CTA — Adopt Now", time: "2 hrs 30 min ago", icon: MousePointerClick, color: "orange" },
 ]
-
 
 
 
@@ -1203,6 +1304,56 @@ export default function AdminPanel() {
               </CardContent>
             </Card>
 
+            {/* Top Customers */}
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600">
+                    <ShoppingBag className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold">Top Customers</CardTitle>
+                    <CardDescription>Ranked by total purchase value</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 pt-2">
+                <div className="space-y-3">
+                  {[...simulatedUsers]
+                    .sort((a, b) => b.totalSpent - a.totalSpent)
+                    .filter(u => u.totalSpent > 0)
+                    .map((su, rank) => (
+                      <div key={su.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all group">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-extrabold shrink-0 ${rank === 0
+                          ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg shadow-amber-400/30"
+                          : rank === 1
+                            ? "bg-gradient-to-br from-zinc-300 to-zinc-400 text-white shadow-lg shadow-zinc-300/30"
+                            : rank === 2
+                              ? "bg-gradient-to-br from-orange-400 to-amber-600 text-white shadow-lg shadow-orange-400/30"
+                              : "bg-muted text-muted-foreground"
+                          }`}>
+                          {rank + 1}
+                        </div>
+                        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0">
+                          {su.avatar ? (
+                            <NextImage src={su.avatar} alt={su.name} width={40} height={40} className="rounded-full object-cover" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold">{su.name[0]}</div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{su.name}</p>
+                          <p className="text-xs text-muted-foreground">{su.purchases.length} {su.purchases.length === 1 ? "order" : "orders"} · Age {su.age}</p>
+                        </div>
+                        <span className="text-sm font-extrabold text-emerald-600 shrink-0">
+                          ₹{su.totalSpent.toLocaleString("en-IN")}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Recent Events Feed */}
             <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
               <CardHeader className="p-8 pb-4">
@@ -1322,14 +1473,131 @@ export default function AdminPanel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="users" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
+          <TabsContent value="users" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4 space-y-8">
+
+            {/* ── Simulated Logged-In Users ── */}
             <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
               <CardHeader className="p-8 pb-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-2xl font-bold">User Management</CardTitle>
+                    <CardTitle className="text-2xl font-bold">Logged-In Users</CardTitle>
                     <CardDescription className="text-base text-muted-foreground mt-1">
-                      Manage registered users and control administrative access.
+                      Simulated users with their age, purchase history, and activity status.
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      {activeUsers} Online
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/30">
+                      <ShoppingBag className="w-3 h-3" />
+                      {totalPurchases} Orders
+                    </span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
+                        <th className="px-6 md:px-8 py-4 font-semibold text-sm">User</th>
+                        <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">Age</th>
+                        <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm text-center">Status</th>
+                        <th className="px-6 py-4 font-semibold text-sm text-center">Purchases</th>
+                        <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-right">Total Spent</th>
+                        <th className="hidden lg:table-cell px-6 py-4 font-semibold text-sm text-right">Last Active</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {simulatedUsers.map((su) => (
+                        <tr key={su.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                          <td className="px-6 md:px-8 py-5">
+                            <div className="flex items-center gap-3">
+                              <div className="relative">
+                                <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner overflow-hidden">
+                                  {su.avatar ? (
+                                    <NextImage src={su.avatar} alt={su.name} width={40} height={40} className="rounded-full object-cover" />
+                                  ) : (
+                                    <span>{su.name[0]}</span>
+                                  )}
+                                </div>
+                                <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black ${su.status === "online" ? "bg-emerald-500" : su.status === "away" ? "bg-amber-400" : "bg-zinc-300 dark:bg-zinc-600"
+                                  }`} />
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="font-bold text-foreground group-hover:text-orange-600 transition-colors">{su.name}</span>
+                                <span className="text-xs text-muted-foreground">{su.email}</span>
+                                {/* Mobile-only extras */}
+                                <div className="sm:hidden mt-1.5 flex items-center gap-2">
+                                  <span className="text-[10px] font-bold bg-muted px-1.5 py-0.5 rounded">{su.age} yrs</span>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${su.status === "online" ? "bg-emerald-500/10 text-emerald-600" : su.status === "away" ? "bg-amber-500/10 text-amber-600" : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                                    }`}>{su.status}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-5 text-center">
+                            <span className="text-sm font-bold text-foreground">{su.age}</span>
+                          </td>
+                          <td className="hidden md:table-cell px-6 py-5 text-center">
+                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${su.status === "online"
+                              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                              : su.status === "away"
+                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                                : "bg-zinc-200/50 text-zinc-500 border border-zinc-300/30 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-700/30"
+                              }`}>
+                              <span className={`w-2 h-2 rounded-full ${su.status === "online" ? "bg-emerald-500 animate-pulse" : su.status === "away" ? "bg-amber-400" : "bg-zinc-400"}`} />
+                              {su.status}
+                            </div>
+                          </td>
+                          <td className="px-6 py-5 text-center">
+                            {su.purchases.length > 0 ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="inline-flex items-center gap-1 text-xs font-bold text-violet-600 bg-violet-500/10 px-2.5 py-0.5 rounded-full">
+                                  <ShoppingBag className="w-3 h-3" />
+                                  {su.purchases.length} {su.purchases.length === 1 ? "order" : "orders"}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                  Last: {su.purchases[0].item.length > 20 ? su.purchases[0].item.substring(0, 20) + "..." : su.purchases[0].item}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50 italic">No purchases</span>
+                            )}
+                          </td>
+                          <td className="hidden sm:table-cell px-6 py-5 text-right">
+                            <span className={`text-sm font-extrabold ${su.totalSpent > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
+                              {su.totalSpent > 0 ? `₹${su.totalSpent.toLocaleString("en-IN")}` : "₹0"}
+                            </span>
+                          </td>
+                          <td className="hidden lg:table-cell px-6 py-5 text-right">
+                            <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+                              <Clock className="w-3.5 h-3.5" />
+                              {su.lastActive}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
+                <span className="text-sm text-muted-foreground font-medium">{simulatedUsers.length} simulated users</span>
+                <span className="text-sm font-bold text-emerald-600">Total Revenue: ₹{totalSimulatedRevenue.toLocaleString("en-IN")}</span>
+              </CardFooter>
+            </Card>
+
+            {/* ── Real Registered Users ── */}
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-2xl font-bold">Registered Users</CardTitle>
+                    <CardDescription className="text-base text-muted-foreground mt-1">
+                      Manage real registered users and control administrative access.
                     </CardDescription>
                   </div>
                 </div>
@@ -1373,7 +1641,7 @@ export default function AdminPanel() {
                                 <Switch
                                   checked={u.admin}
                                   onCheckedChange={() => handleToggleAdmin(u.id, u.admin)}
-                                  disabled={u.id === user?.uid} // Don't let user demote themselves
+                                  disabled={u.id === user?.uid}
                                 />
                               </div>
                             </div>

@@ -5,7 +5,8 @@ import AdminPanel from "./admin-panel";
 export const metadata: Metadata = constructMetadata({
   title: "Admin Dashboard",
   description: "Secure content management for Paw Sattva.",
-  noIndex: true, // Hide admin pages from search engines
+  noIndex: true,
+  pathname: "/admin",
 });
 
 export default function AdminPage() {

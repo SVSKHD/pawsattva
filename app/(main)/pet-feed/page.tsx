@@ -1,5 +1,15 @@
+import { Metadata } from "next";
+import { constructMetadata } from "@/lib/metadata";
 import { PetFeedForm } from "@/components/pet-feed-form"
 import { Badge } from "@/components/ui/badge"
+
+export const metadata: Metadata = constructMetadata({
+  title: "Pet Feed Planner",
+  description:
+    "Get personalized feeding schedules and nutrition plans tailored to your pet's breed, age, and activity level.",
+  keywords: ["pet food", "feeding schedule", "dog diet", "cat diet", "meal plan"],
+  pathname: "/pet-feed",
+});
 
 export default function PetFeedPage() {
   return (

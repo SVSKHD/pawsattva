@@ -10,6 +10,54 @@ import { SocialShare } from '@/components/social-share';
 import { SubscriptionForm } from '@/components/subscription-form';
 import { getBlogBySlug, getBlogs, getCategory, Blog } from '@/firebase/firestore';
 import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+import { siteConfig } from '@/lib/metadata';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const blog = await getBlogBySlug(slug);
+
+  if (!blog) {
+    return {
+      title: "Post Not Found",
+      description: "The blog post you are looking for could not be found.",
+    };
+  }
+
+  const plainExcerpt = blog.excerpt
+    || blog.content.replace(/<[^>]*>/g, "").substring(0, 160) + "...";
+
+  return {
+    title: `${blog.title} | ${siteConfig.name}`,
+    description: plainExcerpt,
+    keywords: blog.keywords
+      ? blog.keywords.split(",").map((k: string) => k.trim())
+      : undefined,
+    openGraph: {
+      type: "article",
+      title: `${blog.title} | ${siteConfig.name}`,
+      description: plainExcerpt,
+      url: `${siteConfig.url}/blog/${slug}`,
+      siteName: siteConfig.name,
+      images: blog.image ? [{ url: blog.image, width: 1200, height: 630 }] : [],
+      publishedTime: blog.date,
+      authors: [blog.authorName || "Paw Sattva Team"],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: blog.title,
+      description: plainExcerpt,
+      images: blog.image ? [blog.image] : [],
+    },
+    alternates: {
+      canonical: `${siteConfig.url}/blog/${slug}`,
+    },
+  };
+}
 
 export default async function BlogPostPage({
   params,

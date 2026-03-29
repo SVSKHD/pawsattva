@@ -50,7 +50,10 @@ const latestBlogsSnapshot = [
 
 export const metadata: Metadata = constructMetadata({
   title: "Premium Pet Care & Nutrition",
-  description: "Welcome to Paw Sattva - The ultimate haven for pet wellness, nutrition, and harmony.",
+  description:
+    "Welcome to Paw Sattva — The ultimate haven for pet wellness, nutrition, and harmony.",
+  keywords: ["pet community", "pet health", "holistic pet care"],
+  pathname: "/",
 });
 
 export default function Home() {
