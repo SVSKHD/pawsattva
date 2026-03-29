@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
@@ -12,21 +11,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { 
-  signInWithPopup, 
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword
-} from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/firebase/firebase";
 import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -36,32 +27,6 @@ export default function LoginPage() {
       router.push("/");
     }
   }, [user, authLoading, router]);
-
-  const handleEmailSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      toast.success("Signed in successfully!");
-      router.push("/");
-    } catch (error: any) {
-      console.error(error);
-      if (error.code === "auth/user-not-found") {
-        // Try to sign up if user not found (simplified flow)
-        try {
-          await createUserWithEmailAndPassword(auth, email, password);
-          toast.success("Account created successfully!");
-          router.push("/");
-        } catch (signUpError: any) {
-          toast.error(signUpError.message);
-        }
-      } else {
-        toast.error(error.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -114,77 +79,15 @@ export default function LoginPage() {
               Welcome back
             </CardTitle>
             <CardDescription>
-              Enter your email or continue with your social account
+              Sign in with your Google account to continue
             </CardDescription>
           </CardHeader>
 
           <CardContent className="space-y-5">
-            <form onSubmit={handleEmailSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-10 bg-background/50"
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </Label>
-                  <Link
-                    href="#"
-                    className="text-xs font-medium text-primary hover:underline"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 bg-background/50"
-                  disabled={loading}
-                />
-              </div>
-
-              <Button
-                type="submit"
-                className="h-10 w-full font-medium shadow-sm transition-all hover:shadow-md"
-                disabled={loading}
-              >
-                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Sign In
-              </Button>
-            </form>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border/80" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="rounded-full border border-border/80 bg-background/80 px-4 py-1 font-medium text-muted-foreground shadow-sm backdrop-blur-sm">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
             <Button
               variant="outline"
               type="button"
-              className="flex h-10 w-full items-center gap-3 bg-background/50 font-medium shadow-sm transition-colors hover:bg-muted/50"
+              className="flex h-12 w-full items-center gap-3 bg-background/50 font-medium shadow-sm transition-colors hover:bg-muted/50"
               onClick={handleGoogleSignIn}
               disabled={loading}
             >
@@ -221,16 +124,6 @@ export default function LoginPage() {
               )}
               Sign in with Google
             </Button>
-
-            <div className="text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="#"
-                className="font-semibold text-primary transition-colors hover:underline"
-              >
-                Sign up
-              </Link>
-            </div>
           </CardContent>
         </Card>
       </div>
