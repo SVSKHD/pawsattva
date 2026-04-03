@@ -1,15 +1,22 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from "next/image";
 import Link from "next/link";
 import { FaInstagram, FaFacebook, FaTwitter, FaYoutube } from "react-icons/fa";
 import Paw from "../app/pawsattva.png";
+import { getCategories, Category } from "@/firebase/firestore";
 
 export function Footer() {
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  useEffect(() => {
+    getCategories().then((data) => setCategories(data)).catch(console.error);
+  }, []);
+
   return (
     <footer className="bg-background px-4 py-20 border-t border-muted relative overflow-hidden">
-      <div className="container mx-auto grid md:grid-cols-4 gap-16 relative z-10">
+      <div className="container mx-auto grid md:grid-cols-5 gap-16 relative z-10">
         <div className="md:col-span-1 space-y-6">
           <Link href="/" className="flex items-center gap-2 group">
             <Image src={Paw} alt="Logo" width={48} height={48} className="object-contain" />
@@ -29,6 +36,21 @@ export function Footer() {
             <li><Link href="#" className="hover:text-primary transition-colors">Community Forum</Link></li>
           </ul>
         </div>
+
+        {categories.length > 0 && (
+          <div>
+            <h4 className="font-bold text-lg mb-8 tracking-tight">Categories</h4>
+            <ul className="space-y-4 text-sm font-medium text-muted-foreground">
+              {categories.map((cat) => (
+                <li key={cat.id}>
+                  <Link href="/blog" className="hover:text-primary transition-colors">
+                    {cat.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div>
           <h4 className="font-bold text-lg mb-8 tracking-tight">Support</h4>

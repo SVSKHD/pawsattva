@@ -27,8 +27,6 @@ import {
   Activity,
   MousePointerClick,
   CalendarDays,
-  ArrowUpRight,
-  ArrowDownRight,
   Zap,
   History,
   Mail,
@@ -36,7 +34,7 @@ import {
   Dog,
   ShoppingBag,
   Clock,
-  IndianRupee
+  PawPrint
 } from "lucide-react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -78,120 +76,19 @@ import {
   getAdminUsers,
   getSubscriptions,
   getAppUsers,
+  onUsersSnapshot,
   updateUserRole,
+  updateUser,
   deleteUser,
+  getPetFeeds,
   Blog,
   Category,
   UserProfile,
-  Subscription
+  PetFeedEntry,
+  Subscription,
+  PetFeed
 } from "@/firebase/firestore"
 import { serverTimestamp } from "firebase/firestore"
-
-// ── Simulated Users ──────────────────────────────────────────────────────────
-interface SimulatedUser {
-  id: string
-  name: string
-  email: string
-  age: number
-  status: "online" | "offline" | "away"
-  lastActive: string
-  purchases: { item: string; amount: number; date: string }[]
-  totalSpent: number
-  avatar?: string
-}
-
-const simulatedUsers: SimulatedUser[] = [
-  {
-    id: "su-1", name: "Priya Sharma", email: "priya.s@gmail.com", age: 28,
-    status: "online", lastActive: "Just now",
-    avatar: "https://i.pravatar.cc/100?img=5",
-    purchases: [
-      { item: "Premium Puppy Kibble (5kg)", amount: 1850, date: "Mar 28, 2026" },
-      { item: "Organic Cat Treats", amount: 420, date: "Mar 22, 2026" },
-    ],
-    totalSpent: 2270,
-  },
-  {
-    id: "su-2", name: "Arjun Menon", email: "arjun.m@outlook.com", age: 34,
-    status: "online", lastActive: "3 min ago",
-    avatar: "https://i.pravatar.cc/100?img=12",
-    purchases: [
-      { item: "Grain-Free Dog Food (10kg)", amount: 3200, date: "Mar 27, 2026" },
-      { item: "Dental Chews Pack", amount: 680, date: "Mar 18, 2026" },
-      { item: "Interactive Puzzle Toy", amount: 950, date: "Mar 10, 2026" },
-    ],
-    totalSpent: 4830,
-  },
-  {
-    id: "su-3", name: "Meera Kulkarni", email: "meera.k@yahoo.com", age: 22,
-    status: "away", lastActive: "28 min ago",
-    avatar: "https://i.pravatar.cc/100?img=26",
-    purchases: [
-      { item: "Kitten Starter Kit", amount: 2100, date: "Mar 29, 2026" },
-    ],
-    totalSpent: 2100,
-  },
-  {
-    id: "su-4", name: "Rohit Patil", email: "rohit.p@gmail.com", age: 41,
-    status: "offline", lastActive: "2 hrs ago",
-    avatar: "https://i.pravatar.cc/100?img=33",
-    purchases: [
-      { item: "Senior Dog Wellness Pack", amount: 4500, date: "Mar 25, 2026" },
-      { item: "Calming Supplements", amount: 1200, date: "Mar 15, 2026" },
-      { item: "Orthopedic Dog Bed", amount: 3800, date: "Mar 5, 2026" },
-      { item: "Joint Health Treats", amount: 750, date: "Feb 28, 2026" },
-    ],
-    totalSpent: 10250,
-  },
-  {
-    id: "su-5", name: "Divya Reddy", email: "divya.r@hotmail.com", age: 31,
-    status: "online", lastActive: "1 min ago",
-    avatar: "https://i.pravatar.cc/100?img=47",
-    purchases: [
-      { item: "Organic Wet Cat Food (12-pack)", amount: 1440, date: "Mar 26, 2026" },
-      { item: "Cat Scratch Tower", amount: 2600, date: "Mar 12, 2026" },
-    ],
-    totalSpent: 4040,
-  },
-  {
-    id: "su-6", name: "Karan Verma", email: "karan.v@gmail.com", age: 26,
-    status: "away", lastActive: "45 min ago",
-    avatar: "https://i.pravatar.cc/100?img=59",
-    purchases: [
-      { item: "Puppy Training Pads (100-pack)", amount: 890, date: "Mar 24, 2026" },
-    ],
-    totalSpent: 890,
-  },
-  {
-    id: "su-7", name: "Sneha Lakshmi", email: "sneha.l@gmail.com", age: 37,
-    status: "offline", lastActive: "5 hrs ago",
-    avatar: "https://i.pravatar.cc/100?img=44",
-    purchases: [
-      { item: "Premium Fish Oil Supplement", amount: 980, date: "Mar 20, 2026" },
-      { item: "Waterproof Raincoat (Dog)", amount: 1350, date: "Mar 8, 2026" },
-    ],
-    totalSpent: 2330,
-  },
-  {
-    id: "su-8", name: "Anil Tiwari", email: "anil.t@outlook.com", age: 45,
-    status: "offline", lastActive: "1 day ago",
-    avatar: "https://i.pravatar.cc/100?img=60",
-    purchases: [],
-    totalSpent: 0,
-  },
-]
-
-const totalSimulatedRevenue = simulatedUsers.reduce((sum, u) => sum + u.totalSpent, 0)
-const activeUsers = simulatedUsers.filter(u => u.status === "online").length
-const avgAge = Math.round(simulatedUsers.reduce((sum, u) => sum + u.age, 0) / simulatedUsers.length)
-const totalPurchases = simulatedUsers.reduce((sum, u) => sum + u.purchases.length, 0)
-
-const analyticsStats = [
-  { label: "Total Users", value: simulatedUsers.length.toLocaleString(), change: "+8.2%", up: true, icon: Users, color: "blue" },
-  { label: "Active Now", value: activeUsers.toString(), change: "+33%", up: true, icon: Eye, color: "purple" },
-  { label: "Total Revenue", value: `₹${totalSimulatedRevenue.toLocaleString("en-IN")}`, change: "+22.1%", up: true, icon: IndianRupee, color: "rose" },
-  { label: "Avg. Age", value: `${avgAge} yrs`, change: "+1.4%", up: true, icon: TrendingUp, color: "orange" },
-]
 
 const postEngagement = [
   { title: "How to Train Your Puppy", views: 14200, likes: 1820, shares: 430, comments: 98 },
@@ -241,6 +138,15 @@ export default function AdminPanel() {
   const [subscribers, setSubscribers] = useState<Subscription[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
+  // User editing states
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [editUserName, setEditUserName] = useState("")
+  const [editUserEmail, setEditUserEmail] = useState("")
+  const [editUserPhone, setEditUserPhone] = useState("")
+  const [userSearchQuery, setUserSearchQuery] = useState("")
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+  const [petFeeds, setPetFeeds] = useState<PetFeed[]>([])
+
   const fetchData = async () => {
     setLoadingData(true)
     try {
@@ -254,6 +160,8 @@ export default function AdminPanel() {
       setUsers(allUsers)
       const subs = await getSubscriptions()
       setSubscribers(subs)
+      const feeds = await getPetFeeds()
+      setPetFeeds(feeds)
     } catch (error) {
       console.error("Error fetching data:", error)
       toast.error("Failed to load data from database.")
@@ -265,6 +173,11 @@ export default function AdminPanel() {
   useEffect(() => {
     if (isAdmin) {
       fetchData()
+      // Real-time listener for users
+      const unsubscribe = onUsersSnapshot((liveUsers) => {
+        setUsers(liveUsers)
+      })
+      return () => unsubscribe()
     }
   }, [isAdmin])
 
@@ -542,14 +455,20 @@ export default function AdminPanel() {
     return categories.find(c => c.id === id)?.name || "Unknown"
   }
 
-  const handleToggleAdmin = async (userId: string, currentAdmin: boolean) => {
+  const handleToggleAdmin = async (userId: string, targetState: boolean) => {
     try {
-      await updateUserRole(userId, !currentAdmin)
-      toast.success(`User role updated successfully.`)
-      fetchData()
-    } catch (error) {
-      console.error("Error updating user role:", error)
-      toast.error("Failed to update user role.")
+      console.log(`[Admin] Attempting to update role for user ${userId} to ${targetState ? "Admin" : "User"}`);
+      await updateUserRole(userId, targetState);
+      toast.success(`User role updated successfully.`);
+      fetchData();
+    } catch (error: any) {
+      console.error("Error updating user role:", error);
+      const errorMessage = error?.message || (typeof error === 'string' ? error : "Unknown error");
+      toast.error(`Failed to update user role: ${errorMessage}`);
+      
+      if (errorMessage.includes("permission-denied")) {
+        console.warn("[Admin] Permission denied. Check your Firestore Security Rules.");
+      }
     }
   }
 
@@ -563,6 +482,37 @@ export default function AdminPanel() {
       toast.error("Failed to delete user account.")
     }
   }
+
+  const handleEditUser = (u: UserProfile) => {
+    setEditingUserId(u.id)
+    setEditUserName(u.displayName || "")
+    setEditUserEmail(u.email)
+    setEditUserPhone(u.phone || "")
+  }
+
+  const handleSaveUser = async () => {
+    if (!editingUserId) return
+    try {
+      await updateUser(editingUserId, {
+        displayName: editUserName,
+        email: editUserEmail,
+        phone: editUserPhone,
+      })
+      toast.success("User updated successfully.")
+      setEditingUserId(null)
+      fetchData()
+    } catch (error) {
+      console.error("Error updating user:", error)
+      toast.error("Failed to update user.")
+    }
+  }
+
+  const filteredUsers = users.filter(u =>
+    (u.displayName || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(userSearchQuery.toLowerCase())
+  )
+
+  const totalPetFeeds = users.reduce((sum, u) => sum + (u.petFeeds?.length || 0), 0)
 
   return (
     <div className="flex-1 w-full max-w-6xl mx-auto px-4 py-8 md:px-8 md:py-12 space-y-8">
@@ -1212,7 +1162,12 @@ export default function AdminPanel() {
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-              {analyticsStats.map((stat) => (
+              {[
+                { label: "Total Users", value: users.length.toString(), icon: Users, color: "blue" },
+                { label: "Subscribers", value: subscribers.length.toString(), icon: Mail, color: "purple" },
+                { label: "Blog Posts", value: blogs.length.toString(), icon: FileText, color: "rose" },
+                { label: "Pet Feeds", value: totalPetFeeds.toString(), icon: Dog, color: "orange" },
+              ].map((stat) => (
                 <Card key={stat.label} className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl rounded-[1.75rem] overflow-hidden">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -1223,11 +1178,6 @@ export default function AdminPanel() {
                         }`}>
                         <stat.icon className="w-6 h-6" />
                       </div>
-                      <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${stat.up ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-500"
-                        }`}>
-                        {stat.up ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                        {stat.change}
-                      </span>
                     </div>
                     <p className="text-3xl font-extrabold tracking-tight text-foreground">{stat.value}</p>
                     <p className="text-sm text-muted-foreground mt-1 font-medium">{stat.label}</p>
@@ -1304,26 +1254,25 @@ export default function AdminPanel() {
               </CardContent>
             </Card>
 
-            {/* Top Customers */}
+            {/* Users with Pet Feeds */}
             <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
               <CardHeader className="p-8 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600">
-                    <ShoppingBag className="w-5 h-5" />
+                    <Dog className="w-5 h-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl font-bold">Top Customers</CardTitle>
-                    <CardDescription>Ranked by total purchase value</CardDescription>
+                    <CardTitle className="text-xl font-bold">Users with Pet Feeds</CardTitle>
+                    <CardDescription>Users who have submitted pet information</CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="p-8 pt-2">
                 <div className="space-y-3">
-                  {[...simulatedUsers]
-                    .sort((a, b) => b.totalSpent - a.totalSpent)
-                    .filter(u => u.totalSpent > 0)
-                    .map((su, rank) => (
-                      <div key={su.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all group">
+                  {users
+                    .filter(u => u.petFeeds && u.petFeeds.length > 0)
+                    .map((u, rank) => (
+                      <div key={u.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all group">
                         <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-extrabold shrink-0 ${rank === 0
                           ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white shadow-lg shadow-amber-400/30"
                           : rank === 1
@@ -1334,22 +1283,33 @@ export default function AdminPanel() {
                           }`}>
                           {rank + 1}
                         </div>
-                        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0">
-                          {su.avatar ? (
-                            <NextImage src={su.avatar} alt={su.name} width={40} height={40} className="rounded-full object-cover" />
+                        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 relative">
+                          {u.photoURL ? (
+                            <NextImage src={u.photoURL} alt={u.displayName || ""} fill className="object-cover rounded-full" />
                           ) : (
-                            <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold">{su.name[0]}</div>
+                            <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold">
+                              {(u.displayName || u.email)[0].toUpperCase()}
+                            </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{su.name}</p>
-                          <p className="text-xs text-muted-foreground">{su.purchases.length} {su.purchases.length === 1 ? "order" : "orders"} · Age {su.age}</p>
+                          <p className="text-sm font-semibold text-foreground">{u.displayName || u.email}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {u.petFeeds!.length} {u.petFeeds!.length === 1 ? "pet" : "pets"} · {u.petFeeds!.map(f => f.petName).join(", ")}
+                          </p>
                         </div>
-                        <span className="text-sm font-extrabold text-emerald-600 shrink-0">
-                          ₹{su.totalSpent.toLocaleString("en-IN")}
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-500/10 px-2.5 py-1 rounded-full shrink-0">
+                          <Dog className="w-3 h-3" />
+                          {u.petFeeds!.length}
                         </span>
                       </div>
                     ))}
+                  {users.filter(u => u.petFeeds && u.petFeeds.length > 0).length === 0 && (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Dog className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                      <p className="font-medium">No pet feed submissions yet.</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1475,25 +1435,34 @@ export default function AdminPanel() {
 
           <TabsContent value="users" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4 space-y-8">
 
-            {/* ── Simulated Logged-In Users ── */}
+            {/* ── All Registered Users with CRUD ── */}
             <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
               <CardHeader className="p-8 pb-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <CardTitle className="text-2xl font-bold">Logged-In Users</CardTitle>
+                    <CardTitle className="text-2xl font-bold">All Users</CardTitle>
                     <CardDescription className="text-base text-muted-foreground mt-1">
-                      Simulated users with their age, purchase history, and activity status.
+                      Manage all registered users, edit profiles, and view pet feed submissions.
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      {activeUsers} Online
+                      Live
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full border border-border/30">
-                      <ShoppingBag className="w-3 h-3" />
-                      {totalPurchases} Orders
+                      <Dog className="w-3 h-3" />
+                      {totalPetFeeds} Pet Feeds
                     </span>
+                    <div className="relative max-w-xs w-full">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search users..."
+                        className="pl-10 h-10 bg-white/50 dark:bg-black/50 border-white/20 dark:border-white/10 rounded-xl"
+                        value={userSearchQuery}
+                        onChange={(e) => setUserSearchQuery(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -1503,189 +1472,238 @@ export default function AdminPanel() {
                     <thead>
                       <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
                         <th className="px-6 md:px-8 py-4 font-semibold text-sm">User</th>
-                        <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">Age</th>
-                        <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm text-center">Status</th>
-                        <th className="px-6 py-4 font-semibold text-sm text-center">Purchases</th>
-                        <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-right">Total Spent</th>
-                        <th className="hidden lg:table-cell px-6 py-4 font-semibold text-sm text-right">Last Active</th>
+                        <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm">Contact</th>
+                        <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">Pet Feeds</th>
+                        <th className="px-6 py-4 font-semibold text-sm text-center">Role</th>
+                        <th className="px-6 py-4 font-semibold text-sm text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {simulatedUsers.map((su) => (
-                        <tr key={su.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-6 md:px-8 py-5">
-                            <div className="flex items-center gap-3">
-                              <div className="relative">
-                                <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner overflow-hidden">
-                                  {su.avatar ? (
-                                    <NextImage src={su.avatar} alt={su.name} width={40} height={40} className="rounded-full object-cover" />
-                                  ) : (
-                                    <span>{su.name[0]}</span>
-                                  )}
+                      {filteredUsers.map((u: UserProfile) => (
+                        <>
+                          <tr key={u.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                            <td className="px-6 md:px-8 py-5">
+                              {editingUserId === u.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    value={editUserName}
+                                    onChange={(e) => setEditUserName(e.target.value)}
+                                    placeholder="Display Name"
+                                    className="h-9 text-sm bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-lg"
+                                  />
+                                  <Input
+                                    value={editUserEmail}
+                                    onChange={(e) => setEditUserEmail(e.target.value)}
+                                    placeholder="Email"
+                                    className="h-9 text-sm bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-lg"
+                                  />
+                                  <Input
+                                    value={editUserPhone}
+                                    onChange={(e) => setEditUserPhone(e.target.value)}
+                                    placeholder="Phone"
+                                    className="h-9 text-sm bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-lg"
+                                  />
                                 </div>
-                                <span className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-black ${su.status === "online" ? "bg-emerald-500" : su.status === "away" ? "bg-amber-400" : "bg-zinc-300 dark:bg-zinc-600"
-                                  }`} />
-                              </div>
-                              <div className="flex flex-col">
-                                <span className="font-bold text-foreground group-hover:text-orange-600 transition-colors">{su.name}</span>
-                                <span className="text-xs text-muted-foreground">{su.email}</span>
-                                {/* Mobile-only extras */}
-                                <div className="sm:hidden mt-1.5 flex items-center gap-2">
-                                  <span className="text-[10px] font-bold bg-muted px-1.5 py-0.5 rounded">{su.age} yrs</span>
-                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${su.status === "online" ? "bg-emerald-500/10 text-emerald-600" : su.status === "away" ? "bg-amber-500/10 text-amber-600" : "bg-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-                                    }`}>{su.status}</span>
+                              ) : (
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner group-hover:bg-orange-500 group-hover:text-white transition-all overflow-hidden relative">
+                                    {u.photoURL ? (
+                                      <NextImage src={u.photoURL} alt={u.displayName || ""} fill className="object-cover" />
+                                    ) : (
+                                      <span>{u.displayName ? u.displayName[0].toUpperCase() : u.email[0].toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-foreground group-hover:text-orange-600 transition-colors">{u.displayName || "Anonymous User"}</span>
+                                    <span className="text-xs text-muted-foreground">{u.email}</span>
+                                    {u.phone && (
+                                      <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                                        <Phone className="w-3 h-3" />
+                                        {u.phone}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="hidden sm:table-cell px-6 py-5 text-center">
-                            <span className="text-sm font-bold text-foreground">{su.age}</span>
-                          </td>
-                          <td className="hidden md:table-cell px-6 py-5 text-center">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${su.status === "online"
-                              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                              : su.status === "away"
-                                ? "bg-amber-500/10 text-amber-600 border border-amber-500/20"
-                                : "bg-zinc-200/50 text-zinc-500 border border-zinc-300/30 dark:bg-zinc-800/50 dark:text-zinc-400 dark:border-zinc-700/30"
-                              }`}>
-                              <span className={`w-2 h-2 rounded-full ${su.status === "online" ? "bg-emerald-500 animate-pulse" : su.status === "away" ? "bg-amber-400" : "bg-zinc-400"}`} />
-                              {su.status}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-center">
-                            {su.purchases.length > 0 ? (
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="inline-flex items-center gap-1 text-xs font-bold text-violet-600 bg-violet-500/10 px-2.5 py-0.5 rounded-full">
-                                  <ShoppingBag className="w-3 h-3" />
-                                  {su.purchases.length} {su.purchases.length === 1 ? "order" : "orders"}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                                  Last: {su.purchases[0].item.length > 20 ? su.purchases[0].item.substring(0, 20) + "..." : su.purchases[0].item}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground/50 italic">No purchases</span>
-                            )}
-                          </td>
-                          <td className="hidden sm:table-cell px-6 py-5 text-right">
-                            <span className={`text-sm font-extrabold ${su.totalSpent > 0 ? "text-emerald-600" : "text-muted-foreground"}`}>
-                              {su.totalSpent > 0 ? `₹${su.totalSpent.toLocaleString("en-IN")}` : "₹0"}
-                            </span>
-                          </td>
-                          <td className="hidden lg:table-cell px-6 py-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
-                              <Clock className="w-3.5 h-3.5" />
-                              {su.lastActive}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">{simulatedUsers.length} simulated users</span>
-                <span className="text-sm font-bold text-emerald-600">Total Revenue: ₹{totalSimulatedRevenue.toLocaleString("en-IN")}</span>
-              </CardFooter>
-            </Card>
-
-            {/* ── Real Registered Users ── */}
-            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-              <CardHeader className="p-8 pb-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <CardTitle className="text-2xl font-bold">Registered Users</CardTitle>
-                    <CardDescription className="text-base text-muted-foreground mt-1">
-                      Manage real registered users and control administrative access.
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                        <th className="px-8 py-4 font-semibold text-sm">User</th>
-                        <th className="px-8 py-4 font-semibold text-sm">Email</th>
-                        <th className="px-8 py-4 font-semibold text-sm text-center">Admin Access</th>
-                        <th className="px-8 py-4 font-semibold text-sm text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/40">
-                      {users.map((u: UserProfile) => (
-                        <tr key={u.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-600 font-bold border border-orange-500/20 shadow-inner group-hover:bg-orange-500 group-hover:text-white transition-all overflow-hidden relative">
-                                {u.photoURL ? (
-                                  <NextImage src={u.photoURL} alt={u.displayName || ""} fill className="object-cover" />
-                                ) : (
-                                  <span>{u.displayName ? u.displayName[0].toUpperCase() : u.email[0].toUpperCase()}</span>
+                              )}
+                            </td>
+                            <td className="hidden md:table-cell px-6 py-5">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                                  <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                                  {u.email}
+                                </div>
+                                {u.phone && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Phone className="w-3.5 h-3.5" />
+                                    {u.phone}
+                                  </div>
                                 )}
                               </div>
-                              <span className="font-bold text-foreground">{u.displayName || "Anonymous User"}</span>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                              <Mail className="w-3.5 h-3.5 text-muted-foreground" />
-                              {u.email}
-                            </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center justify-center">
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs font-bold uppercase tracking-tight ${u.admin ? 'text-orange-600' : 'text-muted-foreground'}`}>{u.admin ? "Admin" : "User"}</span>
-                                <Switch
-                                  checked={u.admin}
-                                  onCheckedChange={() => handleToggleAdmin(u.id, u.admin)}
-                                  disabled={u.id === user?.uid}
-                                />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-8 py-6 text-right">
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  disabled={u.id === user?.uid}
-                                  className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
+                            </td>
+                            <td className="hidden sm:table-cell px-6 py-5 text-center">
+                              {u.petFeeds && u.petFeeds.length > 0 ? (
+                                <button
+                                  onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 bg-orange-500/10 px-3 py-1.5 rounded-full border border-orange-500/20 hover:bg-orange-500/20 transition-all cursor-pointer"
                                 >
-                                  <Trash2 className="w-4 h-4 md:mr-1.5" />
-                                  <span className="hidden md:inline">Delete</span>
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-2xl font-bold font-roboto text-destructive">Delete User Account?</AlertDialogTitle>
-                                  <AlertDialogDescription className="text-base text-muted-foreground font-roboto">
-                                    Are you sure you want to permanently delete "{u.displayName || u.email}"? This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
-                                  <AlertDialogCancel className="h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0 text-white"
-                                    onClick={() => handleDeleteUserAccount(u.id)}
-                                  >
-                                    Delete User
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
+                                  <Dog className="w-3.5 h-3.5" />
+                                  {u.petFeeds.length} {u.petFeeds.length === 1 ? "pet" : "pets"}
+                                  <ChevronRight className={`w-3 h-3 transition-transform ${expandedUserId === u.id ? "rotate-90" : ""}`} />
+                                </button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground/50 italic">No feeds</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="flex items-center justify-center">
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-xs font-bold uppercase tracking-tight ${u.admin ? 'text-orange-600' : 'text-muted-foreground'}`}>{u.admin ? "Admin" : "User"}</span>
+                                  <Switch
+                                    checked={u.admin}
+                                    onCheckedChange={(checked) => handleToggleAdmin(u.id, checked)}
+                                    disabled={u.id === user?.uid}
+                                  />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-5 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {editingUserId === u.id ? (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 px-3 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white rounded-lg transition-all border-emerald-500/20"
+                                      onClick={handleSaveUser}
+                                    >
+                                      <Save className="w-4 h-4 mr-1.5" />
+                                      Save
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 px-3 rounded-lg"
+                                      onClick={() => setEditingUserId(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all"
+                                      onClick={() => handleEditUser(u)}
+                                    >
+                                      <Edit className="w-4 h-4 md:mr-1.5" />
+                                      <span className="hidden md:inline">Edit</span>
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          disabled={u.id === user?.uid}
+                                          className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
+                                        >
+                                          <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                          <span className="hidden md:inline">Delete</span>
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle className="text-2xl font-bold font-roboto text-destructive">Delete User Account?</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-base text-muted-foreground font-roboto">
+                                            Are you sure you want to permanently delete "{u.displayName || u.email}"? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
+                                          <AlertDialogCancel className="h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">Cancel</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            className="h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0 text-white"
+                                            onClick={() => handleDeleteUserAccount(u.id)}
+                                          >
+                                            Delete User
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                          {/* Expanded pet feed details */}
+                          {expandedUserId === u.id && u.petFeeds && u.petFeeds.length > 0 && (
+                            <tr key={`${u.id}-feeds`}>
+                              <td colSpan={5} className="px-6 md:px-8 py-4 bg-orange-50/30 dark:bg-orange-950/10">
+                                <div className="pl-4 md:pl-12 space-y-3">
+                                  <p className="text-xs font-bold text-orange-600 uppercase tracking-widest flex items-center gap-2">
+                                    <PawPrint className="w-3.5 h-3.5" />
+                                    Pet Feed Details
+                                  </p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {u.petFeeds.map((feed, idx) => (
+                                      <div key={idx} className="p-4 rounded-2xl bg-white/60 dark:bg-black/30 border border-white/40 dark:border-white/10 shadow-sm space-y-2">
+                                        <div className="flex items-center gap-2">
+                                          <Dog className="w-4 h-4 text-orange-500" />
+                                          <span className="font-bold text-foreground">{feed.petName}</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1 text-xs">
+                                          <div>
+                                            <span className="text-muted-foreground">Type:</span>
+                                            <span className="ml-1 font-semibold">{feed.petType}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground">Breed:</span>
+                                            <span className="ml-1 font-semibold">{feed.petBreed}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground">Meal Days:</span>
+                                            <span className="ml-1 font-semibold">{feed.mealDays}</span>
+                                          </div>
+                                          <div>
+                                            <span className="text-muted-foreground">Reminders:</span>
+                                            <span className="ml-1 font-semibold">{feed.reminders ? "Yes" : "No"}</span>
+                                          </div>
+                                        </div>
+                                        {feed.createdAt && (
+                                          <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            {new Date(feed.createdAt).toLocaleDateString()}
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      ))}
+                      {filteredUsers.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-8 py-20 text-center text-muted-foreground">
+                            <div className="flex flex-col items-center gap-2">
+                              <Users className="w-8 h-8 opacity-20" />
+                              <p className="font-medium">No users found.</p>
+                            </div>
                           </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
               </CardContent>
               <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">Total {users.length} registered users</span>
+                <span className="text-sm text-muted-foreground font-medium">
+                  Showing {filteredUsers.length} of {users.length} users
+                </span>
+                <span className="text-sm font-bold text-orange-600">
+                  {totalPetFeeds} total pet feed submissions
+                </span>
               </CardFooter>
             </Card>
           </TabsContent>

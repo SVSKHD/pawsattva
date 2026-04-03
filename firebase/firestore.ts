@@ -11,7 +11,9 @@ import {
   limit,
   orderBy, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  onSnapshot,
+  arrayUnion
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
@@ -39,7 +41,20 @@ export interface UserProfile {
   email: string;
   displayName?: string;
   photoURL?: string;
+  phone?: string;
   admin: boolean;
+  petFeeds?: PetFeedEntry[];
+  createdAt?: any;
+}
+
+export interface PetFeedEntry {
+  petName: string;
+  petType: string;
+  petBreed: string;
+  mealDays: number;
+  reminders: boolean;
+  subscribe: boolean;
+  createdAt?: any;
 }
 
 export interface Category {
@@ -61,8 +76,10 @@ export interface Subscription {
 
 export interface PetFeed {
   id?: string;
+  userId?: string;
   name: string;
   phone: string;
+  petType: string;
   petBreed: string;
   petName: string;
   mealDays: number;
@@ -90,9 +107,25 @@ export const getAppUsers = async () => {
   } as UserProfile));
 };
 
+// Real-time listener for users
+export const onUsersSnapshot = (callback: (users: UserProfile[]) => void) => {
+  return onSnapshot(collection(db, "users"), (snapshot) => {
+    const users = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    } as UserProfile));
+    callback(users);
+  });
+};
+
 export const updateUserRole = async (userId: string, isAdmin: boolean) => {
   const docRef = doc(db, "users", userId);
   return await updateDoc(docRef, { admin: isAdmin });
+};
+
+export const updateUser = async (userId: string, data: Partial<UserProfile>) => {
+  const docRef = doc(db, "users", userId);
+  return await updateDoc(docRef, data);
 };
 
 export const deleteUser = async (userId: string) => {
@@ -219,9 +252,39 @@ export const addSubscription = async (sub: Omit<Subscription, "id" | "subscribed
 
 // ── PET FEED OPERATIONS ─────────────────────────────────────────────────────
 
+export const getPetFeeds = async () => {
+  const q = query(collection(db, "petFeeds"), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : doc.data().createdAt
+  } as PetFeed));
+};
+
 export const savePetFeed = async (data: PetFeed) => {
-  return await addDoc(collection(db, "petFeeds"), {
+  // Save to petFeeds collection
+  const feedDoc = await addDoc(collection(db, "petFeeds"), {
     ...data,
     createdAt: serverTimestamp(),
   });
+
+  // Also save pet feed entry under user's document if userId is provided
+  if (data.userId) {
+    const userDocRef = doc(db, "users", data.userId);
+    await updateDoc(userDocRef, {
+      phone: data.phone,
+      petFeeds: arrayUnion({
+        petName: data.petName,
+        petType: data.petType,
+        petBreed: data.petBreed,
+        mealDays: data.mealDays,
+        reminders: data.reminders,
+        subscribe: data.subscribe,
+        createdAt: new Date().toISOString(),
+      }),
+    });
+  }
+
+  return feedDoc;
 };

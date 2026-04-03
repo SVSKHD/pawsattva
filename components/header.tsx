@@ -142,8 +142,8 @@ export function Header() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Syncing</span>
               </div>
             ) : user ? (
-              <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-3 pr-1 py-1 rounded-full border border-white/10">
-                <div className="flex items-center gap-2 overflow-hidden">
+              <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-1 pr-1 py-1 rounded-full border border-white/10">
+                <Link href="/dashboard" className="flex items-center gap-2 pl-2 pr-1 overflow-hidden hover:opacity-80 transition-opacity">
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
                     {user.photoURL ? (
                       <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
@@ -154,7 +154,7 @@ export function Header() {
                   <span className="text-xs font-semibold text-foreground truncate max-w-[80px] hidden lg:block">
                     {user.displayName || user.email?.split('@')[0]}
                   </span>
-                </div>
+                </Link>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -239,6 +239,15 @@ export function Header() {
                 >
                   <LayoutDashboard className="w-5 h-5" />
                   Admin Dashboard
+                </Link>
+              )}
+              {user && (
+                <Link
+                  href="/dashboard"
+                  className="flex items-center justify-center gap-2 text-sm font-semibold p-4 rounded-2xl bg-orange-500/5 text-orange-600 border border-orange-500/10 hover:bg-orange-500/10 transition-all col-span-2"
+                >
+                  <User className="w-5 h-5" />
+                  My Dashboard
                 </Link>
               )}
               {!user && (

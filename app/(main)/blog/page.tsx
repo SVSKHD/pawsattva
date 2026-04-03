@@ -109,14 +109,17 @@ export default function BlogPage() {
     fetchData();
   }, []);
 
-  const filteredBlogs = blogs.filter(blog => {
+  // Only show published posts on the public blog page
+  const publishedBlogs = blogs.filter(b => b.status === 'published');
+
+  const filteredBlogs = publishedBlogs.filter(blog => {
     const matchesCategory = activeCategory === 'all' || blog.categoryId === activeCategory;
     const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       blog.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
 
-  const featuredPost = blogs.find(b => b.status === 'published');
+  const featuredPost = publishedBlogs[0];
 
   const calculateReadTime = (content: string) => {
     const wordsPerMinute = 200;

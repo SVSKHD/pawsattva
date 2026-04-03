@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -8,11 +8,12 @@ import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { useEffect } from "react"
 import { savePetFeed, PetFeed } from "@/firebase/firestore"
+import { useAuth } from "@/components/auth-provider"
 import { Loader2, Dog, Phone, User, Heart, Calendar, Bell, Mail, PawPrint, CheckCircle2, ChevronRight, Sparkles } from "lucide-react"
 
 export function PetFeedForm() {
+  const { user } = useAuth()
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -46,6 +47,13 @@ export function PetFeedForm() {
       setStep(parseInt(savedStep))
     }
   }, [])
+
+  // Pre-fill name from logged-in user
+  useEffect(() => {
+    if (user?.displayName && !formData.name) {
+      setFormData((prev) => ({ ...prev, name: user.displayName || "" }))
+    }
+  }, [user])
 
   // Persist state to localStorage
   useEffect(() => {
@@ -126,7 +134,8 @@ export function PetFeedForm() {
       const finalData = {
         ...formData,
         petType: formData.petType === "Others" ? "Other" : formData.petType,
-        petBreed: finalPetBreed
+        petBreed: finalPetBreed,
+        userId: user?.uid || undefined,
       }
       await savePetFeed(finalData as any)
       toast.success("Pet feed details saved successfully!")

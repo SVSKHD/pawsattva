@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { SocialShare } from '@/components/social-share';
 import { SubscriptionForm } from '@/components/subscription-form';
+import { BlogContentWithEmbeds } from '@/components/instagram-embed';
 import { getBlogBySlug, getBlogs, getCategory, Blog } from '@/firebase/firestore';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -145,9 +146,9 @@ export default async function BlogPostPage({
               </p>
             )}
 
-            <div
+            <BlogContentWithEmbeds
+              htmlContent={blog.content}
               className="prose prose-lg dark:prose-invert max-w-none text-foreground/80"
-              dangerouslySetInnerHTML={{ __html: blog.content }}
             />
 
             <Separator className="my-12" />
