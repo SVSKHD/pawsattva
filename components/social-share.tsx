@@ -19,9 +19,10 @@ import { toast } from 'sonner';
 interface SocialShareProps {
   title: string;
   url?: string;
+  iconOnly?: boolean;
 }
 
-export function SocialShare({ title, url }: SocialShareProps) {
+export function SocialShare({ title, url, iconOnly = false }: SocialShareProps) {
   const [copied, setCopied] = useState(false);
 
   // Get current URL if not provided
@@ -60,9 +61,14 @@ export function SocialShare({ title, url }: SocialShareProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="rounded-full flex items-center gap-2 hover:bg-orange-50 hover:text-orange-600 transition-all border-orange-100">
+        <Button 
+          variant="outline" 
+          size={iconOnly ? "icon" : "sm"} 
+          className={`rounded-full flex items-center transition-all border-orange-100 hover:bg-orange-50 hover:text-orange-600 ${!iconOnly && 'gap-2'}`}
+        >
           <Share2 className="w-4 h-4" />
-          Share
+          {!iconOnly && <span>Share</span>}
+          {iconOnly && <span className="sr-only">Share</span>}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 p-2 rounded-2xl border-orange-100 shadow-xl">

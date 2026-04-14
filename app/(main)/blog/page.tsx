@@ -88,7 +88,12 @@ export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [blogs, setBlogs] = useState<Blog[]>([]);
-  const [categories, setCategories] = useState<Category[]>([{ id: 'all', name: 'All Topics' }]);
+const allTopicsCategory: Category = { 
+    id: 'all', 
+    name: 'All Topics', 
+    description: 'Explore our latest articles, expert guides, and health tips to keep your pets happy and healthy.' 
+  };
+  const [categories, setCategories] = useState<Category[]>([allTopicsCategory]);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
@@ -99,7 +104,7 @@ export default function BlogPage() {
           getCategories()
         ]);
         setBlogs(blogsData);
-        setCategories([{ id: 'all', name: 'All Topics' }, ...categoriesData]);
+        setCategories([allTopicsCategory, ...categoriesData]);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -112,8 +117,17 @@ export default function BlogPage() {
   // Only show published posts on the public blog page
   const publishedBlogs = blogs.filter(b => b.status === 'published');
 
+  const selectedCat = categories.find(c => c.id === activeCategory);
+  const activeParentId = selectedCat?.parentId || selectedCat?.id || 'all';
+  
+  const parentCategories = categories.filter(c => !c.parentId);
+  const subCategories = categories.filter(c => c.parentId === activeParentId);
+
   const filteredBlogs = publishedBlogs.filter(blog => {
-    const matchesCategory = activeCategory === 'all' || blog.categoryId === activeCategory;
+    const isExactMatch = blog.categoryId === activeCategory;
+    const isSubcategoryMatch = categories.some(c => c.id === blog.categoryId && c.parentId === activeCategory);
+    
+    const matchesCategory = activeCategory === 'all' || isExactMatch || isSubcategoryMatch;
     const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       blog.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -137,6 +151,8 @@ export default function BlogPage() {
     const category = categories.find(c => c.id === categoryId);
     return category ? category.name : "General";
   };
+
+  const activeCategoryData = categories.find(c => c.id === activeCategory);
 
   const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
@@ -233,11 +249,11 @@ export default function BlogPage() {
         {/* Categories / Filter Bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12 border-b border-muted pb-8 px-2">
           <div className="flex flex-wrap items-center gap-3">
-            {categories.map((cat) => (
+            {parentCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border-2 ${activeCategory === cat.id
+                className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border-2 ${activeParentId === cat.id
                   ? "bg-primary text-white border-primary shadow-lg shadow-primary/30"
                   : "bg-background text-muted-foreground border-transparent hover:border-muted hover:bg-muted/30"
                   }`}
@@ -249,6 +265,46 @@ export default function BlogPage() {
           <div className="text-sm font-semibold text-muted-foreground flex items-center gap-2 bg-muted/20 px-4 py-2 rounded-full border border-muted/30">
             <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
             Showing {filteredBlogs.length} articles
+          </div>
+        </div>
+
+        {/* Active Category Description Section */}
+        <div key={activeCategory} className="mb-16 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="max-w-4xl">
+            <h2 className="text-3xl md:text-4xl font-black mb-4 flex items-center gap-3">
+              <span className="w-1.5 h-8 bg-primary rounded-full" />
+              {activeCategoryData?.name}
+            </h2>
+            <p className="text-lg md:text-xl text-muted-foreground font-medium leading-relaxed">
+              {activeCategoryData?.description || "Browse our selected articles and guides tailored for this category."}
+            </p>
+            
+            {/* Subcategories */}
+            {subCategories.length > 0 && (
+              <div className="flex flex-wrap items-center gap-3 mt-8">
+                <button
+                  onClick={() => setActiveCategory(activeParentId)}
+                  className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 border ${activeCategory === activeParentId
+                    ? "bg-primary/10 text-primary border-primary shadow-sm"
+                    : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/60"
+                  }`}
+                >
+                  All in {categories.find(c => c.id === activeParentId)?.name}
+                </button>
+                {subCategories.map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setActiveCategory(sub.id)}
+                    className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 border ${activeCategory === sub.id
+                      ? "bg-primary/10 text-primary border-primary shadow-sm"
+                      : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/60"
+                    }`}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

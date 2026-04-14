@@ -65,6 +65,15 @@ export interface Category {
   createdAt?: Timestamp;
 }
 
+export interface SubCategory {
+  id: string;
+  name: string;
+  description?: string;
+  parentCategoryId: string;
+  status?: 'published' | 'draft';
+  createdAt?: Timestamp;
+}
+
 export interface Subscription {
   id: string;
   email: string;
@@ -228,6 +237,51 @@ export const updateCategory = async (id: string, category: Partial<Category>) =>
 
 export const deleteCategory = async (id: string) => {
   const docRef = doc(db, "categories", id);
+  return await deleteDoc(docRef);
+};
+
+// ── SUB-CATEGORY OPERATIONS ─────────────────────────────────────────────────
+
+export const getSubCategories = async () => {
+  const snapshot = await getDocs(collection(db, "subcategories"));
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  } as SubCategory));
+};
+
+export const getSubCategoriesByParent = async (parentCategoryId: string) => {
+  const q = query(collection(db, "subcategories"), where("parentCategoryId", "==", parentCategoryId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+  } as SubCategory));
+};
+
+export const getSubCategory = async (id: string) => {
+  const docRef = doc(db, "subcategories", id);
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() } as SubCategory;
+  }
+  return null;
+};
+
+export const addSubCategory = async (subCategory: Omit<SubCategory, "id">) => {
+  return await addDoc(collection(db, "subcategories"), {
+    ...subCategory,
+    createdAt: serverTimestamp(),
+  });
+};
+
+export const updateSubCategory = async (id: string, subCategory: Partial<SubCategory>) => {
+  const docRef = doc(db, "subcategories", id);
+  return await updateDoc(docRef, subCategory);
+};
+
+export const deleteSubCategory = async (id: string) => {
+  const docRef = doc(db, "subcategories", id);
   return await deleteDoc(docRef);
 };
 

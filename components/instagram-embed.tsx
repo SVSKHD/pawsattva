@@ -61,43 +61,50 @@ export function InstagramEmbed({ url, className = "" }: InstagramEmbedProps) {
   }
 
   return (
-    <div ref={containerRef} className={`instagram-embed-container ${className}`}>
-      <blockquote
-        className="instagram-media"
-        data-instgrm-captioned
-        data-instgrm-permalink={url}
-        data-instgrm-version="14"
-        style={{
-          background: "#FFF",
-          border: 0,
-          borderRadius: "12px",
-          boxShadow: "0 0 1px 0 rgba(0,0,0,0.5), 0 1px 10px 0 rgba(0,0,0,0.15)",
-          margin: "1rem auto",
-          maxWidth: "540px",
-          minWidth: "326px",
-          padding: 0,
-          width: "calc(100% - 2px)",
-        }}
-      >
-        <div style={{ padding: "16px" }}>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
+    <div ref={containerRef} className={`instagram-embed-container flex justify-center my-12 w-full ${className}`}>
+      <div className="relative w-full max-w-[600px] rounded-[2rem] p-2 sm:p-4 bg-gradient-to-br from-orange-50/80 via-white to-orange-50/50 dark:from-neutral-900 dark:via-neutral-900/80 dark:to-neutral-950 border border-orange-100 dark:border-white/10 shadow-2xl shadow-orange-900/5 dark:shadow-black/40 group transition-all duration-500 hover:shadow-orange-900/10">
+        <div className="absolute -top-6 -right-6 w-32 h-32 bg-orange-400/20 dark:bg-orange-500/10 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-125 pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-40 h-40 bg-rose-400/20 dark:bg-rose-500/10 rounded-full blur-3xl transition-transform duration-700 group-hover:scale-125 pointer-events-none" />
+        
+        <div className="relative z-10 w-full overflow-hidden rounded-[1.5rem] bg-white dark:bg-black ring-1 ring-black/5 dark:ring-white/10 shadow-inner flex justify-center">
+          <blockquote
+            className="instagram-media w-full"
+            data-instgrm-captioned
+            data-instgrm-permalink={url}
+            data-instgrm-version="14"
             style={{
-              color: "#c9c8cd",
-              fontFamily: "Arial, sans-serif",
-              fontSize: "14px",
-              fontStyle: "normal",
-              fontWeight: "normal",
-              lineHeight: "17px",
-              textDecoration: "none",
+              background: "#FFF",
+              border: 0,
+              borderRadius: "3px",
+              boxShadow: "none",
+              margin: "0px",
+              maxWidth: "540px",
+              minWidth: "326px",
+              padding: 0,
+              width: "100%",
             }}
           >
-            View this post on Instagram
-          </a>
+            <div style={{ padding: "16px" }}>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#c9c8cd",
+                  fontFamily: "Arial, sans-serif",
+                  fontSize: "14px",
+                  fontStyle: "normal",
+                  fontWeight: "normal",
+                  lineHeight: "17px",
+                  textDecoration: "none",
+                }}
+              >
+                View this post on Instagram
+              </a>
+            </div>
+          </blockquote>
         </div>
-      </blockquote>
+      </div>
     </div>
   );
 }

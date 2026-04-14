@@ -73,6 +73,10 @@ import {
   addCategory,
   updateCategory,
   deleteCategory,
+  getSubCategories,
+  addSubCategory,
+  updateSubCategory,
+  deleteSubCategory,
   getAdminUsers,
   getSubscriptions,
   getAppUsers,
@@ -83,6 +87,7 @@ import {
   getPetFeeds,
   Blog,
   Category,
+  SubCategory,
   UserProfile,
   PetFeedEntry,
   Subscription,
@@ -196,12 +201,14 @@ export default function AdminPanel() {
   // Category states
   const [categoryName, setCategoryName] = useState("")
   const [categoryDesc, setCategoryDesc] = useState("")
+  const [categoryParentId, setCategoryParentId] = useState("")
   const [categoryStatus, setCategoryStatus] = useState<"published" | "draft">("published")
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
 
   // List filter states
   const [searchQuery, setSearchQuery] = useState("")
-  // ── Auto-Draft helpers ──────────────────────────────────────────────────────
+  // ── Sub-Category states ──────────────────────────────────────────────────────
+  const [pendingDeletionCheck, setPendingDeletionCheck] = useState<{ id: string, name: string, subs: Category[] } | null>(null)
   const hasDraftContent = useCallback(
     () => !!(blogTitle || blogContent || blogKeywords || blogCategory),
     [blogTitle, blogContent, blogKeywords, blogCategory]
@@ -404,6 +411,7 @@ export default function AdminPanel() {
       const catData = {
         name: categoryName,
         description: categoryDesc,
+        parentId: (categoryParentId === "none" || !categoryParentId) ? undefined : categoryParentId,
         status: categoryStatus as 'published' | 'draft'
       }
 
@@ -429,6 +437,7 @@ export default function AdminPanel() {
   const handleEditCategory = (cat: any) => {
     setCategoryName(cat.name)
     setCategoryDesc(cat.description || "")
+    setCategoryParentId(cat.parentId || "")
     setCategoryStatus(cat.status || "published")
     setEditingCategoryId(cat.id)
     startTransition(() => {
@@ -436,13 +445,32 @@ export default function AdminPanel() {
     })
   }
 
-  const handleDeleteCategory = async (id: string) => {
+  const handleDeleteCategory = async (id: string, name: string) => {
+    // Check for sub-categories
+    const relatedSubs = categories.filter(c => c.parentId === id)
+    if (relatedSubs.length > 0) {
+      setPendingDeletionCheck({ id, name, subs: relatedSubs })
+      return
+    }
+
     try {
       await deleteCategory(id)
       toast.success("Category has been deleted.")
       fetchData()
     } catch (error) {
       console.error("Error deleting category:", error)
+      toast.error("Failed to delete category.")
+    }
+  }
+
+  const confirmDeleteCategory = async (id: string) => {
+    try {
+      await deleteCategory(id)
+      toast.success("Category and dependency info updated.")
+      setPendingDeletionCheck(null)
+      fetchData()
+    } catch (error) {
+      console.error("Error confirming deletion:", error)
       toast.error("Failed to delete category.")
     }
   }
@@ -465,7 +493,7 @@ export default function AdminPanel() {
       console.error("Error updating user role:", error);
       const errorMessage = error?.message || (typeof error === 'string' ? error : "Unknown error");
       toast.error(`Failed to update user role: ${errorMessage}`);
-      
+
       if (errorMessage.includes("permission-denied")) {
         console.warn("[Admin] Permission denied. Check your Firestore Security Rules.");
       }
@@ -541,7 +569,7 @@ export default function AdminPanel() {
         }}
         className="w-full space-y-6"
       >
-        <TabsList className="flex flex-nowrap items-center h-auto bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/8 dark:border-white/10 p-1.5 gap-1 rounded-2xl overflow-x-auto scrollbar-hide w-full max-w-full justify-start md:justify-center md:inline-flex">
+        <TabsList className="flex flex-nowrap items-center h-auto bg-black/5 dark:bg-white/5 backdrop-blur-xl border border-black/8 dark:border-white/10 p-1 gap-2 rounded-2xl overflow-x-auto scrollbar-hide w-full max-w-full justify-start md:justify-center md:inline-flex">
           <TabsTrigger value="blog-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <FileText className="w-4 h-4 mr-1.5" />
             Blogs
@@ -550,13 +578,21 @@ export default function AdminPanel() {
             <PlusCircle className="w-4 h-4 mr-1.5" />
             {editingBlogId ? "Edit Blog" : "New Blog"}
           </TabsTrigger>
-          <TabsTrigger value="category-list" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+          <TabsTrigger value="category-list" className="rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <FolderPlus className="w-4 h-4 mr-1.5" />
             Categories
           </TabsTrigger>
-          <TabsTrigger value="category" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+          <TabsTrigger value="category" className="rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-orange-600 dark:data-[state=active]:text-orange-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <PlusCircle className="w-4 h-4 mr-1.5" />
-            {editingCategoryId ? "Edit Category" : "New Category"}
+            {editingCategoryId && !categories.find(c => c.id === editingCategoryId)?.parentId ? "Edit Cat" : "New Cat"}
+          </TabsTrigger>
+          <TabsTrigger value="sub-category-list" className="rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-amber-600 dark:data-[state=active]:text-amber-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+            <Settings2 className="w-4 h-4 mr-1.5" />
+            Sub-Cats
+          </TabsTrigger>
+          <TabsTrigger value="sub-category" className="rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-amber-600 dark:data-[state=active]:text-amber-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
+            <PlusCircle className="w-4 h-4 mr-1.5" />
+            {editingCategoryId && categories.find(c => c.id === editingCategoryId)?.parentId ? "Edit Sub" : "New Sub"}
           </TabsTrigger>
           <TabsTrigger value="analytics" className="rounded-xl px-5 py-2 text-sm font-semibold transition-all duration-200 data-[state=active]:bg-white dark:data-[state=active]:bg-white/10 data-[state=active]:shadow-sm data-[state=active]:text-violet-600 dark:data-[state=active]:text-violet-400 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-white/5 shrink-0">
             <BarChart3 className="w-4 h-4 mr-1.5" />
@@ -995,20 +1031,21 @@ export default function AdminPanel() {
                     <thead>
                       <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
                         <th className="px-6 md:px-8 py-4 font-semibold text-sm">Category Name</th>
-                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Description</th>
+                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Parent</th>
+                        <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Description</th>
                         <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
-                      {categories.map((cat: any) => (
+                      {categories.filter(c => !c.parentId).map((cat: any) => (
                         <tr key={cat.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
                           <td className="px-6 md:px-8 py-5">
                             <span className="font-bold text-foreground group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cat.name}</span>
-                            <div className="md:hidden mt-1 text-xs text-muted-foreground truncate max-w-[150px]">
-                              {cat.description || "No description"}
-                            </div>
                           </td>
-                          <td className="hidden md:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
+                          <td className="hidden md:table-cell px-8 py-5 text-sm font-bold text-orange-600/70">
+                            <span className="text-muted-foreground/50 font-normal">Top Level</span>
+                          </td>
+                          <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
                             {cat.description || "No description provided."}
                           </td>
                           <td className="px-6 md:px-8 py-5 text-right">
@@ -1022,35 +1059,15 @@ export default function AdminPanel() {
                                 <Edit className="w-4 h-4 md:mr-1.5" />
                                 <span className="hidden md:inline">Edit</span>
                               </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
-                                  >
-                                    <Trash2 className="w-4 h-4 md:mr-1.5" />
-                                    <span className="hidden md:inline">Delete</span>
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-2xl font-bold font-roboto">Delete Category?</AlertDialogTitle>
-                                    <AlertDialogDescription className="text-base text-muted-foreground font-roboto">
-                                      Are you sure you want to delete "{cat.name}"? This may affect blogs linked to this category.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
-                                    <AlertDialogCancel className="h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0"
-                                      onClick={() => handleDeleteCategory(cat.id)}
-                                    >
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all shadow-sm"
+                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                              >
+                                <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                <span className="hidden md:inline">Delete</span>
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -1060,7 +1077,74 @@ export default function AdminPanel() {
                 </div>
               </CardContent>
               <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">Total {categories.length} categories</span>
+                <span className="text-sm text-muted-foreground font-medium">Total {categories.filter(c => !c.parentId).length} categories</span>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sub-category-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+              <CardHeader className="p-8 pb-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <CardTitle className="text-2xl font-bold">Manage Sub-Categories</CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
+                        <th className="px-6 md:px-8 py-4 font-semibold text-sm">Sub-Category</th>
+                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Parent Category</th>
+                        <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Description</th>
+                        <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/40">
+                      {categories.filter(c => c.parentId).map((cat: any) => (
+                        <tr key={cat.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                          <td className="px-6 md:px-8 py-5">
+                            <span className="font-bold text-foreground group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cat.name}</span>
+                          </td>
+                          <td className="hidden md:table-cell px-8 py-5 text-sm font-bold text-orange-600/70">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 w-fit">
+                              <ChevronRight className="w-3.5 h-3.5" />
+                              {getCategoryName(cat.parentId)}
+                            </div>
+                          </td>
+                          <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
+                            {cat.description || "No description provided."}
+                          </td>
+                          <td className="px-6 md:px-8 py-5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all"
+                                onClick={() => handleEditCategory(cat)}
+                              >
+                                <Edit className="w-4 h-4 md:mr-1.5" />
+                                <span className="hidden md:inline">Edit</span>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all shadow-sm"
+                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
+                              >
+                                <Trash2 className="w-4 h-4 md:mr-1.5" />
+                                <span className="hidden md:inline">Delete</span>
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
+                <span className="text-sm text-muted-foreground font-medium">Total {categories.filter(c => c.parentId).length} sub-categories</span>
               </CardFooter>
             </Card>
           </TabsContent>
@@ -1107,7 +1191,7 @@ export default function AdminPanel() {
                       <Textarea
                         id="catDesc"
                         placeholder="Briefly describe what this category is about..."
-                        className="min-h-[140px] resize-y bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 text-base rounded-2xl shadow-sm transition-all group-hover:bg-white/60 dark:group-hover:bg-black/60 p-4"
+                        className="min-h-[100px] resize-y bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 text-base rounded-2xl shadow-sm transition-all group-hover:bg-white/60 dark:group-hover:bg-black/60 p-4"
                         value={categoryDesc}
                         onChange={(e) => setCategoryDesc(e.target.value)}
                       />
@@ -1142,6 +1226,7 @@ export default function AdminPanel() {
                     setEditingCategoryId(null);
                     setCategoryName("");
                     setCategoryDesc("");
+                    setCategoryParentId("");
                     setCategoryStatus("published");
                     startTransition(() => {
                       setActiveTab("category-list")
@@ -1149,9 +1234,109 @@ export default function AdminPanel() {
                   }}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="h-12 px-10 gap-2 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-600 hover:to-yellow-600 text-white shadow-xl shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 font-bold text-base border-0 rounded-xl">
+                  <Button type="submit" className="h-12 px-10 gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 transition-all hover:scale-105 active:scale-95 font-bold text-base border-0 rounded-xl">
                     <Save className="w-5 h-5" />
                     {editingCategoryId ? 'Update Category' : 'Save Category'}
+                  </Button>
+                </CardFooter>
+              </form>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sub-category" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
+            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden max-w-4xl mx-auto rounded-[2rem]">
+              <form onSubmit={handleCategorySubmit} className="relative z-10">
+                <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-8 pt-8 px-8">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 shadow-inner">
+                      <FolderPlus className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-3xl font-bold text-foreground">
+                        {editingCategoryId ? "Edit Sub-Category" : "New Sub-Category"}
+                      </CardTitle>
+                      <CardDescription className="text-base text-muted-foreground mt-1">
+                        Group content more granularly by adding a sub-category to a parent.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-8 p-8">
+                  <div className="space-y-6">
+                    <div className="space-y-3 group">
+                      <Label htmlFor="subCatParent" className="text-base font-semibold text-foreground/90 flex items-center justify-between">
+                        Parent Category
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Required</span>
+                      </Label>
+                      <Select value={categoryParentId} onValueChange={setCategoryParentId} required>
+                        <SelectTrigger id="subCatParent" className="h-14 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-2xl focus:ring-amber-500/30 shadow-sm">
+                          <SelectValue placeholder="Select Parent Category" />
+                        </SelectTrigger>
+                        <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10 max-h-[300px]">
+                          {categories
+                            .filter(c => !c.parentId && c.id !== editingCategoryId)
+                            .map((c) => (
+                              <SelectItem key={c.id} value={c.id} className="rounded-lg my-1 cursor-pointer">
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3 group">
+                      <Label htmlFor="subCatName" className="text-base font-semibold text-foreground/90 flex items-center justify-between">
+                        Sub-Category Name
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Required</span>
+                      </Label>
+                      <Input
+                        id="subCatName"
+                        placeholder="e.g. Behavioral Training, Senior Health..."
+                        value={categoryName}
+                        onChange={(e) => setCategoryName(e.target.value)}
+                        className="h-14 text-lg bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 rounded-2xl shadow-sm transition-all group-hover:bg-white/60 dark:group-hover:bg-black/60 px-4"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-3 group">
+                      <Label htmlFor="subCatDesc" className="text-base font-semibold text-foreground/90">Description</Label>
+                      <Textarea
+                        id="subCatDesc"
+                        placeholder="Briefly describe this sub-category..."
+                        className="min-h-[100px] bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-2xl p-4 shadow-sm"
+                        value={categoryDesc}
+                        onChange={(e) => setCategoryDesc(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-3 group">
+                      <Label htmlFor="subCatStatus" className="text-base font-semibold text-foreground/90">Status</Label>
+                      <Select value={categoryStatus} onValueChange={(val: "published" | "draft") => setCategoryStatus(val)}>
+                        <SelectTrigger id="subCatStatus" className="h-14 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-2xl focus:ring-amber-500/30 shadow-sm">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
+                          <SelectItem value="draft" className="rounded-lg my-1 cursor-pointer">Draft</SelectItem>
+                          <SelectItem value="published" className="rounded-lg my-1 cursor-pointer">Published</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-end gap-4 border-t border-border/40 bg-white/20 dark:bg-black/20 p-8">
+                  <Button type="button" variant="outline" className="h-12 px-8 rounded-xl" onClick={() => {
+                    setEditingCategoryId(null);
+                    setCategoryName("");
+                    setCategoryDesc("");
+                    setCategoryParentId("");
+                    startTransition(() => setActiveTab("sub-category-list"))
+                  }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="h-12 px-10 bg-gradient-to-r from-amber-500 to-yellow-500 text-white font-bold rounded-xl shadow-xl">
+                    <Save className="w-5 h-5 mr-2" />
+                    {editingCategoryId ? 'Update Sub-Category' : 'Save Sub-Category'}
                   </Button>
                 </CardFooter>
               </form>
@@ -1709,6 +1894,54 @@ export default function AdminPanel() {
           </TabsContent>
         </div>
       </Tabs>
+
+      {/* Deletion with Dependencies Alert */}
+      <AlertDialog open={!!pendingDeletionCheck} onOpenChange={(open) => !open && setPendingDeletionCheck(null)}>
+        <AlertDialogContent className="rounded-[2.5rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/95 dark:bg-black/95 shadow-2xl p-0 overflow-hidden max-w-lg">
+          <div className="p-8 pb-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-destructive/10 rounded-2xl border border-destructive/20 shadow-inner">
+                <Trash2 className="w-8 h-8 text-destructive" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-2xl font-bold tracking-tight">Cannot Delete Category</AlertDialogTitle>
+                <AlertDialogDescription className="text-base text-muted-foreground mt-1">
+                  "{pendingDeletionCheck?.name}" has active sub-categories.
+                </AlertDialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-sm font-semibold text-foreground/80 uppercase tracking-wider">Related Sub-Categories:</p>
+              <div className="space-y-2 max-h-[160px] overflow-y-auto pr-2 custom-scrollbar">
+                {pendingDeletionCheck?.subs.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-3 p-3 rounded-xl bg-muted/30 border border-border/40 group hover:bg-muted/50 transition-all">
+                    <ChevronRight className="w-4 h-4 text-orange-500 group-hover:translate-x-0.5 transition-transform" />
+                    <span className="font-bold text-sm text-foreground/90">{sub.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <p className="mt-8 text-sm text-muted-foreground leading-relaxed italic">
+              Please delete or reassign these sub-categories first before deleting the parent category.
+            </p>
+          </div>
+
+          <AlertDialogFooter className="bg-muted/30 p-6 border-t border-border/40 gap-3">
+            <AlertDialogCancel className="h-12 rounded-xl border-0 bg-transparent hover:bg-muted font-bold px-8" onClick={() => setPendingDeletionCheck(null)}>
+              Go Back
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="h-12 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 font-bold px-8 border-0"
+              onClick={() => confirmDeleteCategory(pendingDeletionCheck?.id || "")}
+            >
+              Delete Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   )
 }
