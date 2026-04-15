@@ -27,7 +27,8 @@ export interface Blog {
   excerpt?: string;
   content: string;
   image?: string;
-  categoryId: string;
+  categoryId: string;          // legacy single-category (kept for backward compat)
+  categoryIds?: string[];      // multi-category support (primary field going forward)
   authorId?: string;
   authorName?: string;
   status: 'published' | 'draft';

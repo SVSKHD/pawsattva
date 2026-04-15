@@ -62,8 +62,6 @@ import AdminLoader from "@/components/loader"
 
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
-import { Loader2 } from "lucide-react"
-import { db } from "@/firebase/firebase"
 import {
   getBlogs,
   addBlog,
@@ -193,7 +191,7 @@ export default function AdminPanel() {
   const [blogExcerpt, setBlogExcerpt] = useState("")
   const [blogImage, setBlogImage] = useState("")
   const [blogContent, setBlogContent] = useState("")
-  const [blogCategory, setBlogCategory] = useState("")
+  const [blogCategories, setBlogCategories] = useState<string[]>([])
   const [blogAuthorId, setBlogAuthorId] = useState("")
   const [blogStatus, setBlogStatus] = useState<"published" | "draft">("draft")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
@@ -210,20 +208,20 @@ export default function AdminPanel() {
   // ── Sub-Category states ──────────────────────────────────────────────────────
   const [pendingDeletionCheck, setPendingDeletionCheck] = useState<{ id: string, name: string, subs: Category[] } | null>(null)
   const hasDraftContent = useCallback(
-    () => !!(blogTitle || blogContent || blogKeywords || blogCategory),
-    [blogTitle, blogContent, blogKeywords, blogCategory]
+    () => !!(blogTitle || blogContent || blogKeywords || blogCategories.length),
+    [blogTitle, blogContent, blogKeywords, blogCategories]
   )
 
   const saveDraft = useCallback(() => {
-    if (!blogTitle && !blogContent && !blogKeywords && !blogCategory) return
+    if (!blogTitle && !blogContent && !blogKeywords && !blogCategories.length) return
     const draft = {
       blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage,
-      blogContent, blogCategory, blogAuthorId, blogStatus, editingBlogId,
+      blogContent, blogCategories, blogAuthorId, blogStatus, editingBlogId,
       savedAt: new Date().toISOString(),
     }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     setSavedDraft({ savedAt: draft.savedAt })
-  }, [blogTitle, blogSlug, blogKeywords, blogContent, blogCategory, blogStatus, editingBlogId])
+  }, [blogTitle, blogSlug, blogKeywords, blogContent, blogCategories, blogStatus, editingBlogId])
 
   const clearDraft = useCallback(() => {
     localStorage.removeItem(DRAFT_KEY)
@@ -252,7 +250,7 @@ export default function AdminPanel() {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     }
-  }, [blogTitle, blogSlug, blogKeywords, blogContent, blogCategory, blogStatus, activeTab, editingBlogId, hasDraftContent, saveDraft])
+  }, [blogTitle, blogSlug, blogKeywords, blogContent, blogCategories, blogStatus, activeTab, editingBlogId, hasDraftContent, saveDraft])
 
   // Save immediately when navigating away from the blog tab
   useEffect(() => {
@@ -280,7 +278,7 @@ export default function AdminPanel() {
       setBlogSlug(d.blogSlug || "")
       setBlogKeywords(d.blogKeywords || "")
       setBlogContent(d.blogContent || "")
-      setBlogCategory(d.blogCategory || "")
+      setBlogCategories(Array.isArray(d.blogCategories) ? d.blogCategories : (d.blogCategory ? [d.blogCategory] : []))
       setBlogStatus(d.blogStatus || "draft")
       setEditingBlogId(d.editingBlogId || null)
       toast.success("Draft restored! Continue where you left off.")
@@ -325,8 +323,8 @@ export default function AdminPanel() {
 
   const handleBlogSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!blogTitle || !blogContent || !blogCategory) {
-      toast.error("Please fill in all required fields.")
+    if (!blogTitle || !blogContent || blogCategories.length === 0) {
+      toast.error("Please fill in all required fields and select at least one category.")
       return
     }
 
@@ -339,7 +337,8 @@ export default function AdminPanel() {
         excerpt: blogExcerpt,
         image: blogImage,
         content: blogContent,
-        categoryId: blogCategory,
+        categoryId: blogCategories[0],          // keep legacy field as primary
+        categoryIds: blogCategories,            // full multi-category array
         authorId: blogAuthorId,
         authorName: selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
         status: blogStatus as 'published' | 'draft'
@@ -361,7 +360,7 @@ export default function AdminPanel() {
       setBlogExcerpt("")
       setBlogImage("")
       setBlogContent("")
-      setBlogCategory("")
+      setBlogCategories([])
       setBlogAuthorId("")
       setBlogStatus("draft")
       clearDraft()
@@ -379,7 +378,8 @@ export default function AdminPanel() {
     setBlogExcerpt(blog.excerpt || "")
     setBlogImage(blog.image || "")
     setBlogContent(blog.content)
-    setBlogCategory(blog.categoryId)
+    // Support both legacy (categoryId) and new (categoryIds) formats
+    setBlogCategories(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : [])
     setBlogAuthorId(blog.authorId || "")
     setBlogStatus(blog.status)
     setEditingBlogId(blog.id)
@@ -615,148 +615,159 @@ export default function AdminPanel() {
               to   { opacity: 1; transform: translateY(0); }
             }
             [data-state="active"].tab-panel {
-              animation: tab-enter 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
-            }
-          `}</style>
-          <div className="pointer-events-none absolute -inset-x-4 top-0 h-32 bg-orange-400/5 dark:bg-orange-500/5 blur-3xl rounded-full" />
+                    <TabsContent value="blog-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-2 pb-6 space-y-5">
+            {/* ── Header ── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold">Manage Blogs</h2>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  <span className="font-semibold text-emerald-600">{blogs.filter(b => b.status === 'published').length} published</span>
+                  {" · "}
+                  <span className="font-semibold text-amber-600">{blogs.filter(b => b.status === 'draft').length} drafts</span>
+                </p>
+              </div>
+              <div className="relative max-w-xs w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input placeholder="Search posts..." className="pl-10 h-10 bg-white/50 dark:bg-black/50 border-white/20 dark:border-white/10 rounded-xl"
+                  value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              </div>
+            </div>
 
-          <TabsContent value="blog-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-2 pb-6">
-            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-              <CardHeader className="p-8 pb-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <CardTitle className="text-2xl font-bold">Manage Blogs</CardTitle>
-                  <div className="relative max-w-xs w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search posts..."
-                      className="pl-10 h-10 bg-white/50 dark:bg-black/50 border-white/20 dark:border-white/10 rounded-xl"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm">Title & Category</th>
-                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Author</th>
-                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Status</th>
-                        <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Date</th>
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/40">
-                      {filteredBlogs.length > 0 ? filteredBlogs.map((blog) => (
-                        <tr key={blog.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-6 md:px-8 py-5">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-bold text-foreground group-hover:text-orange-600 transition-colors uppercase tracking-tight">{blog.title}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                  {getCategoryName(blog.categoryId)} <ChevronRight className="w-3 h-3" />
-                                </span>
-                                <span className="hidden sm:inline text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
-                              </div>
-                              <div className="md:hidden mt-2 flex flex-col gap-1.5">
-                                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                                  <Users className="w-3 h-3" /> {blog.authorName || "Unknown Author"}
-                                </span>
-                                <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider w-fit ${blog.status === 'published'
-                                  ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                                  : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
-                                  }`}>
-                                  {blog.status}
-                                </div>
-                              </div>
+            {/* ── PUBLISHED ── */}
+            <div className="rounded-[1.75rem] border border-emerald-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-emerald-500/5 border-b border-emerald-500/15">
+                <div className="w-1 h-6 rounded-full bg-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm uppercase tracking-widest">Published</span>
+                <span className="ml-auto text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  {filteredBlogs.filter(b => b.status === 'published').length}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                      <th className="px-6 md:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Title &amp; Category</th>
+                      <th className="hidden md:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Author</th>
+                      <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Date</th>
+                      <th className="px-6 md:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {filteredBlogs.filter(b => b.status === 'published').length > 0
+                      ? filteredBlogs.filter(b => b.status === 'published').map((blog) => (
+                        <tr key={blog.id} className="group hover:bg-emerald-500/5 transition-colors">
+                          <td className="px-6 md:px-8 py-4">
+                            <span className="font-bold text-foreground group-hover:text-emerald-700 transition-colors">{blog.title}</span>
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : []).map(cid => (
+                                <span key={cid} className="text-[10px] font-semibold bg-emerald-500/10 text-emerald-700 border border-emerald-500/15 px-1.5 py-0.5 rounded-full">{getCategoryName(cid)}</span>
+                              ))}
+                              <span className="hidden sm:inline text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
                             </div>
                           </td>
-                          <td className="hidden md:table-cell px-8 py-5">
-                            <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-                              <Users className="w-4 h-4 text-orange-500/60" />
-                              {blog.authorName || "Unknown"}
-                            </div>
-                          </td>
-                          <td className="hidden md:table-cell px-8 py-5">
-                            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${blog.status === 'published'
-                              ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
-                              : 'bg-orange-500/10 text-orange-600 border border-orange-500/20'
-                              }`}>
-                              {blog.status === 'published' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <CircleDashed className="w-3.5 h-3.5" />}
-                              {blog.status}
-                            </div>
-                          </td>
-                          <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium">
-                            {blog.date}
-                          </td>
-                          <td className="px-6 md:px-8 py-5 text-right">
+                          <td className="hidden md:table-cell px-8 py-4 text-sm text-foreground/70 font-medium">{blog.authorName || "Unknown"}</td>
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground">{blog.date}</td>
+                          <td className="px-6 md:px-8 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all"
-                                onClick={() => handleEditBlog(blog)}
-                              >
-                                <Edit className="w-4 h-4 md:mr-1.5" />
-                                <span className="hidden md:inline">Edit</span>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditBlog(blog)}>
+                                <Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span>
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all"
-                                  >
-                                    <Trash2 className="w-4 h-4 md:mr-1.5" />
-                                    <span className="hidden md:inline">Delete</span>
+                                  <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all">
+                                    <Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span>
                                   </Button>
                                 </AlertDialogTrigger>
-
                                 <AlertDialogContent className="p-10 rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
-
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle className="text-2xl p-2 font-bold font-roboto">Confirm Deletion</AlertDialogTitle>
+                                    <AlertDialogTitle className="text-2xl p-2 font-bold">Confirm Deletion</AlertDialogTitle>
                                     <hr className="border-black/20" />
-                                    <AlertDialogDescription className="text-base text-muted-foreground font-roboto">
-                                      Are you sure you want to permanently delete "{blog.title}"? This action cannot be undone.
-                                    </AlertDialogDescription>
+                                    <AlertDialogDescription className="text-base text-muted-foreground">Are you sure you want to permanently delete "{blog.title}"? This action cannot be undone.</AlertDialogDescription>
                                   </AlertDialogHeader>
-
                                   <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
                                     <AlertDialogCancel className="pt-2 h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">No, Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="p-2 h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0"
-                                      onClick={() => handleDeleteBlog(blog.id)}
-                                    >
-                                      Yes, Delete Permanently
-                                    </AlertDialogAction>
+                                    <AlertDialogAction className="p-2 h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0" onClick={() => handleDeleteBlog(blog.id)}>Yes, Delete Permanently</AlertDialogAction>
                                   </AlertDialogFooter>
-
                                 </AlertDialogContent>
                               </AlertDialog>
                             </div>
                           </td>
                         </tr>
-                      )) : (
-                        <tr>
-                          <td colSpan={4} className="px-8 py-20 text-center text-muted-foreground">
-                            <div className="flex flex-col items-center gap-2">
-                              <MoreVertical className="w-8 h-8 opacity-20" />
-                              <p className="font-medium">No blog posts found matching your search.</p>
+                      ))
+                      : <tr><td colSpan={4} className="px-8 py-12 text-center text-muted-foreground text-sm font-medium">No published posts yet.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── DRAFTS ── */}
+            <div className="rounded-[1.75rem] border border-amber-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-amber-500/5 border-b border-amber-500/15">
+                <div className="w-1 h-6 rounded-full bg-amber-500" />
+                <CircleDashed className="w-4 h-4 text-amber-600" />
+                <span className="font-bold text-amber-700 dark:text-amber-400 text-sm uppercase tracking-widest">Drafts</span>
+                <span className="ml-auto text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                  {filteredBlogs.filter(b => b.status === 'draft').length}
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                      <th className="px-6 md:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Title &amp; Category</th>
+                      <th className="hidden md:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Author</th>
+                      <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Date</th>
+                      <th className="px-6 md:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {filteredBlogs.filter(b => b.status === 'draft').length > 0
+                      ? filteredBlogs.filter(b => b.status === 'draft').map((blog) => (
+                        <tr key={blog.id} className="group hover:bg-amber-500/5 transition-colors">
+                          <td className="px-6 md:px-8 py-4">
+                            <span className="font-bold text-foreground/75 group-hover:text-amber-700 transition-colors">{blog.title}</span>
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : []).map(cid => (
+                                <span key={cid} className="text-[10px] font-semibold bg-amber-500/10 text-amber-700 border border-amber-500/15 px-1.5 py-0.5 rounded-full">{getCategoryName(cid)}</span>
+                              ))}
+                              <span className="hidden sm:inline text-[10px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground font-mono">/{blog.slug}</span>
+                            </div>
+                          </td>
+                          <td className="hidden md:table-cell px-8 py-4 text-sm text-foreground/70 font-medium">{blog.authorName || "Unknown"}</td>
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground">{blog.date}</td>
+                          <td className="px-6 md:px-8 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditBlog(blog)}>
+                                <Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span>
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all">
+                                    <Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span>
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="p-10 rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="text-2xl p-2 font-bold">Confirm Deletion</AlertDialogTitle>
+                                    <hr className="border-black/20" />
+                                    <AlertDialogDescription className="text-base text-muted-foreground">Are you sure you want to permanently delete "{blog.title}"? This action cannot be undone.</AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter className="mt-6 border-0 bg-transparent gap-3 px-0 pb-0">
+                                    <AlertDialogCancel className="pt-2 h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted transition-all">No, Cancel</AlertDialogCancel>
+                                    <AlertDialogAction className="p-2 h-11 rounded-xl bg-destructive hover:bg-destructive/90 transition-all shadow-lg shadow-destructive/20 border-0" onClick={() => handleDeleteBlog(blog.id)}>Yes, Delete Permanently</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">Showing {filteredBlogs.length} of {blogs.length} articles</span>
-              </CardFooter>
-            </Card>
+                      ))
+                      : <tr><td colSpan={4} className="px-8 py-12 text-center text-muted-foreground text-sm font-medium">No draft posts.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="blog" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
@@ -911,23 +922,84 @@ export default function AdminPanel() {
                           Publish Info
                         </h3>
 
-                        <div className="space-y-4">
-                          <Label htmlFor="category" className="text-sm font-semibold text-foreground/80 flex items-center justify-between">
-                            Category
-                            <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Req</span>
+                        <div className="space-y-3">
+                          <Label className="text-sm font-semibold text-foreground/80 flex items-center justify-between">
+                            Categories
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Req · multi</span>
                           </Label>
-                          <Select value={blogCategory} onValueChange={setBlogCategory}>
-                            <SelectTrigger id="category" className="h-12 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-xl focus:ring-orange-500/30">
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                            <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
-                              {categories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id} className="rounded-lg my-1 cursor-pointer">
-                                  {cat.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+
+                          {/* Selected chips */}
+                          {blogCategories.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-1">
+                              {blogCategories.map(id => {
+                                const cat = categories.find(c => c.id === id)
+                                return cat ? (
+                                  <span key={id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-500/10 text-orange-700 border border-orange-500/20">
+                                    {cat.parentId ? <ChevronRight className="w-2.5 h-2.5" /> : null}
+                                    {cat.name}
+                                    <button type="button" onClick={() => setBlogCategories(prev => prev.filter(x => x !== id))} className="ml-0.5 hover:text-red-500 transition-colors">×</button>
+                                  </span>
+                                ) : null
+                              })}
+                            </div>
+                          )}
+
+                          {/* Parent categories */}
+                          <div className="rounded-xl border border-white/30 dark:border-white/10 bg-white/40 dark:bg-black/30 divide-y divide-border/30 overflow-hidden max-h-[220px] overflow-y-auto">
+                            {categories.filter(c => !c.parentId).map(cat => {
+                              const subs = categories.filter(s => s.parentId === cat.id)
+                              const checked = blogCategories.includes(cat.id)
+                              return (
+                                <div key={cat.id}>
+                                  {/* Parent row */}
+                                  <label className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer hover:bg-orange-500/5 transition-colors ${ checked ? 'bg-orange-500/5' : '' }`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setBlogCategories(prev => prev.includes(cat.id) ? prev : [...prev, cat.id])
+                                        } else {
+                                          setBlogCategories(prev => prev.filter(x => x !== cat.id))
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 accent-orange-500 rounded"
+                                    />
+                                    <span className="text-sm font-semibold text-foreground/90">{cat.name}</span>
+                                    {checked && <CheckCircle2 className="w-3.5 h-3.5 text-orange-500 ml-auto" />}
+                                  </label>
+                                  {/* Sub-category rows */}
+                                  {subs.map(sub => {
+                                    const subChecked = blogCategories.includes(sub.id)
+                                    return (
+                                      <label key={sub.id} className={`flex items-center gap-2.5 pl-7 pr-3 py-2 cursor-pointer hover:bg-orange-500/5 transition-colors ${ subChecked ? 'bg-orange-500/5' : '' }`}>
+                                        <input
+                                          type="checkbox"
+                                          checked={subChecked}
+                                          onChange={e => {
+                                            if (e.target.checked) {
+                                              setBlogCategories(prev => prev.includes(sub.id) ? prev : [...prev, sub.id])
+                                            } else {
+                                              setBlogCategories(prev => prev.filter(x => x !== sub.id))
+                                            }
+                                          }}
+                                          className="w-3 h-3 accent-orange-400 rounded"
+                                        />
+                                        <ChevronRight className="w-3 h-3 text-muted-foreground/40" />
+                                        <span className="text-xs font-medium text-muted-foreground">{sub.name}</span>
+                                        {subChecked && <CheckCircle2 className="w-3 h-3 text-orange-400 ml-auto" />}
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              )
+                            })}
+                          </div>
+                          {blogCategories.length === 0 && (
+                            <p className="text-[11px] text-orange-500 font-medium flex items-center gap-1">
+                              <CircleDashed className="w-3 h-3" /> Select at least one category
+                            </p>
+                          )}
                         </div>
 
                         <div className="space-y-4 pt-6 mt-6 border-t border-border/40">
@@ -1000,7 +1072,7 @@ export default function AdminPanel() {
                     setBlogExcerpt("");
                     setBlogImage("");
                     setBlogContent("");
-                    setBlogCategory("");
+                    setBlogCategories([]);
                     setBlogAuthorId("");
                     setBlogStatus("draft");
                     startTransition(() => {
@@ -1018,135 +1090,178 @@ export default function AdminPanel() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="category-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
-            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-              <CardHeader className="p-8 pb-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <CardTitle className="text-2xl font-bold">Manage Categories</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm">Category Name</th>
-                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Parent</th>
-                        <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Description</th>
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/40">
-                      {categories.filter(c => !c.parentId).map((cat: any) => (
-                        <tr key={cat.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-6 md:px-8 py-5">
-                            <span className="font-bold text-foreground group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cat.name}</span>
-                          </td>
-                          <td className="hidden md:table-cell px-8 py-5 text-sm font-bold text-orange-600/70">
-                            <span className="text-muted-foreground/50 font-normal">Top Level</span>
-                          </td>
-                          <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
-                            {cat.description || "No description provided."}
-                          </td>
-                          <td className="px-6 md:px-8 py-5 text-right">
+          <TabsContent value="category-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4 space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold">Manage Categories</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                <span className="font-semibold text-emerald-600">{categories.filter(c => !c.parentId && c.status === 'published').length} published</span>
+                {" · "}
+                <span className="font-semibold text-amber-600">{categories.filter(c => !c.parentId && c.status === 'draft').length} drafts</span>
+              </p>
+            </div>
+
+            {/* ── PUBLISHED ── */}
+            <div className="rounded-[1.75rem] border border-emerald-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-emerald-500/5 border-b border-emerald-500/15">
+                <div className="w-1 h-6 rounded-full bg-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm uppercase tracking-widest">Published</span>
+                <span className="ml-auto text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20">{categories.filter(c => !c.parentId && c.status === 'published').length}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead><tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Category Name</th>
+                    <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border/30">
+                    {categories.filter(c => !c.parentId && c.status === 'published').length > 0
+                      ? categories.filter(c => !c.parentId && c.status === 'published').map((cat: any) => (
+                        <tr key={cat.id} className="group hover:bg-emerald-500/5 transition-colors">
+                          <td className="px-8 py-4 font-bold text-foreground group-hover:text-emerald-700 transition-colors uppercase tracking-tight">{cat.name}</td>
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">{cat.description || "—"}</td>
+                          <td className="px-8 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all"
-                                onClick={() => handleEditCategory(cat)}
-                              >
-                                <Edit className="w-4 h-4 md:mr-1.5" />
-                                <span className="hidden md:inline">Edit</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all shadow-sm"
-                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                              >
-                                <Trash2 className="w-4 h-4 md:mr-1.5" />
-                                <span className="hidden md:inline">Delete</span>
-                              </Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditCategory(cat)}><Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span></Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all" onClick={() => handleDeleteCategory(cat.id, cat.name)}><Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span></Button>
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">Total {categories.filter(c => !c.parentId).length} categories</span>
-              </CardFooter>
-            </Card>
+                      ))
+                      : <tr><td colSpan={3} className="px-8 py-8 text-center text-muted-foreground text-sm">No published categories.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── DRAFTS ── */}
+            <div className="rounded-[1.75rem] border border-amber-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-amber-500/5 border-b border-amber-500/15">
+                <div className="w-1 h-6 rounded-full bg-amber-500" />
+                <CircleDashed className="w-4 h-4 text-amber-600" />
+                <span className="font-bold text-amber-700 dark:text-amber-400 text-sm uppercase tracking-widest">Drafts</span>
+                <span className="ml-auto text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-500/20">{categories.filter(c => !c.parentId && c.status === 'draft').length}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead><tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Category Name</th>
+                    <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border/30">
+                    {categories.filter(c => !c.parentId && c.status === 'draft').length > 0
+                      ? categories.filter(c => !c.parentId && c.status === 'draft').map((cat: any) => (
+                        <tr key={cat.id} className="group hover:bg-amber-500/5 transition-colors">
+                          <td className="px-8 py-4 font-bold text-foreground/70 group-hover:text-amber-700 transition-colors uppercase tracking-tight">{cat.name}</td>
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">{cat.description || "—"}</td>
+                          <td className="px-8 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditCategory(cat)}><Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span></Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all" onClick={() => handleDeleteCategory(cat.id, cat.name)}><Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                      : <tr><td colSpan={3} className="px-8 py-8 text-center text-muted-foreground text-sm">No draft categories.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </TabsContent>
 
-          <TabsContent value="sub-category-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">
-            <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-              <CardHeader className="p-8 pb-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <CardTitle className="text-2xl font-bold">Manage Sub-Categories</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm">Sub-Category</th>
-                        <th className="hidden md:table-cell px-8 py-4 font-semibold text-sm">Parent Category</th>
-                        <th className="hidden lg:table-cell px-8 py-4 font-semibold text-sm">Description</th>
-                        <th className="px-6 md:px-8 py-4 font-semibold text-sm text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/40">
-                      {categories.filter(c => c.parentId).map((cat: any) => (
-                        <tr key={cat.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                          <td className="px-6 md:px-8 py-5">
-                            <span className="font-bold text-foreground group-hover:text-amber-600 transition-colors uppercase tracking-tight">{cat.name}</span>
-                          </td>
-                          <td className="hidden md:table-cell px-8 py-5 text-sm font-bold text-orange-600/70">
-                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 w-fit">
-                              <ChevronRight className="w-3.5 h-3.5" />
-                              {getCategoryName(cat.parentId)}
+          <TabsContent value="sub-category-list" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4 space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold">Manage Sub-Categories</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                <span className="font-semibold text-emerald-600">{categories.filter(c => c.parentId && c.status === 'published').length} published</span>
+                {" · "}
+                <span className="font-semibold text-amber-600">{categories.filter(c => c.parentId && c.status === 'draft').length} drafts</span>
+              </p>
+            </div>
+
+            {/* ── PUBLISHED ── */}
+            <div className="rounded-[1.75rem] border border-emerald-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-emerald-500/5 border-b border-emerald-500/15">
+                <div className="w-1 h-6 rounded-full bg-emerald-500" />
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm uppercase tracking-widest">Published</span>
+                <span className="ml-auto text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20">{categories.filter(c => c.parentId && c.status === 'published').length}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead><tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Sub-Category</th>
+                    <th className="hidden md:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Parent</th>
+                    <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border/30">
+                    {categories.filter(c => c.parentId && c.status === 'published').length > 0
+                      ? categories.filter(c => c.parentId && c.status === 'published').map((cat: any) => (
+                        <tr key={cat.id} className="group hover:bg-emerald-500/5 transition-colors">
+                          <td className="px-8 py-4 font-bold text-foreground group-hover:text-emerald-700 transition-colors uppercase tracking-tight">{cat.name}</td>
+                          <td className="hidden md:table-cell px-8 py-4">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 w-fit text-xs font-bold text-orange-600">
+                              <ChevronRight className="w-3.5 h-3.5" />{getCategoryName(cat.parentId)}
                             </div>
                           </td>
-                          <td className="hidden lg:table-cell px-8 py-5 text-sm text-muted-foreground font-medium max-w-xs truncate">
-                            {cat.description || "No description provided."}
-                          </td>
-                          <td className="px-6 md:px-8 py-5 text-right">
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">{cat.description || "—"}</td>
+                          <td className="px-8 py-4 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all"
-                                onClick={() => handleEditCategory(cat)}
-                              >
-                                <Edit className="w-4 h-4 md:mr-1.5" />
-                                <span className="hidden md:inline">Edit</span>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 md:h-9 px-2 md:px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all shadow-sm"
-                                onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                              >
-                                <Trash2 className="w-4 h-4 md:mr-1.5" />
-                                <span className="hidden md:inline">Delete</span>
-                              </Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditCategory(cat)}><Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span></Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all" onClick={() => handleDeleteCategory(cat.id, cat.name)}><Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span></Button>
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-              <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-                <span className="text-sm text-muted-foreground font-medium">Total {categories.filter(c => c.parentId).length} sub-categories</span>
-              </CardFooter>
-            </Card>
+                      ))
+                      : <tr><td colSpan={4} className="px-8 py-8 text-center text-muted-foreground text-sm">No published sub-categories.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* ── DRAFTS ── */}
+            <div className="rounded-[1.75rem] border border-amber-500/20 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-8 py-4 bg-amber-500/5 border-b border-amber-500/15">
+                <div className="w-1 h-6 rounded-full bg-amber-500" />
+                <CircleDashed className="w-4 h-4 text-amber-600" />
+                <span className="font-bold text-amber-700 dark:text-amber-400 text-sm uppercase tracking-widest">Drafts</span>
+                <span className="ml-auto text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 rounded-full border border-amber-500/20">{categories.filter(c => c.parentId && c.status === 'draft').length}</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead><tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Sub-Category</th>
+                    <th className="hidden md:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Parent</th>
+                    <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
+                    <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+                  </tr></thead>
+                  <tbody className="divide-y divide-border/30">
+                    {categories.filter(c => c.parentId && c.status === 'draft').length > 0
+                      ? categories.filter(c => c.parentId && c.status === 'draft').map((cat: any) => (
+                        <tr key={cat.id} className="group hover:bg-amber-500/5 transition-colors">
+                          <td className="px-8 py-4 font-bold text-foreground/70 group-hover:text-amber-700 transition-colors uppercase tracking-tight">{cat.name}</td>
+                          <td className="hidden md:table-cell px-8 py-4">
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/20 w-fit text-xs font-bold text-orange-600">
+                              <ChevronRight className="w-3.5 h-3.5" />{getCategoryName(cat.parentId)}
+                            </div>
+                          </td>
+                          <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">{cat.description || "—"}</td>
+                          <td className="px-8 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/20 text-amber-600 hover:bg-amber-600 hover:text-white rounded-lg transition-all" onClick={() => handleEditCategory(cat)}><Edit className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Edit</span></Button>
+                              <Button variant="outline" size="sm" className="h-8 px-3 bg-white/50 dark:bg-black/50 border-white/40 text-destructive hover:bg-destructive hover:text-white rounded-lg transition-all" onClick={() => handleDeleteCategory(cat.id, cat.name)}><Trash2 className="w-4 h-4 md:mr-1.5" /><span className="hidden md:inline">Delete</span></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                      : <tr><td colSpan={4} className="px-8 py-8 text-center text-muted-foreground text-sm">No draft sub-categories.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="category" className="tab-panel focus-visible:outline-none focus-visible:ring-0 relative z-10 pt-4">

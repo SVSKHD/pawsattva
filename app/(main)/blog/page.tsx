@@ -124,10 +124,15 @@ const allTopicsCategory: Category = {
   const subCategories = categories.filter(c => c.parentId === activeParentId);
 
   const filteredBlogs = publishedBlogs.filter(blog => {
-    const isExactMatch = blog.categoryId === activeCategory;
-    const isSubcategoryMatch = categories.some(c => c.id === blog.categoryId && c.parentId === activeCategory);
-    
-    const matchesCategory = activeCategory === 'all' || isExactMatch || isSubcategoryMatch;
+    // Resolve all category IDs for this blog (new multi + legacy single)
+    const allCatIds: string[] = blog.categoryIds?.length
+      ? blog.categoryIds
+      : blog.categoryId ? [blog.categoryId] : []
+
+    const matchesCategory = activeCategory === 'all' ||
+      allCatIds.includes(activeCategory) ||
+      allCatIds.some(cid => categories.find(c => c.id === cid)?.parentId === activeCategory)
+
     const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       blog.content.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -326,10 +331,12 @@ const allTopicsCategory: Category = {
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
-                  <div className="absolute top-4 left-4">
-                    <Badge className="bg-white/80 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg">
-                      {getCategoryName(blog.categoryId)}
-                    </Badge>
+                  <div className="absolute top-4 left-4 flex flex-wrap gap-1.5 max-w-[calc(100%-2rem)]">
+                    {(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : []).slice(0, 3).map(cid => (
+                      <Badge key={cid} className="bg-white/80 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg">
+                        {getCategoryName(cid)}
+                      </Badge>
+                    ))}
                   </div>
                   {/* Glass Overlay on Hover */}
                   <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
