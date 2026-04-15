@@ -3,86 +3,33 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search, Calendar, User, Clock, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Search, Calendar, Clock, ChevronRight, ArrowUpRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SubscriptionForm } from '@/components/subscription-form';
 
-// Static fallback removed, using state instead
-
-// Dummy Blogs
-const dummyBlogs = [
-  {
-    id: '1',
-    title: "Understanding Pet Nutrition: A Complete Guide",
-    excerpt: "Everything you need to know about feeding your furry friends for a long and healthy life.",
-    author: "Dr. Sarah Mitchell",
-    date: "March 20, 2026",
-    category: "Nutrition",
-    readTime: "8 min read",
-    image: "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=2070&auto=format&fit=crop",
-    slug: "understanding-pet-nutrition",
-    featured: true
-  },
-  {
-    id: '2',
-    title: "5 Tips for Outdoor Activities with Dogs",
-    excerpt: "Stay active and safe while exploring the great outdoors with your canine companion.",
-    author: "James Wilson",
-    date: "Mar 15, 2026",
-    category: "Training",
-    readTime: "5 min read",
-    image: "https://images.unsplash.com/photo-1551717743-499438096569?q=80&w=800&auto=format&fit=crop",
-    slug: "outdoor-activities-dogs"
-  },
-  {
-    id: '3',
-    title: "Common Household Hazards for Cats",
-    excerpt: "Identify and remove hidden dangers in your home to keep your cat safe and healthy.",
-    author: "Dr. Emily Chen",
-    date: "Mar 12, 2026",
-    category: "Health",
-    readTime: "6 min read",
-    image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800&auto=format&fit=crop",
-    slug: "cat-hazards"
-  },
-  {
-    id: '4',
-    title: "The Benefits of Regular Grooming",
-    excerpt: "Why grooming is about more than just looking good for your pets' overall well-being.",
-    author: "Sarah Brown",
-    date: "Mar 10, 2026",
-    category: "Lifestyle",
-    readTime: "4 min read",
-    image: "https://images.unsplash.com/photo-1516734212186-a967f81ad0d7?q=80&w=800&auto=format&fit=crop",
-    slug: "benefits-grooming"
-  },
-  {
-    id: '5',
-    title: "Puppy Socialization: The First 100 Days",
-    excerpt: "How to introduce your new puppy to the world in a positive and constructive way.",
-    author: "James Wilson",
-    date: "Mar 8, 2026",
-    category: "Training",
-    readTime: "7 min read",
-    image: "https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=800&auto=format&fit=crop",
-    slug: "puppy-socialization"
-  },
-  {
-    id: '6',
-    title: "Dental Health for Senior Dogs",
-    excerpt: "Maintain your aging dog's quality of life with proper oral care and hygiene.",
-    author: "Dr. Sarah Mitchell",
-    date: "Mar 5, 2026",
-    category: "Health",
-    readTime: "6 min read",
-    image: "https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=800&auto=format&fit=crop",
-    slug: "senior-dog-dental"
-  }
-];
 
 import { getBlogs, Blog, getCategories, Category } from '@/firebase/firestore';
+
+function decodeEntities(str: string): string {
+  const named: Record<string, string> = {
+    '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+    '&quot;': '"', '&#39;': "'", '&apos;': "'",
+    '&rsquo;': '\u2019', '&lsquo;': '\u2018',
+    '&rdquo;': '\u201D', '&ldquo;': '\u201C',
+    '&ndash;': '\u2013', '&mdash;': '\u2014',
+    '&hellip;': '\u2026',
+  };
+  return str
+    .replace(/&(?:#x([\da-f]+)|#(\d+)|(\w+));/gi, (_m, hex, dec, name) => {
+      if (name) return named[`&${name.toLowerCase()};`] ?? _m;
+      const code = hex ? parseInt(hex, 16) : parseInt(dec, 10);
+      return (code === 160 || code === 8203) ? ' ' : String.fromCharCode(code);
+    })
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('all');
@@ -147,7 +94,7 @@ const allTopicsCategory: Category = {
   };
 
   const truncateExcerpt = (content: string, length: number = 160) => {
-    const plainText = content.replace(/<[^>]*>/g, '');
+    const plainText = decodeEntities(content.replace(/<[^>]*>/g, ''));
     if (plainText.length <= length) return plainText;
     return plainText.substring(0, length).trim() + "...";
   };
