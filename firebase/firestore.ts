@@ -1,15 +1,15 @@
-import { 
-  collection, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  query, 
+import {
+  collection,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
   where,
   limit,
-  orderBy, 
+  orderBy,
   serverTimestamp,
   Timestamp,
   onSnapshot,
@@ -58,6 +58,7 @@ export interface PetFeedEntry {
 }
 
 export interface Category {
+  parentId?: string;
   id: string;
   name: string;
   description?: string;
@@ -160,8 +161,8 @@ export const getBlog = async (id: string) => {
   const snapshot = await getDoc(docRef);
   if (snapshot.exists()) {
     const data = snapshot.data();
-    return { 
-      id: snapshot.id, 
+    return {
+      id: snapshot.id,
       ...data,
       date: data.date?.toDate ? data.date.toDate().toISOString().split('T')[0] : data.date
     } as Blog;
@@ -197,8 +198,8 @@ export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
   if (snapshot.empty) return null;
   const docData = snapshot.docs[0];
   const data = docData.data();
-  return { 
-    id: docData.id, 
+  return {
+    id: docData.id,
     ...data,
     date: data.date?.toDate ? data.date.toDate().toISOString().split('T')[0] : data.date
   } as Blog;
