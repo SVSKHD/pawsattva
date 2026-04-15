@@ -159,7 +159,7 @@ const allTopicsCategory: Category = {
 
   const activeCategoryData = categories.find(c => c.id === activeCategory);
 
-  const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+  const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop";
 
   if (loading) {
     return (
@@ -436,7 +436,7 @@ const allTopicsCategory: Category = {
                 </div>
                 <div className="absolute inset-4 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center">
                   <Image
-                    src="https://images.unsplash.com/photo-1573435567032-ff5982925350?q=80&w=1974&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+                    src="https://images.unsplash.com/photo-1573435567032-ff5982925350?q=80&w=1974&auto=format&fit=crop"
                     alt="Join us"
                     width={200}
                     height={200}

@@ -24,6 +24,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { siteConfig } from '@/lib/metadata';
 import ReadingEnhancements from './reading-enhancements';
+import { ReadAloud } from './read-aloud';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -78,28 +79,30 @@ export async function generateMetadata({
   };
 }
 
+// Decode HTML entities — handles named, decimal (&#160;), and hex (&#xA0;) forms
+function decodeHtmlEntities(str: string): string {
+  const named: Record<string, string> = {
+    '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+    '&quot;': '"', '&#39;': "'", '&apos;': "'",
+    '&rsquo;': '\u2019', '&lsquo;': '\u2018',
+    '&rdquo;': '\u201D', '&ldquo;': '\u201C',
+    '&ndash;': '\u2013', '&mdash;': '\u2014',
+    '&hellip;': '\u2026', '&middot;': '\u00B7',
+    '&bull;': '\u2022', '&trade;': '\u2122',
+    '&copy;': '\u00A9', '&reg;': '\u00AE',
+  };
+  return str.replace(/&(?:#x([\da-f]+)|#(\d+)|(\w+));/gi, (_m, hex, dec, name) => {
+    if (name) return named[`&${name.toLowerCase()};`] ?? _m;
+    const code = hex ? parseInt(hex, 16) : parseInt(dec, 10);
+    // Map non-breaking spaces and other whitespace-like chars to plain space
+    if (code === 160 || code === 8203 || code === 8204) return ' ';
+    return String.fromCharCode(code);
+  });
+}
+
 // Inject ids onto h2/h3 so the TOC can link to them
 function injectHeadingIds(html: string): { html: string; toc: { id: string; text: string; level: number }[] } {
   const toc: { id: string; text: string; level: number }[] = [];
-  
-  const decodeHtmlEntities = (str: string) => {
-    const entities: Record<string, string> = {
-      '&nbsp;': ' ',
-      '&amp;': '&',
-      '&lt;': '<',
-      '&gt;': '>',
-      '&quot;': '"',
-      '&#39;': "'",
-      '&rsquo;': "'",
-      '&lsquo;': "'",
-      '&rdquo;': '"',
-      '&ldquo;': '"',
-      '&ndash;': '-',
-      '&mdash;': '—',
-      '&#160;': ' ',
-    };
-    return str.replace(/&[#\w]+;/ig, (match) => entities[match.toLowerCase()] || match);
-  };
 
   const slugify = (s: string) =>
     decodeHtmlEntities(s)
@@ -162,7 +165,7 @@ export default async function BlogPostPage({
   const related = (sameCat.length ? sameCat : published.filter((b) => b.id !== blog.id)).slice(0, 3);
 
   // Stats
-  const plainText = blog.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const plainText = decodeHtmlEntities(blog.content.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
   const wordCount = plainText ? plainText.split(' ').length : 0;
   const readTime = Math.max(1, Math.ceil(wordCount / 200));
 
@@ -249,6 +252,12 @@ export default async function BlogPostPage({
                   <span>{wordCount.toLocaleString()} words</span>
                 </div>
               </div>
+
+              <ReadAloud
+                title={blog.title}
+                plainText={plainText}
+                excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
+              />
             </div>
           </div>
         </div>
