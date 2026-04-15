@@ -256,7 +256,7 @@ export function ReadAloud({ title, plainText, excerpt }: { title: string; plainT
       {/* Floating player bar */}
       {active && (
         <div
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50
+          className="fixed bottom-[7.5rem] md:bottom-8 left-1/2 -translate-x-1/2 z-50
             w-[min(560px,calc(100vw-2rem))]
             bg-white dark:bg-zinc-900 rounded-2xl
             shadow-2xl shadow-black/20 border border-orange-100 dark:border-zinc-700
