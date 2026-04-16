@@ -189,7 +189,7 @@ export default async function BlogPostPage({
       <BlogViewTracker blogId={blog.id} title={blog.title} />
 
       {/* Hero */}
-      <header className="relative w-full min-h-[360px] sm:min-h-[420px] md:h-[60vh] md:min-h-[460px] lg:min-h-[500px]">
+      <header className="relative w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
@@ -202,8 +202,8 @@ export default async function BlogPostPage({
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/80" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        <div className="absolute inset-0 flex flex-col justify-end pt-16 sm:pt-20">
-          <div className="container mx-auto px-3 sm:px-4 pb-8 sm:pb-14">
+        <div className="relative z-10 flex flex-col justify-end min-h-[inherit] pt-24 sm:pt-28">
+          <div className="container mx-auto px-3 sm:px-4 pb-6 sm:pb-14">
             {/* Breadcrumbs */}
             <nav className="flex items-center text-white/70 text-xs sm:text-sm mb-3 sm:mb-6 gap-1.5 sm:gap-2">
               <Link href="/" className="hover:text-white inline-flex items-center gap-1">
@@ -258,7 +258,7 @@ export default async function BlogPostPage({
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5 md:mb-5">
                 <ReadAloud
                   title={blog.title}
                   plainText={plainText}
