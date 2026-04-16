@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Search, Calendar, Clock, ChevronRight, ArrowUpRight } from 'lucide-react';
+import { Search, Calendar, Clock, ChevronRight, ArrowUpRight, ThumbsUp, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -119,7 +119,7 @@ const allTopicsCategory: Category = {
   return (
     <div className="bg-background min-h-screen pb-20">
       {/* Search Header */}
-      <section className="relative h-[400px] flex items-center justify-center overflow-hidden">
+      <section className="relative h-[360px] md:h-[420px] lg:h-[450px] pt-24 flex items-center justify-center overflow-hidden">
         {/* Animated Background Spheres */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
@@ -304,6 +304,24 @@ const allTopicsCategory: Category = {
                       <Clock className="w-3.5 h-3.5" />
                       {calculateReadTime(blog.content)}
                     </span>
+                    {(blog.views ?? 0) > 0 && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-orange-300" />
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-3 h-3" />
+                          {(blog.views ?? 0).toLocaleString()}
+                        </span>
+                      </>
+                    )}
+                    {(blog.likes ?? 0) > 0 && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-orange-300" />
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                          <ThumbsUp className="w-3 h-3" />
+                          {(blog.likes ?? 0).toLocaleString()}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   <h3 className="text-2xl font-bold mb-4 line-clamp-2 group-hover:text-primary transition-colors leading-tight">

@@ -11,6 +11,8 @@ import {
   BookOpen,
   MessageCircle,
   Home,
+  ThumbsUp,
+  Eye,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +27,8 @@ import type { Metadata } from 'next';
 import { siteConfig } from '@/lib/metadata';
 import ReadingEnhancements from './reading-enhancements';
 import { ReadAloud } from './read-aloud';
+import { BlogReactions } from '@/components/blog-reactions';
+import { BlogViewTracker } from '@/components/blog-view-tracker';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -120,14 +124,14 @@ function injectHeadingIds(html: string): { html: string; toc: { id: string; text
       // Decode entities for display text and strip tracking tags
       const text = decodeHtmlEntities(inner.replace(/<[^>]*>/g, '')).trim();
       if (!text) return _m;
-      
+
       let id = slugify(text) || `section-${toc.length + 1}`;
       let n = 1;
       while (used.has(id)) id = `${id}-${++n}`;
       used.add(id);
-      
+
       toc.push({ id, text, level: tag.toLowerCase() === 'h2' ? 2 : 3 });
-      
+
       // Keep existing attrs but override/add id
       const cleanedAttrs = attrs.replace(/\sid="[^"]*"/i, '');
       return `<${tag}${cleanedAttrs} id="${id}">${inner}</${tag}>`;
@@ -182,9 +186,10 @@ export default async function BlogPostPage({
     <div className="bg-background min-h-screen">
       {/* Scroll progress + back-to-top (client) */}
       <ReadingEnhancements toc={toc} />
+      <BlogViewTracker blogId={blog.id} title={blog.title} />
 
       {/* Hero */}
-      <header className="relative w-full h-[62vh] min-h-[460px]">
+      <header className="relative w-full min-h-[360px] sm:min-h-[420px] md:h-[60vh] md:min-h-[460px] lg:min-h-[500px]">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
@@ -197,28 +202,28 @@ export default async function BlogPostPage({
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/80" />
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        <div className="absolute inset-0 flex flex-col justify-end">
-          <div className="container mx-auto px-4 pb-14">
+        <div className="absolute inset-0 flex flex-col justify-end pt-16 sm:pt-20">
+          <div className="container mx-auto px-3 sm:px-4 pb-8 sm:pb-14">
             {/* Breadcrumbs */}
-            <nav className="flex items-center text-white/70 text-sm mb-6 gap-2">
+            <nav className="flex items-center text-white/70 text-xs sm:text-sm mb-3 sm:mb-6 gap-1.5 sm:gap-2">
               <Link href="/" className="hover:text-white inline-flex items-center gap-1">
-                <Home className="w-3.5 h-3.5" /> Home
+                <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Home
               </Link>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <Link href="/blog" className="hover:text-white">Blog</Link>
               {category?.name && (
                 <>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span className="text-white/90">{category.name}</span>
                 </>
               )}
             </nav>
 
             <div className="max-w-4xl">
-              <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-5 uppercase tracking-wider text-xs px-3 py-1">
+              <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-3 sm:mb-5 uppercase tracking-wider text-[10px] sm:text-xs px-2.5 py-0.5 sm:px-3 sm:py-1">
                 {category?.name || 'Uncategorized'}
               </Badge>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-6 leading-[1.05] tracking-tight drop-shadow-sm">
+              <h1 className="text-2xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-4 sm:mb-6 leading-[1.1] sm:leading-[1.05] tracking-tight drop-shadow-sm">
                 {blog.title}
               </h1>
 
@@ -228,36 +233,50 @@ export default async function BlogPostPage({
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center text-white/90 gap-x-6 gap-y-3">
+              <div className="flex flex-wrap items-center text-white/90 gap-x-4 sm:gap-x-6 gap-y-2 sm:gap-y-3">
                 <div className="flex items-center">
-                  <div className="w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-3 border-2 border-white text-lg shadow-md">
+                  <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-2 sm:mr-3 border-2 border-white text-sm sm:text-lg shadow-md">
                     {authorInitial}
                   </div>
                   <div className="leading-tight">
-                    <div className="font-medium">{authorName}</div>
-                    <div className="text-xs text-white/70">Pet Care Expert</div>
+                    <div className="font-medium text-sm sm:text-base">{authorName}</div>
+                    <div className="text-[10px] sm:text-xs text-white/70">Pet Care Expert</div>
                   </div>
                 </div>
                 <div className="h-8 w-px bg-white/20 hidden sm:block" />
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{blog.date}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{readTime} min read</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <BookOpen className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{wordCount.toLocaleString()} words</span>
                 </div>
               </div>
 
-              <ReadAloud
-                title={blog.title}
-                plainText={plainText}
-                excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
-              />
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5">
+                <ReadAloud
+                  title={blog.title}
+                  plainText={plainText}
+                  excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
+                />
+                {(blog.views ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <Eye className="w-4 h-4" />
+                    <span>{(blog.views ?? 0).toLocaleString()} views</span>
+                  </div>
+                )}
+                {(blog.likes ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <ThumbsUp className="w-4 h-4" />
+                    <span>{(blog.likes ?? 0).toLocaleString()} likes</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -317,7 +336,16 @@ export default async function BlogPostPage({
               </CardContent>
             </Card>
 
-            <Separator className="my-12" />
+            {/* Likes / Dislikes */}
+            <div className="flex items-center justify-center py-8">
+              <BlogReactions
+                blogId={blog.id}
+                initialLikes={blog.likes ?? 0}
+                initialDislikes={blog.dislikes ?? 0}
+              />
+            </div>
+
+            <Separator className="my-8" />
 
             {/* Tags + share */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -460,10 +488,18 @@ export default async function BlogPostPage({
                             <h4 className="font-bold leading-snug text-sm group-hover:text-orange-600 transition-colors line-clamp-2">
                               {post.title}
                             </h4>
-                            <p className="text-xs text-muted-foreground flex items-center mt-1">
-                              <Calendar className="w-3 h-3 mr-1" />
-                              {post.date}
-                            </p>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                              <span className="flex items-center">
+                                <Calendar className="w-3 h-3 mr-1" />
+                                {post.date}
+                              </span>
+                              {(post.likes ?? 0) > 0 && (
+                                <span className="flex items-center gap-0.5 text-emerald-600">
+                                  <ThumbsUp className="w-3 h-3" />
+                                  {(post.likes ?? 0).toLocaleString()}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </Link>

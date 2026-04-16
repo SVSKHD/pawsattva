@@ -232,7 +232,7 @@ export function ReadAloud({ title, plainText, excerpt }: { title: string; plainT
   return (
     <>
       {/* Trigger button + excerpt preview */}
-      <div className="mt-5">
+      <div>
         <button
           type="button"
           onClick={active ? handleStop : handlePlay}

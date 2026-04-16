@@ -13,7 +13,7 @@ import {
   getBlogs, addBlog, updateBlog, deleteBlog,
   getCategories, addCategory, updateCategory, deleteCategory,
   getAdminUsers, getSubscriptions, getAppUsers,
-  onUsersSnapshot, updateUserRole, updateUser, deleteUser,
+  onUsersSnapshot, onBlogsSnapshot, updateUserRole, updateUser, deleteUser,
   Blog, Category, UserProfile, Subscription
 } from "@/firebase/firestore"
 
@@ -92,8 +92,9 @@ export default function AdminPanel() {
   useEffect(() => {
     if (!isAdmin) return
     fetchData()
-    const unsubscribe = onUsersSnapshot(setUsers)
-    return () => unsubscribe()
+    const unsubUsers = onUsersSnapshot(setUsers)
+    const unsubBlogs = onBlogsSnapshot(setBlogs)
+    return () => { unsubUsers(); unsubBlogs() }
   }, [isAdmin])
 
   // ── Blog form state ───────────────────────────────────────────────────────

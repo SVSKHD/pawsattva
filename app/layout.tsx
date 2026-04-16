@@ -34,6 +34,7 @@ export const viewport: Viewport = {
 
 import { AuthProvider } from "@/components/auth-provider";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { FirebaseAnalytics } from "@/components/firebase-analytics";
 
 export default function RootLayout({
   children,
@@ -50,6 +51,7 @@ export default function RootLayout({
           <TooltipProvider>
             {children}
             <SonnerToaster richColors position="top-center" />
+            <FirebaseAnalytics />
           </TooltipProvider>
         </AuthProvider>
       </body>

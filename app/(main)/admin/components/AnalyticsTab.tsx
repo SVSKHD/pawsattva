@@ -1,38 +1,25 @@
 "use client"
 
+import { useMemo } from "react"
 import NextImage from "next/image"
 import {
-  Users, Mail, FileText, Dog, TrendingUp, Eye, Heart,
-  Share2, Activity, CalendarDays, ShoppingBag, MousePointerClick
+  Users, Mail, FileText, Dog, TrendingUp, Heart, ThumbsDown, Eye,
+  Activity, BarChart3
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Blog, Subscription, UserProfile } from "@/firebase/firestore"
 
-const POST_ENGAGEMENT = [
-  { title: "How to Train Your Puppy", views: 14200, likes: 1820, shares: 430, comments: 98 },
-  { title: "Best Food for Cats", views: 9800, likes: 1100, shares: 220, comments: 54 },
-  { title: "Puppy Health Guide", views: 7400, likes: 870, shares: 190, comments: 41 },
-  { title: "Dog Grooming Basics", views: 5100, likes: 610, shares: 140, comments: 29 },
-  { title: "Cat Behavior Explained", views: 3900, likes: 480, shares: 95, comments: 22 },
-]
-
-const RECENT_EVENTS = [
-  { type: "purchase", user: "Priya Sharma", target: "Bought Premium Puppy Kibble (5kg) — ₹1,850", time: "2 min ago", icon: ShoppingBag, color: "emerald" },
-  { type: "like", user: "Arjun Menon", target: "Liked — How to Train Your Puppy", time: "11 min ago", icon: Heart, color: "rose" },
-  { type: "signup", user: "Meera Kulkarni", target: "New account created", time: "28 min ago", icon: Users, color: "blue" },
-  { type: "purchase", user: "Rohit Patil", target: "Bought Senior Dog Wellness Pack — ₹4,500", time: "45 min ago", icon: ShoppingBag, color: "emerald" },
-  { type: "like", user: "Divya Reddy", target: "Liked — Cat Behavior Explained", time: "1 hr ago", icon: Heart, color: "rose" },
-  { type: "share", user: "Karan Verma", target: "Shared — Dog Grooming Basics", time: "1 hr 20 min ago", icon: Share2, color: "blue" },
-  { type: "signup", user: "Sneha Lakshmi", target: "New account created", time: "2 hrs ago", icon: Users, color: "emerald" },
-  { type: "click", user: "Anil Tiwari", target: "Clicked CTA — Adopt Now", time: "2 hrs 30 min ago", icon: MousePointerClick, color: "orange" },
-]
-
-const EVENT_COLORS: Record<string, string> = {
-  rose: "bg-rose-500/10 text-rose-600",
-  blue: "bg-blue-500/10 text-blue-600",
-  emerald: "bg-emerald-500/10 text-emerald-600",
-  orange: "bg-orange-500/10 text-orange-600",
-  violet: "bg-violet-500/10 text-violet-600",
+function getTimeAgo(date: Date): string {
+  const now = Date.now()
+  const diff = now - date.getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  const days = Math.floor(hrs / 24)
+  if (days < 30) return `${days}d ago`
+  return date.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
 }
 
 interface AnalyticsTabProps {
@@ -43,11 +30,39 @@ interface AnalyticsTabProps {
 }
 
 export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: AnalyticsTabProps) {
+  const totalViews = blogs.reduce((sum, b) => sum + (b.views ?? 0), 0)
+  const totalLikes = blogs.reduce((sum, b) => sum + (b.likes ?? 0), 0)
+  const totalDislikes = blogs.reduce((sum, b) => sum + (b.dislikes ?? 0), 0)
+  const publishedCount = blogs.filter(b => b.status === "published").length
+  const avgViewsPerPost = publishedCount > 0 ? Math.round(totalViews / publishedCount) : 0
+  const engagementRate = totalViews > 0 ? ((totalLikes + totalDislikes) / totalViews * 100).toFixed(1) : "0"
+
+  const blogsByEngagement = [...blogs]
+    .map((b) => ({ ...b, engagement: (b.views ?? 0) + (b.likes ?? 0) + (b.dislikes ?? 0) }))
+    .sort((a, b) => b.engagement - a.engagement)
+    .slice(0, 10)
+
+  // Recent user signups (sorted by creation date)
+  const recentUsers = useMemo(() =>
+    [...users]
+      .filter(u => u.createdAt)
+      .sort((a, b) => {
+        const da = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()
+        const db = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime()
+        return db - da
+      })
+      .slice(0, 8),
+    [users]
+  )
+
   const stats = [
     { label: "Total Users", value: users.length, icon: Users, color: "bg-blue-500/10 text-blue-600" },
     { label: "Subscribers", value: subscribers.length, icon: Mail, color: "bg-violet-500/10 text-violet-600" },
     { label: "Blog Posts", value: blogs.length, icon: FileText, color: "bg-rose-500/10 text-rose-600" },
     { label: "Pet Feeds", value: totalPetFeeds, icon: Dog, color: "bg-orange-500/10 text-orange-600" },
+    { label: "Total Views", value: totalViews, icon: Eye, color: "bg-sky-500/10 text-sky-600" },
+    { label: "Total Likes", value: totalLikes, icon: Heart, color: "bg-emerald-500/10 text-emerald-600" },
+    { label: "Total Dislikes", value: totalDislikes, icon: ThumbsDown, color: "bg-rose-500/10 text-rose-500" },
   ]
 
   return (
@@ -76,7 +91,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             </div>
             <div>
               <CardTitle className="text-xl font-bold">Post Engagement</CardTitle>
-              <CardDescription>Likes, shares & views per article</CardDescription>
+              <CardDescription>Real-time likes & dislikes per article</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -88,57 +103,67 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
                   <th className="px-6 md:px-8 py-4 font-semibold text-sm">Article</th>
                   <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
                     <span className="flex items-center justify-center gap-1.5">
-                      <Eye className="w-3.5 h-3.5" />
+                      <Eye className="w-3.5 h-3.5 text-sky-500" />
                       <span className="hidden sm:inline">Views</span>
+                    </span>
+                  </th>
+                  <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
+                    <span className="flex items-center justify-center gap-1.5">
+                      <Heart className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="hidden sm:inline">Likes</span>
                     </span>
                   </th>
                   <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">
                     <span className="flex items-center justify-center gap-1.5">
-                      <Heart className="w-3.5 h-3.5 text-rose-500" />
-                      <span className="hidden md:inline">Likes</span>
-                    </span>
-                  </th>
-                  <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm text-center">
-                    <span className="flex items-center justify-center gap-1.5">
-                      <Share2 className="w-3.5 h-3.5 text-blue-500" />
-                      <span className="hidden lg:inline">Shares</span>
+                      <ThumbsDown className="w-3.5 h-3.5 text-rose-500" />
+                      <span className="hidden md:inline">Dislikes</span>
                     </span>
                   </th>
                   <th className="px-6 py-4 font-semibold text-sm text-center">Eng.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {POST_ENGAGEMENT.map((row, i) => {
-                  const engagePct = Math.round(((row.likes + row.shares + row.comments) / (row.views || 1)) * 100)
+                {blogsByEngagement.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-8 py-12 text-center text-muted-foreground">
+                      No engagement data yet. Views, likes and dislikes will appear here.
+                    </td>
+                  </tr>
+                ) : blogsByEngagement.map((row) => {
+                  const views = row.views ?? 0
+                  const likes = row.likes ?? 0
+                  const dislikes = row.dislikes ?? 0
+                  const total = likes + dislikes
+                  const likePct = total > 0 ? Math.round((likes / total) * 100) : 0
                   return (
-                    <tr key={i} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
+                    <tr key={row.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
                       <td className="px-6 md:px-8 py-4">
                         <span className="font-semibold text-foreground group-hover:text-violet-600 transition-colors text-xs md:text-sm line-clamp-1">
                           {row.title}
                         </span>
                       </td>
                       <td className="px-4 md:px-6 py-4 text-center text-xs md:text-sm font-medium text-muted-foreground">
-                        {row.views.toLocaleString()}
+                        {views.toLocaleString()}
+                      </td>
+                      <td className="px-4 md:px-6 py-4 text-center">
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
+                          <Heart className="w-3 h-3" />{likes.toLocaleString()}
+                        </span>
                       </td>
                       <td className="hidden sm:table-cell px-6 py-4 text-center">
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-500/10 px-2.5 py-0.5 rounded-full">
-                          <Heart className="w-3 h-3" />{row.likes.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="hidden md:table-cell px-6 py-4 text-center">
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-500/10 px-2.5 py-0.5 rounded-full">
-                          <Share2 className="w-3 h-3" />{row.shares.toLocaleString()}
+                          <ThumbsDown className="w-3 h-3" />{dislikes.toLocaleString()}
                         </span>
                       </td>
                       <td className="px-4 md:px-6 py-4 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <div className="hidden xs:block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500"
-                              style={{ width: `${Math.min(engagePct * 5, 100)}%` }}
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
+                              style={{ width: `${likePct}%` }}
                             />
                           </div>
-                          <span className="text-[10px] md:text-xs font-bold text-violet-600">{engagePct}%</span>
+                          <span className="text-[10px] md:text-xs font-bold text-violet-600">{total > 0 ? `${likePct}%` : "—"}</span>
                         </div>
                       </td>
                     </tr>
@@ -206,16 +231,57 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
         </CardContent>
       </Card>
 
-      {/* Recent events */}
+      {/* Performance overview */}
       <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
         <CardHeader className="p-8 pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-600">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+            <div>
+              <CardTitle className="text-xl font-bold">Performance Overview</CardTitle>
+              <CardDescription>Key metrics at a glance</CardDescription>
+            </div>
+            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Real-time
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent className="p-8 pt-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+              <p className="text-2xl font-extrabold text-sky-600">{avgViewsPerPost.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Avg. Views / Post</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+              <p className="text-2xl font-extrabold text-emerald-600">{engagementRate}%</p>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Engagement Rate</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+              <p className="text-2xl font-extrabold text-violet-600">{publishedCount}</p>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Published Posts</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+              <p className="text-2xl font-extrabold text-orange-600">
+                {totalLikes + totalDislikes > 0 ? Math.round((totalLikes / (totalLikes + totalDislikes)) * 100) : 0}%
+              </p>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Like Ratio</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Recent signups */}
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
+        <CardHeader className="p-8 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600">
               <Activity className="w-5 h-5" />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold">Live Event Feed</CardTitle>
-              <CardDescription>Real-time user interactions</CardDescription>
+              <CardTitle className="text-xl font-bold">Recent Signups</CardTitle>
+              <CardDescription>Newest users on the platform</CardDescription>
             </div>
             <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -225,24 +291,41 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
         </CardHeader>
         <CardContent className="p-8 pt-2">
           <div className="space-y-3">
-            {RECENT_EVENTS.map((ev, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all"
-              >
-                <div className={`p-2.5 rounded-xl shrink-0 ${EVENT_COLORS[ev.color] || EVENT_COLORS.violet}`}>
-                  <ev.icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold">{ev.user}</p>
-                  <p className="text-xs text-muted-foreground truncate">{ev.target}</p>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-                  <CalendarDays className="w-3.5 h-3.5" />
-                  {ev.time}
-                </div>
+            {recentUsers.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="w-10 h-10 mx-auto mb-3 opacity-20" />
+                <p className="font-medium">No recent signups.</p>
               </div>
-            ))}
+            ) : recentUsers.map((u) => {
+              const joined = u.createdAt?.toDate
+                ? u.createdAt.toDate()
+                : new Date(u.createdAt)
+              const timeAgo = getTimeAgo(joined)
+              return (
+                <div
+                  key={u.id}
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 relative">
+                    {u.photoURL
+                      ? <NextImage src={u.photoURL} alt={u.displayName || ""} fill className="object-cover rounded-full" />
+                      : <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 font-bold">
+                          {(u.displayName || u.email)[0].toUpperCase()}
+                        </div>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">{u.displayName || u.email.split("@")[0]}</p>
+                    <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {u.admin && (
+                      <span className="text-[10px] font-bold bg-orange-500/10 text-orange-600 px-2 py-0.5 rounded-full">Admin</span>
+                    )}
+                    <span className="text-xs text-muted-foreground">{timeAgo}</span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </CardContent>
       </Card>

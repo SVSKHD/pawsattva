@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
 import { siteConfig } from "@/lib/metadata";
-import { getBlogs } from "@/firebase/firestore";
+import { getBlogs, getCategories } from "@/firebase/firestore";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static routes
@@ -31,10 +31,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Dynamic blog routes from Firestore
+  // Dynamic routes from Firestore
   let blogRoutes: MetadataRoute.Sitemap = [];
+  let categoryRoutes: MetadataRoute.Sitemap = [];
+
+  const slugify = (name: string) =>
+    name.toLowerCase().trim().replace(/[^\w\s-]/g, "").replace(/[\s_]+/g, "-").replace(/^-+|-+$/g, "");
+
   try {
-    const blogs = await getBlogs();
+    const [blogs, categories] = await Promise.all([getBlogs(), getCategories()]);
+
     blogRoutes = blogs
       .filter((blog) => blog.status === "published")
       .map((blog) => ({
@@ -45,9 +51,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         changeFrequency: "weekly" as const,
         priority: 0.7,
       }));
+
+    categoryRoutes = categories
+      .filter((cat) => cat.status !== "draft")
+      .map((cat) => ({
+        url: `${siteConfig.url}/category/${slugify(cat.name)}`,
+        lastModified: new Date(),
+        changeFrequency: "weekly" as const,
+        priority: 0.8,
+      }));
   } catch (error) {
-    console.error("Sitemap: Error fetching blogs:", error);
+    console.error("Sitemap: Error fetching data:", error);
   }
 
-  return [...staticRoutes, ...blogRoutes];
+  return [...staticRoutes, ...categoryRoutes, ...blogRoutes];
 }

@@ -13,7 +13,8 @@ import {
   serverTimestamp,
   Timestamp,
   onSnapshot,
-  arrayUnion
+  arrayUnion,
+  increment
 } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
@@ -31,6 +32,9 @@ export interface Blog {
   categoryIds?: string[];      // multi-category support (primary field going forward)
   authorId?: string;
   authorName?: string;
+  likes?: number;
+  dislikes?: number;
+  views?: number;
   status: 'published' | 'draft';
   date: any;
   createdAt?: Timestamp;
@@ -65,6 +69,8 @@ export interface Category {
   description?: string;
   status?: 'published' | 'draft';
   createdAt?: Timestamp;
+  imageUrl?: string;
+  image?: boolean
 }
 
 export interface SubCategory {
@@ -191,6 +197,34 @@ export const updateBlog = async (id: string, blog: Partial<Blog>) => {
 export const deleteBlog = async (id: string) => {
   const docRef = doc(db, "blogs", id);
   return await deleteDoc(docRef);
+};
+
+// Real-time listener for blogs
+export const onBlogsSnapshot = (callback: (blogs: Blog[]) => void) => {
+  const blogsQuery = query(collection(db, "blogs"), orderBy("date", "desc"));
+  return onSnapshot(blogsQuery, (snapshot) => {
+    const blogs = snapshot.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      date: d.data().date?.toDate ? d.data().date.toDate().toISOString().split('T')[0] : d.data().date
+    } as Blog));
+    callback(blogs);
+  });
+};
+
+export const incrementBlogLikes = async (blogId: string) => {
+  const docRef = doc(db, "blogs", blogId);
+  return await updateDoc(docRef, { likes: increment(1) });
+};
+
+export const incrementBlogDislikes = async (blogId: string) => {
+  const docRef = doc(db, "blogs", blogId);
+  return await updateDoc(docRef, { dislikes: increment(1) });
+};
+
+export const incrementBlogViews = async (blogId: string) => {
+  const docRef = doc(db, "blogs", blogId);
+  return await updateDoc(docRef, { views: increment(1) });
 };
 
 export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
