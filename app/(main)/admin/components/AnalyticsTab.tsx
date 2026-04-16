@@ -66,32 +66,32 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
   ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {/* Stat cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
         {stats.map((s) => (
-          <Card key={s.label} className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl rounded-[1.75rem]">
-            <CardContent className="p-6">
-              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-4 ${s.color}`}>
-                <s.icon className="w-5 h-5" />
+          <Card key={s.label} className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl rounded-2xl sm:rounded-[1.75rem]">
+            <CardContent className="p-3.5 sm:p-6">
+              <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2.5 sm:mb-4 ${s.color}`}>
+                <s.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <p className="text-3xl font-extrabold tracking-tight">{s.value}</p>
-              <p className="text-sm text-muted-foreground mt-1 font-medium">{s.label}</p>
+              <p className="text-xl sm:text-3xl font-extrabold tracking-tight">{s.value}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 font-medium">{s.label}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Post engagement */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-        <CardHeader className="p-8 pb-4">
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-600">
-              <TrendingUp className="w-5 h-5" />
+            <div className="p-2 sm:p-2.5 rounded-xl bg-violet-500/10 text-violet-600">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <CardTitle className="text-xl font-bold">Post Engagement</CardTitle>
-              <CardDescription>Real-time likes & dislikes per article</CardDescription>
+              <CardTitle className="text-lg sm:text-xl font-bold">Post Engagement</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Real-time likes & dislikes per article</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -100,7 +100,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             <table className="w-full text-left">
               <thead>
                 <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                  <th className="px-6 md:px-8 py-4 font-semibold text-sm">Article</th>
+                  <th className="px-3 sm:px-6 md:px-8 py-3 sm:py-4 font-semibold text-xs sm:text-sm">Article</th>
                   <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
                     <span className="flex items-center justify-center gap-1.5">
                       <Eye className="w-3.5 h-3.5 text-sky-500" />
@@ -176,8 +176,8 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
       </Card>
 
       {/* Users with pet feeds */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-        <CardHeader className="p-8 pb-4">
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600">
               <Dog className="w-5 h-5" />
@@ -188,7 +188,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             </div>
           </div>
         </CardHeader>
-        <CardContent className="p-8 pt-2">
+        <CardContent className="p-4 sm:p-8 pt-2">
           <div className="space-y-3">
             {users.filter(u => u.petFeeds && u.petFeeds.length > 0).map((u, rank) => (
               <div
@@ -232,8 +232,8 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
       </Card>
 
       {/* Performance overview */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-        <CardHeader className="p-8 pb-4">
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-600">
               <BarChart3 className="w-5 h-5" />
@@ -248,7 +248,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             </span>
           </div>
         </CardHeader>
-        <CardContent className="p-8 pt-2">
+        <CardContent className="p-4 sm:p-8 pt-2">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
               <p className="text-2xl font-extrabold text-sky-600">{avgViewsPerPost.toLocaleString()}</p>
@@ -273,8 +273,8 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
       </Card>
 
       {/* Recent signups */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-        <CardHeader className="p-8 pb-4">
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600">
               <Activity className="w-5 h-5" />
@@ -289,7 +289,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             </span>
           </div>
         </CardHeader>
-        <CardContent className="p-8 pt-2">
+        <CardContent className="p-4 sm:p-8 pt-2">
           <div className="space-y-3">
             {recentUsers.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">

@@ -40,9 +40,9 @@ export function CategoryFormTab({
   const parentCategories = categories.filter(c => !c.parentId && c.id !== editingCategoryId)
 
   return (
-    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden max-w-3xl mx-auto rounded-[2rem]">
+    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden max-w-3xl mx-auto rounded-2xl sm:rounded-[2rem]">
       <form onSubmit={handleCategorySubmit}>
-        <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-6 pt-6 px-8">
+        <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-4 sm:pb-6 pt-4 sm:pt-6 px-4 sm:px-8">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
               <FolderPlus className="w-7 h-7 text-amber-500" />
@@ -62,7 +62,7 @@ export function CategoryFormTab({
           </div>
         </CardHeader>
 
-        <CardContent className="p-8 space-y-6">
+        <CardContent className="p-4 sm:p-8 space-y-5 sm:space-y-6">
           {/* Parent selector — only for sub-categories */}
           {isSubCategory && (
             <div className="space-y-2">
@@ -138,18 +138,18 @@ export function CategoryFormTab({
           </div>
         </CardContent>
 
-        <CardFooter className="flex justify-end gap-3 border-t border-border/40 bg-white/20 dark:bg-black/20 p-6">
+        <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t border-border/40 bg-white/20 dark:bg-black/20 p-4 sm:p-6">
           <Button
             type="button"
             variant="outline"
-            className="h-11 px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold"
+            className="h-10 sm:h-11 px-5 sm:px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold w-full sm:w-auto"
             onClick={onCancel}
           >
             Cancel
           </Button>
           <Button
             type="submit"
-            className="h-11 px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0"
+            className="h-10 sm:h-11 px-6 sm:px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0 w-full sm:w-auto"
           >
             <Save className="w-4 h-4" />
             {isEditing

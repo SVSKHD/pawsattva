@@ -99,21 +99,21 @@ export function BlogFormTab({
         </div>
       )}
 
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden rounded-[2rem]">
+      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden rounded-2xl sm:rounded-[2rem]">
         <form onSubmit={handleBlogSubmit}>
-          <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-6 pt-6 px-8">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-orange-500/10 rounded-2xl border border-orange-500/20">
+          <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-4 sm:pb-6 pt-4 sm:pt-6 px-4 sm:px-8">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 bg-orange-500/10 rounded-xl sm:rounded-2xl border border-orange-500/20 shrink-0">
                 {editingBlogId
-                  ? <Edit className="w-7 h-7 text-orange-600" />
-                  : <PlusCircle className="w-7 h-7 text-orange-600 dark:text-orange-400" />}
+                  ? <Edit className="w-5 h-5 sm:w-7 sm:h-7 text-orange-600" />
+                  : <PlusCircle className="w-5 h-5 sm:w-7 sm:h-7 text-orange-600 dark:text-orange-400" />}
               </div>
-              <div className="flex-1 flex items-start justify-between gap-4">
+              <div className="flex-1 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
                 <div>
-                  <CardTitle className="text-2xl font-bold">
+                  <CardTitle className="text-xl sm:text-2xl font-bold">
                     {editingBlogId ? "Edit Blog Post" : "Create New Blog Post"}
                   </CardTitle>
-                  <CardDescription className="mt-0.5">
+                  <CardDescription className="mt-0.5 text-xs sm:text-sm">
                     {editingBlogId
                       ? "Update your article details and save changes."
                       : "Draft a new article. Select a category and set its publishing status."}
@@ -129,7 +129,7 @@ export function BlogFormTab({
             </div>
           </CardHeader>
 
-          <CardContent className="p-8">
+          <CardContent className="p-4 sm:p-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
               {/* ── Main content column ── */}
               <div className="lg:col-span-8 space-y-7">
@@ -362,18 +362,18 @@ export function BlogFormTab({
             </div>
           </CardContent>
 
-          <CardFooter className="flex justify-end gap-3 border-t border-border/40 bg-white/20 dark:bg-black/20 p-6">
+          <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t border-border/40 bg-white/20 dark:bg-black/20 p-4 sm:p-6">
             <Button
               type="button"
               variant="outline"
-              className="h-11 px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold"
+              className="h-10 sm:h-11 px-5 sm:px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold w-full sm:w-auto"
               onClick={onCancel}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              className="h-11 px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0"
+              className="h-10 sm:h-11 px-6 sm:px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0 w-full sm:w-auto"
             >
               <Save className="w-4 h-4" />
               {editingBlogId

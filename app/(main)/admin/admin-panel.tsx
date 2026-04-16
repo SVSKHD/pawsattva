@@ -378,18 +378,18 @@ export default function AdminPanel() {
   }
 
   return (
-    <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8 md:px-8 md:py-12">
+    <div className="flex-1 w-full max-w-7xl mx-auto px-3 py-6 sm:px-4 sm:py-8 md:px-8 md:py-12">
 
       {/* ── Page header ── */}
-      <div className="mt-20 mb-8 flex flex-col gap-2">
+      <div className="mt-20 sm:mt-20 mb-6 sm:mb-8 flex flex-col gap-2">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 w-fit border border-orange-500/20 text-xs font-semibold tracking-widest uppercase">
           <Settings2 className="w-3.5 h-3.5" />
           Administration
         </div>
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400">
           Content Hub
         </h1>
-        <p className="text-muted-foreground text-base max-w-xl">
+        <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
           Manage blog articles, categories, and view platform analytics.
         </p>
       </div>
@@ -400,7 +400,7 @@ export default function AdminPanel() {
       </div>
 
       {/* ── Body: sidebar + content ── */}
-      <div className="flex gap-8 items-start">
+      <div className="flex gap-4 sm:gap-6 md:gap-8 items-start">
         {/* Sidebar (desktop only) */}
         <AdminNav activeTab={activeTab} onTabChange={handleTabChange} />
 
@@ -415,11 +415,11 @@ export default function AdminPanel() {
           `}</style>
 
           {activeTab === "blog-list" && (
-            <div className="tab-panel space-y-6">
-              <div className="flex items-center justify-between gap-4">
+            <div className="tab-panel space-y-4 sm:space-y-6">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-2xl font-bold">Blog Posts</h2>
-                  <p className="text-sm text-muted-foreground mt-0.5">
+                  <h2 className="text-xl sm:text-2xl font-bold">Blog Posts</h2>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                     <span className="font-semibold text-emerald-600">{blogs.filter(b => b.status === "published").length} published</span>
                     {" · "}
                     <span className="font-semibold text-amber-600">{blogs.filter(b => b.status === "draft").length} drafts</span>
@@ -427,7 +427,7 @@ export default function AdminPanel() {
                 </div>
                 <Button
                   onClick={() => handleTabChange("blog")}
-                  className="h-10 px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-sm"
+                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm shrink-0"
                 >
                   + New Post
                 </Button>
@@ -472,12 +472,11 @@ export default function AdminPanel() {
           )}
 
           {activeTab === "category-list" && (
-            <div className="tab-panel space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div />
+            <div className="tab-panel space-y-4 sm:space-y-6">
+              <div className="flex items-center justify-end gap-3">
                 <Button
                   onClick={() => { resetCategoryForm(); handleTabChange("category") }}
-                  className="h-10 px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-sm"
+                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm"
                 >
                   + New Category
                 </Button>
@@ -507,12 +506,11 @@ export default function AdminPanel() {
           )}
 
           {activeTab === "sub-category-list" && (
-            <div className="tab-panel space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div />
+            <div className="tab-panel space-y-4 sm:space-y-6">
+              <div className="flex items-center justify-end gap-3">
                 <Button
                   onClick={() => { resetCategoryForm(); handleTabChange("sub-category") }}
-                  className="h-10 px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-sm"
+                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm"
                 >
                   + New Sub-Category
                 </Button>
@@ -586,15 +584,15 @@ export default function AdminPanel() {
 
       {/* ── Category deletion guard dialog ── */}
       <AlertDialog open={!!pendingDeletionCheck} onOpenChange={(open) => !open && setPendingDeletionCheck(null)}>
-        <AlertDialogContent className="rounded-[2.5rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/95 dark:bg-black/95 shadow-2xl p-0 overflow-hidden max-w-lg">
-          <div className="p-8 pb-6">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="p-3 bg-destructive/10 rounded-2xl border border-destructive/20">
-                <Trash2 className="w-8 h-8 text-destructive" />
+        <AlertDialogContent className="rounded-[2rem] sm:rounded-[2.5rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/95 dark:bg-black/95 shadow-2xl p-0 overflow-hidden max-w-lg mx-4 sm:mx-auto">
+          <div className="p-5 sm:p-8 pb-4 sm:pb-6">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="p-2.5 sm:p-3 bg-destructive/10 rounded-xl sm:rounded-2xl border border-destructive/20">
+                <Trash2 className="w-6 h-6 sm:w-8 sm:h-8 text-destructive" />
               </div>
               <div>
-                <AlertDialogTitle className="text-2xl font-bold">Cannot Delete Category</AlertDialogTitle>
-                <AlertDialogDescription className="text-base text-muted-foreground mt-1">
+                <AlertDialogTitle className="text-xl sm:text-2xl font-bold">Cannot Delete Category</AlertDialogTitle>
+                <AlertDialogDescription className="text-sm sm:text-base text-muted-foreground mt-1">
                   &quot;{pendingDeletionCheck?.name}&quot; has active sub-categories.
                 </AlertDialogDescription>
               </div>
@@ -614,7 +612,7 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
-          <AlertDialogFooter className="p-8 pt-0 gap-3 border-t border-border/40">
+          <AlertDialogFooter className="p-5 sm:p-8 pt-0 gap-3 border-t border-border/40">
             <AlertDialogCancel className="h-11 rounded-xl bg-muted/50 border-0 hover:bg-muted">
               Cancel
             </AlertDialogCancel>

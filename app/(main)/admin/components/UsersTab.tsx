@@ -50,12 +50,12 @@ export function UsersTab({
   handleToggleAdmin, handleDeleteUserAccount,
 }: UsersTabProps) {
   return (
-    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-[2rem]">
-      <CardHeader className="p-8 pb-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+      <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
           <div>
-            <CardTitle className="text-2xl font-bold">All Users</CardTitle>
-            <CardDescription className="text-base mt-1">
+            <CardTitle className="text-xl sm:text-2xl font-bold">All Users</CardTitle>
+            <CardDescription className="text-xs sm:text-base mt-1">
               Manage registered users, edit profiles, and view pet feed submissions.
             </CardDescription>
           </div>
@@ -86,11 +86,11 @@ export function UsersTab({
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                <th className="px-6 md:px-8 py-4 font-semibold text-sm">User</th>
-                <th className="hidden md:table-cell px-6 py-4 font-semibold text-sm">Contact</th>
-                <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">Pet Feeds</th>
-                <th className="px-6 py-4 font-semibold text-sm text-center">Role</th>
-                <th className="px-6 py-4 font-semibold text-sm text-right">Actions</th>
+                <th className="px-3 sm:px-6 md:px-8 py-3 sm:py-4 font-semibold text-xs sm:text-sm">User</th>
+                <th className="hidden md:table-cell px-4 sm:px-6 py-3 sm:py-4 font-semibold text-xs sm:text-sm">Contact</th>
+                <th className="hidden sm:table-cell px-4 sm:px-6 py-3 sm:py-4 font-semibold text-xs sm:text-sm text-center">Pet Feeds</th>
+                <th className="px-2 sm:px-6 py-3 sm:py-4 font-semibold text-xs sm:text-sm text-center">Role</th>
+                <th className="px-2 sm:px-6 py-3 sm:py-4 font-semibold text-xs sm:text-sm text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
@@ -98,7 +98,7 @@ export function UsersTab({
                 <>
                   <tr key={u.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
                     {/* User cell */}
-                    <td className="px-6 md:px-8 py-5">
+                    <td className="px-3 sm:px-6 md:px-8 py-3 sm:py-5">
                       {editingUserId === u.id ? (
                         <div className="space-y-2">
                           <Input
@@ -143,7 +143,7 @@ export function UsersTab({
                     </td>
 
                     {/* Contact cell */}
-                    <td className="hidden md:table-cell px-6 py-5">
+                    <td className="hidden md:table-cell px-4 sm:px-6 py-3 sm:py-5">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 text-sm font-medium">
                           <Mail className="w-3.5 h-3.5 text-muted-foreground" />{u.email}
@@ -157,7 +157,7 @@ export function UsersTab({
                     </td>
 
                     {/* Pet feeds cell */}
-                    <td className="hidden sm:table-cell px-6 py-5 text-center">
+                    <td className="hidden sm:table-cell px-4 sm:px-6 py-3 sm:py-5 text-center">
                       {u.petFeeds && u.petFeeds.length > 0 ? (
                         <button
                           onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
@@ -173,7 +173,7 @@ export function UsersTab({
                     </td>
 
                     {/* Role cell */}
-                    <td className="px-6 py-5">
+                    <td className="px-2 sm:px-6 py-3 sm:py-5">
                       <div className="flex items-center justify-center gap-2">
                         <span className={`text-xs font-bold uppercase tracking-tight ${u.admin ? "text-orange-600" : "text-muted-foreground"}`}>
                           {u.admin ? "Admin" : "User"}
@@ -187,7 +187,7 @@ export function UsersTab({
                     </td>
 
                     {/* Actions cell */}
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-2 sm:px-6 py-3 sm:py-5 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {editingUserId === u.id ? (
                           <>
@@ -231,7 +231,7 @@ export function UsersTab({
                                   <span className="hidden md:inline">Delete</span>
                                 </Button>
                               </AlertDialogTrigger>
-                              <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl">
+                              <AlertDialogContent className="rounded-2xl sm:rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl mx-4 sm:mx-auto">
                                 <AlertDialogHeader>
                                   <AlertDialogTitle className="text-2xl font-bold text-destructive">Delete User Account?</AlertDialogTitle>
                                   <AlertDialogDescription className="text-base text-muted-foreground">
@@ -258,7 +258,7 @@ export function UsersTab({
                   {/* Expanded pet feed details */}
                   {expandedUserId === u.id && u.petFeeds && u.petFeeds.length > 0 && (
                     <tr key={`${u.id}-feeds`}>
-                      <td colSpan={5} className="px-6 md:px-8 py-4 bg-orange-50/30 dark:bg-orange-950/10">
+                      <td colSpan={5} className="px-3 sm:px-6 md:px-8 py-3 sm:py-4 bg-orange-50/30 dark:bg-orange-950/10">
                         <div className="pl-4 md:pl-12 space-y-3">
                           <p className="text-xs font-bold text-orange-600 uppercase tracking-widest flex items-center gap-2">
                             <PawPrint className="w-3.5 h-3.5" />
@@ -311,11 +311,11 @@ export function UsersTab({
         </div>
       </CardContent>
 
-      <CardFooter className="p-8 flex items-center justify-between border-t border-border/40">
-        <span className="text-sm text-muted-foreground font-medium">
+      <CardFooter className="p-4 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-border/40">
+        <span className="text-xs sm:text-sm text-muted-foreground font-medium">
           Showing <span className="font-bold text-foreground">{filteredUsers.length}</span> of {users.length} users
         </span>
-        <span className="text-sm font-bold text-orange-600">
+        <span className="text-xs sm:text-sm font-bold text-orange-600">
           {totalPetFeeds} total pet feed submissions
         </span>
       </CardFooter>

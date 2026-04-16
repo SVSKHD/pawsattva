@@ -37,11 +37,11 @@ function CategoryTable({
   onDelete: (id: string, name: string) => void
 }) {
   return (
-    <div className={`rounded-[1.75rem] border ${borderColor} bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden`}>
-      <div className={`flex items-center gap-3 px-8 py-4 ${headerBg} border-b ${borderColor}`}>
+    <div className={`rounded-2xl sm:rounded-[1.75rem] border ${borderColor} bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl overflow-hidden`}>
+      <div className={`flex items-center gap-2 sm:gap-3 px-4 sm:px-8 py-3 sm:py-4 ${headerBg} border-b ${borderColor}`}>
         <div className={`w-1 h-6 rounded-full ${bgColor}`} />
         <Icon className={`w-4 h-4 ${color}`} />
-        <span className={`font-bold ${color} text-sm uppercase tracking-widest`}>{title}</span>
+        <span className={`font-bold ${color} text-xs sm:text-sm uppercase tracking-widest`}>{title}</span>
         <span className={`ml-auto text-xs font-bold bg-opacity-15 ${color} px-2.5 py-0.5 rounded-full border ${borderColor} ${bgColor.replace("bg-", "bg-")}/15`}>
           {items.length}
         </span>
@@ -50,21 +50,21 @@ function CategoryTable({
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border/30 bg-white/10 dark:bg-black/10">
-              <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Category Name</th>
-              <th className="hidden lg:table-cell px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
-              <th className="px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
+              <th className="px-3 sm:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Category Name</th>
+              <th className="hidden lg:table-cell px-4 sm:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider">Description</th>
+              <th className="px-3 sm:px-8 py-3 font-semibold text-xs text-muted-foreground uppercase tracking-wider text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/30">
             {items.length > 0 ? items.map((cat) => (
               <tr key={cat.id} className={`group hover:${headerBg} transition-colors`}>
-                <td className={`px-8 py-4 font-bold uppercase tracking-tight ${color.replace("text-", "group-hover:text-")}`}>
+                <td className={`px-3 sm:px-8 py-3 sm:py-4 font-bold text-sm sm:text-base uppercase tracking-tight ${color.replace("text-", "group-hover:text-")}`}>
                   {cat.name}
                 </td>
-                <td className="hidden lg:table-cell px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">
+                <td className="hidden lg:table-cell px-4 sm:px-8 py-4 text-sm text-muted-foreground max-w-xs truncate">
                   {cat.description || "—"}
                 </td>
-                <td className="px-8 py-4 text-right">
+                <td className="px-3 sm:px-8 py-3 sm:py-4 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button
                       variant="outline"
@@ -86,7 +86,7 @@ function CategoryTable({
                           <span className="hidden md:inline">Delete</span>
                         </Button>
                       </AlertDialogTrigger>
-                      <AlertDialogContent className="rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl p-10">
+                      <AlertDialogContent className="rounded-2xl sm:rounded-[2rem] border-white/30 dark:border-white/10 backdrop-blur-3xl bg-white/90 dark:bg-black/90 shadow-2xl p-5 sm:p-10 mx-4 sm:mx-auto">
                         <AlertDialogHeader>
                           <AlertDialogTitle className="text-2xl font-bold">Confirm Deletion</AlertDialogTitle>
                           <hr className="border-black/20" />
@@ -110,7 +110,7 @@ function CategoryTable({
               </tr>
             )) : (
               <tr>
-                <td colSpan={3} className="px-8 py-10 text-center text-muted-foreground text-sm font-medium">
+                <td colSpan={3} className="px-4 sm:px-8 py-10 text-center text-muted-foreground text-sm font-medium">
                   No {title.toLowerCase()} categories.
                 </td>
               </tr>
