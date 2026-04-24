@@ -29,6 +29,7 @@ import ReadingEnhancements from './reading-enhancements';
 import { ReadAloud } from './read-aloud';
 import { BlogReactions } from '@/components/blog-reactions';
 import { BlogViewTracker } from '@/components/blog-view-tracker';
+import { BlogComments } from '@/components/blog-comments';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -276,6 +277,12 @@ export default async function BlogPostPage({
                     <span>{(blog.likes ?? 0).toLocaleString()} likes</span>
                   </div>
                 )}
+                {(blog.commentsCount ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <MessageCircle className="w-4 h-4" />
+                    <span>{(blog.commentsCount ?? 0).toLocaleString()} comments</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -345,6 +352,8 @@ export default async function BlogPostPage({
               />
             </div>
 
+            <Separator className="my-8" />
+            <BlogComments blogId={blog.id} />
             <Separator className="my-8" />
 
             {/* Tags + share */}
