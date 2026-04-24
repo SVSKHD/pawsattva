@@ -1,13 +1,25 @@
 "use client"
 
-import { FolderPlus, Save, CheckCircle2, CircleDashed } from "lucide-react"
+import { FolderPlus, Save, CheckCircle2, CircleDashed, UploadCloud, Trash2 } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Progress } from "@/components/ui/progress"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Category } from "@/firebase/firestore"
+import { useState } from "react"
 
 interface CategoryFormTabProps {
   isSubCategory: boolean
@@ -15,6 +27,11 @@ interface CategoryFormTabProps {
   setCategoryName: (v: string) => void
   categoryDesc: string
   setCategoryDesc: (v: string) => void
+  categoryImage: string
+  setCategoryImage: (v: string) => void
+  uploadingCategoryImage: boolean
+  categoryImageUploadProgress: number
+  handleCategoryImageUpload: (file: File) => Promise<void>
   categoryParentId: string
   setCategoryParentId: (v: string) => void
   categoryStatus: "published" | "draft"
@@ -29,6 +46,8 @@ export function CategoryFormTab({
   isSubCategory,
   categoryName, setCategoryName,
   categoryDesc, setCategoryDesc,
+  categoryImage, setCategoryImage,
+  uploadingCategoryImage, categoryImageUploadProgress, handleCategoryImageUpload,
   categoryParentId, setCategoryParentId,
   categoryStatus, setCategoryStatus,
   editingCategoryId,
@@ -37,6 +56,7 @@ export function CategoryFormTab({
   onCancel,
 }: CategoryFormTabProps) {
   const isEditing = !!editingCategoryId
+  const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
   const parentCategories = categories.filter(c => !c.parentId && c.id !== editingCategoryId)
 
   return (
@@ -115,6 +135,55 @@ export function CategoryFormTab({
           </div>
 
           <div className="space-y-2">
+            <Label className="text-sm font-semibold">Category Image</Label>
+            <Input
+              placeholder="https://example.com/category-image.jpg"
+              value={categoryImage}
+              onChange={(e) => setCategoryImage(e.target.value)}
+              className="h-11 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 rounded-xl px-4"
+            />
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 cursor-pointer hover:bg-amber-500/15 transition-colors">
+              <UploadCloud className="w-3.5 h-3.5" />
+              {uploadingCategoryImage ? `Uploading... ${categoryImageUploadProgress}%` : "Upload image (auto-compress)"}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingCategoryImage}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (file) await handleCategoryImageUpload(file)
+                  e.currentTarget.value = ""
+                }}
+              />
+            </label>
+            {uploadingCategoryImage && (
+              <div className="space-y-1">
+                <Progress value={categoryImageUploadProgress} className="h-2" />
+                <p className="text-[11px] text-muted-foreground">Upload progress: {categoryImageUploadProgress}%</p>
+              </div>
+            )}
+            {categoryImage && /^https?:\/\/.+/i.test(categoryImage) && (
+              <div className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-muted/20">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={categoryImage} alt="Category preview" className="max-h-40 w-full object-contain" />
+                <div className="p-2 border-t border-black/10 dark:border-white/10 flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                    onClick={() => setConfirmDeleteImage(true)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
             <Label className="text-sm font-semibold">Status</Label>
             <Select value={categoryStatus} onValueChange={(val: "published" | "draft") => setCategoryStatus(val)}>
               <SelectTrigger className="h-13 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-xl focus:ring-amber-500/30">
@@ -158,6 +227,29 @@ export function CategoryFormTab({
           </Button>
         </CardFooter>
       </form>
+
+      <AlertDialog open={confirmDeleteImage} onOpenChange={setConfirmDeleteImage}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove category image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the selected image from this form only.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setCategoryImage("")
+                setConfirmDeleteImage(false)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  PlusCircle, Edit, Save, CheckCircle2, CircleDashed,
+  PlusCircle, Edit, Save, CheckCircle2, CircleDashed, Trash2,
   ChevronRight, UploadCloud, Settings2, History
 } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -10,8 +10,20 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Progress } from "@/components/ui/progress"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import Editor from "@/components/editor"
 import { Category, UserProfile } from "@/firebase/firestore"
+import { useState } from "react"
 
 interface BlogFormTabProps {
   blogTitle: string
@@ -69,6 +81,8 @@ export function BlogFormTab({
   restoreDraft, discardDraft, formatDraftTime,
   handleBlogSubmit, handleTitleChange, onCancel,
 }: BlogFormTabProps) {
+  const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
+
   return (
     <div className="space-y-4">
       {/* Draft restore banner */}
@@ -418,6 +432,29 @@ export function BlogFormTab({
           </CardFooter>
         </form>
       </Card>
+
+      <AlertDialog open={confirmDeleteImage} onOpenChange={setConfirmDeleteImage}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove featured image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This only removes it from the blog form. The uploaded file remains in storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setBlogImage("")
+                setConfirmDeleteImage(false)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

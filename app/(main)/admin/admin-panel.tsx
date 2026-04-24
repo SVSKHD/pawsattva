@@ -118,6 +118,9 @@ export default function AdminPanel() {
   const [categoryDesc, setCategoryDesc] = useState("")
   const [categoryParentId, setCategoryParentId] = useState("")
   const [categoryStatus, setCategoryStatus] = useState<"published" | "draft">("published")
+  const [categoryImage, setCategoryImage] = useState("")
+  const [uploadingCategoryImage, setUploadingCategoryImage] = useState(false)
+  const [categoryImageUploadProgress, setCategoryImageUploadProgress] = useState(0)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [pendingDeletionCheck, setPendingDeletionCheck] = useState<{ id: string; name: string; subs: Category[] } | null>(null)
 
@@ -348,6 +351,7 @@ export default function AdminPanel() {
   // ── Category handlers ─────────────────────────────────────────────────────
   const resetCategoryForm = () => {
     setCategoryName(""); setCategoryDesc(""); setCategoryParentId("")
+    setCategoryImage(""); setCategoryImageUploadProgress(0)
     setCategoryStatus("published"); setEditingCategoryId(null)
   }
 
@@ -357,6 +361,7 @@ export default function AdminPanel() {
     try {
       const catData = {
         name: categoryName, description: categoryDesc,
+        imageUrl: categoryImage || undefined,
         parentId: categoryParentId && categoryParentId !== "none" ? categoryParentId : undefined,
         status: categoryStatus as "published" | "draft",
       }
@@ -378,9 +383,33 @@ export default function AdminPanel() {
 
   const handleEditCategory = (cat: Category) => {
     setCategoryName(cat.name); setCategoryDesc(cat.description || "")
+    setCategoryImage(cat.imageUrl || "")
     setCategoryParentId(cat.parentId || ""); setCategoryStatus(cat.status || "published")
     setEditingCategoryId(cat.id)
     handleTabChange(cat.parentId ? "sub-category" : "category")
+  }
+
+  const handleCategoryImageUpload = async (file: File, isSubCategory: boolean) => {
+    try {
+      setUploadingCategoryImage(true)
+      setCategoryImageUploadProgress(0)
+      const result = await uploadBlogImage(file, {
+        folder: isSubCategory ? "subcategory-images" : "category-images",
+        targetKB: 180,
+        onProgress: setCategoryImageUploadProgress,
+      })
+      setCategoryImage(result.url)
+      toast.success(
+        result.wasCompressed
+          ? `Category image uploaded (${result.originalKB}KB → ${result.compressedKB}KB).`
+          : `Category image uploaded (${result.compressedKB}KB).`
+      )
+    } catch {
+      toast.error("Category image upload failed.")
+    } finally {
+      setUploadingCategoryImage(false)
+      setCategoryImageUploadProgress(0)
+    }
   }
 
   const handleDeleteCategory = async (id: string, name: string) => {
@@ -554,13 +583,17 @@ export default function AdminPanel() {
 
           {activeTab === "category" && (
             <div className="tab-panel">
-              <CategoryFormTab
-                isSubCategory={false}
-                categoryName={categoryName} setCategoryName={setCategoryName}
-                categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
-                categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
-                categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
-                editingCategoryId={editingCategoryId}
+                <CategoryFormTab
+                  isSubCategory={false}
+                  categoryName={categoryName} setCategoryName={setCategoryName}
+                  categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
+                  categoryImage={categoryImage} setCategoryImage={setCategoryImage}
+                  uploadingCategoryImage={uploadingCategoryImage}
+                  categoryImageUploadProgress={categoryImageUploadProgress}
+                  handleCategoryImageUpload={(file) => handleCategoryImageUpload(file, false)}
+                  categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
+                  categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
+                  editingCategoryId={editingCategoryId}
                 categories={categories}
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("category-list") }}
@@ -589,13 +622,17 @@ export default function AdminPanel() {
 
           {activeTab === "sub-category" && (
             <div className="tab-panel">
-              <CategoryFormTab
-                isSubCategory={true}
-                categoryName={categoryName} setCategoryName={setCategoryName}
-                categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
-                categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
-                categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
-                editingCategoryId={editingCategoryId}
+                <CategoryFormTab
+                  isSubCategory={true}
+                  categoryName={categoryName} setCategoryName={setCategoryName}
+                  categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
+                  categoryImage={categoryImage} setCategoryImage={setCategoryImage}
+                  uploadingCategoryImage={uploadingCategoryImage}
+                  categoryImageUploadProgress={categoryImageUploadProgress}
+                  handleCategoryImageUpload={(file) => handleCategoryImageUpload(file, true)}
+                  categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
+                  categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
+                  editingCategoryId={editingCategoryId}
                 categories={categories}
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("sub-category-list") }}
