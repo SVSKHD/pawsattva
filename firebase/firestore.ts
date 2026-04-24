@@ -35,10 +35,26 @@ export interface Blog {
   likes?: number;
   dislikes?: number;
   views?: number;
+  commentsCount?: number;
   status: 'published' | 'draft';
+  instagramAutoPost?: boolean;
+  instagramCaption?: string;
+  instagramPostId?: string;
+  instagramPostStatus?: 'pending' | 'posted' | 'failed';
+  instagramPostError?: string;
   date: any;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+}
+
+export interface BlogComment {
+  id: string;
+  blogId: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  content: string;
+  createdAt?: Timestamp;
 }
 
 export interface UserProfile {
@@ -225,6 +241,39 @@ export const incrementBlogDislikes = async (blogId: string) => {
 export const incrementBlogViews = async (blogId: string) => {
   const docRef = doc(db, "blogs", blogId);
   return await updateDoc(docRef, { views: increment(1) });
+};
+
+export const addBlogComment = async (blogId: string, payload: Omit<BlogComment, "id" | "blogId" | "createdAt">) => {
+  const commentRef = collection(db, "blogs", blogId, "comments");
+  await addDoc(commentRef, {
+    ...payload,
+    blogId,
+    createdAt: serverTimestamp(),
+  });
+
+  const blogRef = doc(db, "blogs", blogId);
+  await updateDoc(blogRef, {
+    commentsCount: increment(1),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const onBlogCommentsSnapshot = (
+  blogId: string,
+  callback: (comments: BlogComment[]) => void
+) => {
+  const commentsQuery = query(
+    collection(db, "blogs", blogId, "comments"),
+    orderBy("createdAt", "desc")
+  );
+
+  return onSnapshot(commentsQuery, (snapshot) => {
+    const comments = snapshot.docs.map((entry) => ({
+      id: entry.id,
+      ...entry.data(),
+    } as BlogComment));
+    callback(comments);
+  });
 };
 
 export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
