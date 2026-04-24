@@ -37,7 +37,6 @@ interface BlogFormTabProps {
   setBlogImage: (v: string) => void
   handleFeaturedImageUpload: (file: File) => Promise<void>
   uploadingFeaturedImage: boolean
-  featuredImageUploadProgress: number
   blogContent: string
   setBlogContent: (v: string) => void
   blogCategories: string[]
@@ -69,7 +68,7 @@ export function BlogFormTab({
   blogKeywords, setBlogKeywords,
   blogExcerpt, setBlogExcerpt,
   blogImage, setBlogImage,
-  handleFeaturedImageUpload, uploadingFeaturedImage, featuredImageUploadProgress,
+  handleFeaturedImageUpload, uploadingFeaturedImage,
   blogContent, setBlogContent,
   blogCategories, setBlogCategories,
   blogAuthorId, setBlogAuthorId,
@@ -193,7 +192,7 @@ export function BlogFormTab({
                       />
                       <label className="inline-flex items-center gap-2 text-xs font-semibold text-orange-600 bg-orange-500/10 border border-orange-500/20 rounded-xl px-3 py-2 cursor-pointer hover:bg-orange-500/15 transition-colors">
                         <UploadCloud className="w-3.5 h-3.5" />
-                        {uploadingFeaturedImage ? `Uploading... ${featuredImageUploadProgress}%` : "Upload image (auto-compress)"}
+                        {uploadingFeaturedImage ? "Uploading & compressing..." : "Upload image (auto-compress)"}
                         <input
                           type="file"
                           accept="image/*"
@@ -206,33 +205,6 @@ export function BlogFormTab({
                           }}
                         />
                       </label>
-                      {uploadingFeaturedImage && (
-                        <div className="space-y-1">
-                          <Progress value={featuredImageUploadProgress} className="h-2" />
-                          <p className="text-[11px] text-muted-foreground">
-                            Processing & upload progress: {featuredImageUploadProgress}%
-                          </p>
-                        </div>
-                      )}
-
-                      {blogImage && /^https?:\/\/.+/i.test(blogImage) && (
-                        <div className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-muted/20">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={blogImage} alt="Featured preview" className="max-h-48 w-full object-contain" />
-                          <div className="p-2 border-t border-black/10 dark:border-white/10 flex justify-end">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="h-8 gap-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
-                              onClick={() => setConfirmDeleteImage(true)}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                   <div className="space-y-2 md:col-span-2">

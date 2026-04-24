@@ -45,9 +45,9 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
       toast.error("Comment should be at least 3 characters.");
       return;
     }
-    const sanitized = sanitizeProfanity(raw);
     if (hasProfanity(raw)) {
-      toast.warning("Profanity was detected and masked automatically.");
+      toast.error("Please remove abusive language from your comment.");
+      return;
     }
 
     try {
@@ -56,17 +56,12 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         userId: user.uid,
         userName: user.displayName || user.email?.split("@")[0] || "User",
         userEmail: user.email || "",
-        content: sanitized,
+        content: sanitizeProfanity(raw),
       });
       setNewComment("");
       toast.success("Comment posted.");
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Failed to post comment.";
-      if (message.toLowerCase().includes("permission")) {
-        toast.error("Comment failed: permission denied. Please login again and try.");
-      } else {
-        toast.error(message);
-      }
+    } catch {
+      toast.error("Failed to post comment.");
     } finally {
       setSaving(false);
     }

@@ -112,7 +112,6 @@ export default function AdminPanel() {
   const [instagramCaption, setInstagramCaption] = useState("")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
-  const [featuredImageUploadProgress, setFeaturedImageUploadProgress] = useState(0)
 
   // ── Category form state ───────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState("")
@@ -314,12 +313,7 @@ export default function AdminPanel() {
   const handleFeaturedImageUpload = async (file: File) => {
     try {
       setUploadingFeaturedImage(true)
-      setFeaturedImageUploadProgress(0)
-      const result = await uploadBlogImage(file, {
-        folder: "blog-featured-images",
-        targetKB: 240,
-        onProgress: setFeaturedImageUploadProgress,
-      })
+      const result = await uploadBlogImage(file, { folder: "blog-featured-images", targetKB: 240 })
       setBlogImage(result.url)
       toast.success(
         result.wasCompressed
@@ -329,7 +323,6 @@ export default function AdminPanel() {
     } catch {
       toast.error("Image upload failed. Please try again.")
     } finally {
-      setFeaturedImageUploadProgress(0)
       setUploadingFeaturedImage(false)
     }
   }
@@ -549,7 +542,6 @@ export default function AdminPanel() {
                 blogImage={blogImage} setBlogImage={setBlogImage}
                 handleFeaturedImageUpload={handleFeaturedImageUpload}
                 uploadingFeaturedImage={uploadingFeaturedImage}
-                featuredImageUploadProgress={featuredImageUploadProgress}
                 blogContent={blogContent} setBlogContent={setBlogContent}
                 blogCategories={blogCategories} setBlogCategories={setBlogCategories}
                 blogAuthorId={blogAuthorId} setBlogAuthorId={setBlogAuthorId}

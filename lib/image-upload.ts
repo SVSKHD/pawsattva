@@ -1,13 +1,12 @@
 "use client";
 
-import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/firebase/firebase";
 
 interface UploadOptions {
   folder?: string;
   targetKB?: number;
   maxDimension?: number;
-  onProgress?: (value: number) => void;
 }
 
 const RASTER_TYPES = new Set([
@@ -106,30 +105,8 @@ export const uploadBlogImage = async (file: File, options: UploadOptions = {}) =
   const extension = (uploadFile.name.split(".").pop() || "jpg").toLowerCase();
   const path = `${folder}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
   const storageRef = ref(storage, path);
-  const task = uploadBytesResumable(storageRef, uploadFile, { contentType: uploadFile.type || file.type });
-
-  const url = await new Promise<string>((resolve, reject) => {
-    task.on(
-      "state_changed",
-      (snapshot) => {
-        if (!options.onProgress) return;
-        const progress = snapshot.totalBytes > 0
-          ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100)
-          : 0;
-        options.onProgress(progress);
-      },
-      reject,
-      async () => {
-        try {
-          options.onProgress?.(100);
-          const downloadUrl = await getDownloadURL(task.snapshot.ref);
-          resolve(downloadUrl);
-        } catch (error) {
-          reject(error);
-        }
-      }
-    );
-  });
+  await uploadBytes(storageRef, uploadFile, { contentType: uploadFile.type || file.type });
+  const url = await getDownloadURL(storageRef);
 
   return {
     url,
