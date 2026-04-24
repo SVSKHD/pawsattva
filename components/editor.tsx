@@ -25,6 +25,7 @@ import {
   Redo,
   RemoveFormatting,
 } from "lucide-react";
+import { uploadBlogImage } from "@/lib/image-upload";
 
 interface EditorProps {
   value: string;
@@ -37,6 +38,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   const [instagramUrl, setInstagramUrl] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const editor = useEditor({
     extensions: [
@@ -77,14 +79,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
             event.preventDefault();
             const file = item.getAsFile();
             if (!file) return false;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              const src = e.target?.result as string;
-              if (src) {
-                editor?.chain().focus().setImage({ src }).run();
-              }
-            };
-            reader.readAsDataURL(file);
+            void insertUploadedImage(file);
             return true;
           }
         }
@@ -107,18 +102,29 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         if (!imageFile) return false;
 
         event.preventDefault();
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const src = e.target?.result as string;
-          if (src) {
-            editor?.chain().focus().setImage({ src }).run();
-          }
-        };
-        reader.readAsDataURL(imageFile);
+        void insertUploadedImage(imageFile);
         return true;
       },
     },
   });
+
+  const insertUploadedImage = useCallback(async (file: File) => {
+    if (!editor) return;
+    try {
+      setIsUploadingImage(true);
+      const result = await uploadBlogImage(file, { folder: "blog-content-images", targetKB: 200 });
+      editor.chain().focus().setImage({ src: result.url }).run();
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const src = e.target?.result as string;
+        if (src) editor?.chain().focus().setImage({ src }).run();
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  }, [editor]);
 
   // Sync external value changes (e.g. draft restore, editing existing blog)
   useEffect(() => {
@@ -290,6 +296,27 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
           <p className="text-[11px] text-muted-foreground mt-2">
             Supports JPG, PNG, GIF, WebP, SVG, and other image formats.
           </p>
+          <label
+            className={`mt-3 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
+              isUploadingImage
+                ? "border-orange-300 bg-orange-500/10 text-orange-600"
+                : "cursor-pointer border-black/10 bg-black/5 text-foreground hover:bg-black/10 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+            }`}
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            {isUploadingImage ? "Uploading & compressing..." : "Upload local image (auto-compress)"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              disabled={isUploadingImage}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file) await insertUploadedImage(file);
+                e.currentTarget.value = "";
+              }}
+            />
+          </label>
 
           {imageUrl && /^https?:\/\/.+/i.test(imageUrl) && (
             <div className="mt-4 rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-muted/20">

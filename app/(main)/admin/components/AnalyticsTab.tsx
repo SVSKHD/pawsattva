@@ -4,10 +4,22 @@ import { useMemo } from "react"
 import NextImage from "next/image"
 import {
   Users, Mail, FileText, Dog, TrendingUp, Heart, ThumbsDown, Eye,
-  Activity, BarChart3
+  Activity, BarChart3, MessageCircle
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Blog, Subscription, UserProfile } from "@/firebase/firestore"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+  LineChart,
+  Line
+} from "recharts"
 
 function getTimeAgo(date: Date): string {
   const now = Date.now()
@@ -63,7 +75,37 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
     { label: "Total Views", value: totalViews, icon: Eye, color: "bg-sky-500/10 text-sky-600" },
     { label: "Total Likes", value: totalLikes, icon: Heart, color: "bg-emerald-500/10 text-emerald-600" },
     { label: "Total Dislikes", value: totalDislikes, icon: ThumbsDown, color: "bg-rose-500/10 text-rose-500" },
+    { label: "Total Comments", value: blogs.reduce((sum, b) => sum + (b.commentsCount ?? 0), 0), icon: MessageCircle, color: "bg-amber-500/10 text-amber-600" },
   ]
+
+  const topPostsData = useMemo(
+    () =>
+      [...blogs]
+        .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
+        .slice(0, 8)
+        .map((b) => ({
+          name: b.title.length > 22 ? `${b.title.slice(0, 22)}…` : b.title,
+          views: b.views ?? 0,
+          likes: b.likes ?? 0,
+          comments: b.commentsCount ?? 0,
+        })),
+    [blogs]
+  )
+
+  const monthlyData = useMemo(() => {
+    const map = new Map<string, { month: string; views: number; likes: number; comments: number }>()
+    for (const post of blogs) {
+      const date = new Date(post.date)
+      if (Number.isNaN(date.getTime())) continue
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+      const current = map.get(key) || { month: key, views: 0, likes: 0, comments: 0 }
+      current.views += post.views ?? 0
+      current.likes += post.likes ?? 0
+      current.comments += post.commentsCount ?? 0
+      map.set(key, current)
+    }
+    return [...map.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
+  }, [blogs])
 
   return (
     <div className="space-y-5 sm:space-y-8">
@@ -80,6 +122,51 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Post engagement */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
+        <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+          <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
+            <CardTitle className="text-lg sm:text-xl font-bold">Top Posts (Views/Likes/Comments)</CardTitle>
+            <CardDescription>Live ranking from current blog metrics</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[320px] px-2 sm:px-4 pb-6">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={topPostsData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={64} />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="views" fill="#0ea5e9" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="likes" fill="#10b981" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="comments" fill="#f59e0b" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
+          <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
+            <CardTitle className="text-lg sm:text-xl font-bold">6-Month Engagement Trend</CardTitle>
+            <CardDescription>Views, likes and comments over time</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[320px] px-2 sm:px-4 pb-6">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="views" stroke="#0ea5e9" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="likes" stroke="#10b981" strokeWidth={2.5} dot={false} />
+                <Line type="monotone" dataKey="comments" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Post engagement */}

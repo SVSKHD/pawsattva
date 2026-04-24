@@ -32,6 +32,7 @@ import { CategoryFormTab } from "./components/CategoryFormTab"
 import { AnalyticsTab } from "./components/AnalyticsTab"
 import { SubscribersTab } from "./components/SubscribersTab"
 import { UsersTab } from "./components/UsersTab"
+import { uploadBlogImage } from "@/lib/image-upload"
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -107,13 +108,20 @@ export default function AdminPanel() {
   const [blogCategories, setBlogCategories] = useState<string[]>([])
   const [blogAuthorId, setBlogAuthorId] = useState("")
   const [blogStatus, setBlogStatus] = useState<"published" | "draft">("draft")
+  const [instagramAutoPost, setInstagramAutoPost] = useState(false)
+  const [instagramCaption, setInstagramCaption] = useState("")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
+  const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
+  const [featuredImageUploadProgress, setFeaturedImageUploadProgress] = useState(0)
 
   // ── Category form state ───────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState("")
   const [categoryDesc, setCategoryDesc] = useState("")
   const [categoryParentId, setCategoryParentId] = useState("")
   const [categoryStatus, setCategoryStatus] = useState<"published" | "draft">("published")
+  const [categoryImage, setCategoryImage] = useState("")
+  const [uploadingCategoryImage, setUploadingCategoryImage] = useState(false)
+  const [categoryImageUploadProgress, setCategoryImageUploadProgress] = useState(0)
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null)
   const [pendingDeletionCheck, setPendingDeletionCheck] = useState<{ id: string; name: string; subs: Category[] } | null>(null)
 
@@ -138,12 +146,13 @@ export default function AdminPanel() {
     if (!blogTitle && !blogContent && !blogKeywords && !blogCategories.length) return
     const draft = {
       blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage,
-      blogContent, blogCategories, blogAuthorId, blogStatus, editingBlogId,
+      blogContent, blogCategories, blogAuthorId, blogStatus,
+      instagramAutoPost, instagramCaption, editingBlogId,
       savedAt: new Date().toISOString(),
     }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     setSavedDraft({ savedAt: draft.savedAt })
-  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, editingBlogId])
+  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, editingBlogId])
 
   const clearDraft = useCallback(() => {
     localStorage.removeItem(DRAFT_KEY)
@@ -190,6 +199,8 @@ export default function AdminPanel() {
       setBlogContent(d.blogContent || "")
       setBlogCategories(Array.isArray(d.blogCategories) ? d.blogCategories : d.blogCategory ? [d.blogCategory] : [])
       setBlogStatus(d.blogStatus || "draft")
+      setInstagramAutoPost(Boolean(d.instagramAutoPost))
+      setInstagramCaption(d.instagramCaption || "")
       setEditingBlogId(d.editingBlogId || null)
       toast.success("Draft restored!")
     } catch {
@@ -231,6 +242,7 @@ export default function AdminPanel() {
   const resetBlogForm = () => {
     setBlogTitle(""); setBlogSlug(""); setBlogKeywords(""); setBlogExcerpt("")
     setBlogImage(""); setBlogContent(""); setBlogCategories([])
+    setInstagramAutoPost(false); setInstagramCaption("")
     setBlogAuthorId(""); setBlogStatus("draft"); setEditingBlogId(null)
   }
 
@@ -249,14 +261,47 @@ export default function AdminPanel() {
         authorId: blogAuthorId,
         authorName: selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
         status: blogStatus as "published" | "draft",
+        instagramAutoPost,
+        instagramCaption: instagramCaption.trim(),
+        instagramPostStatus: instagramAutoPost && blogStatus === "published" ? "pending" as const : undefined,
       }
+      let persistedBlogId = editingBlogId
       if (editingBlogId) {
         await updateBlog(editingBlogId, blogData)
         toast.success(`"${blogTitle}" updated.`)
       } else {
-        await addBlog(blogData)
+        const created = await addBlog(blogData)
+        persistedBlogId = created.id
         toast.success(`"${blogTitle}" saved as ${blogStatus}.`)
       }
+
+      if (persistedBlogId && blogStatus === "published" && instagramAutoPost) {
+        if (!blogImage) {
+          toast.warning("Instagram sync skipped: featured image URL is required.")
+        } else {
+          const igRes = await fetch("/api/instagram/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ imageUrl: blogImage, caption: instagramCaption.trim() }),
+          })
+          const igData = await igRes.json().catch(() => ({}))
+          if (igRes.ok && igData?.id) {
+            await updateBlog(persistedBlogId, {
+              instagramPostId: igData.id as string,
+              instagramPostStatus: "posted",
+              instagramPostError: "",
+            })
+            toast.success("Published to Instagram successfully.")
+          } else {
+            await updateBlog(persistedBlogId, {
+              instagramPostStatus: "failed",
+              instagramPostError: typeof igData?.error === "string" ? igData.error : "Instagram publish failed",
+            })
+            toast.warning("Blog published, but Instagram publish failed.")
+          }
+        }
+      }
+
       resetBlogForm()
       clearDraft()
       fetchData()
@@ -266,10 +311,34 @@ export default function AdminPanel() {
     }
   }
 
+  const handleFeaturedImageUpload = async (file: File) => {
+    try {
+      setUploadingFeaturedImage(true)
+      setFeaturedImageUploadProgress(0)
+      const result = await uploadBlogImage(file, {
+        folder: "blog-featured-images",
+        targetKB: 240,
+        onProgress: setFeaturedImageUploadProgress,
+      })
+      setBlogImage(result.url)
+      toast.success(
+        result.wasCompressed
+          ? `Image uploaded (${result.originalKB}KB → ${result.compressedKB}KB).`
+          : `Image uploaded (${result.compressedKB}KB).`
+      )
+    } catch {
+      toast.error("Image upload failed. Please try again.")
+    } finally {
+      setFeaturedImageUploadProgress(0)
+      setUploadingFeaturedImage(false)
+    }
+  }
+
   const handleEditBlog = (blog: Blog) => {
     setBlogTitle(blog.title); setBlogSlug(blog.slug)
     setBlogKeywords(blog.keywords || ""); setBlogExcerpt(blog.excerpt || "")
     setBlogImage(blog.image || ""); setBlogContent(blog.content)
+    setInstagramAutoPost(Boolean(blog.instagramAutoPost)); setInstagramCaption(blog.instagramCaption || "")
     setBlogCategories(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : [])
     setBlogAuthorId(blog.authorId || ""); setBlogStatus(blog.status)
     setEditingBlogId(blog.id)
@@ -289,6 +358,7 @@ export default function AdminPanel() {
   // ── Category handlers ─────────────────────────────────────────────────────
   const resetCategoryForm = () => {
     setCategoryName(""); setCategoryDesc(""); setCategoryParentId("")
+    setCategoryImage(""); setCategoryImageUploadProgress(0)
     setCategoryStatus("published"); setEditingCategoryId(null)
   }
 
@@ -298,6 +368,7 @@ export default function AdminPanel() {
     try {
       const catData = {
         name: categoryName, description: categoryDesc,
+        imageUrl: categoryImage || undefined,
         parentId: categoryParentId && categoryParentId !== "none" ? categoryParentId : undefined,
         status: categoryStatus as "published" | "draft",
       }
@@ -319,9 +390,33 @@ export default function AdminPanel() {
 
   const handleEditCategory = (cat: Category) => {
     setCategoryName(cat.name); setCategoryDesc(cat.description || "")
+    setCategoryImage(cat.imageUrl || "")
     setCategoryParentId(cat.parentId || ""); setCategoryStatus(cat.status || "published")
     setEditingCategoryId(cat.id)
     handleTabChange(cat.parentId ? "sub-category" : "category")
+  }
+
+  const handleCategoryImageUpload = async (file: File, isSubCategory: boolean) => {
+    try {
+      setUploadingCategoryImage(true)
+      setCategoryImageUploadProgress(0)
+      const result = await uploadBlogImage(file, {
+        folder: isSubCategory ? "subcategory-images" : "category-images",
+        targetKB: 180,
+        onProgress: setCategoryImageUploadProgress,
+      })
+      setCategoryImage(result.url)
+      toast.success(
+        result.wasCompressed
+          ? `Category image uploaded (${result.originalKB}KB → ${result.compressedKB}KB).`
+          : `Category image uploaded (${result.compressedKB}KB).`
+      )
+    } catch {
+      toast.error("Category image upload failed.")
+    } finally {
+      setUploadingCategoryImage(false)
+      setCategoryImageUploadProgress(0)
+    }
   }
 
   const handleDeleteCategory = async (id: string, name: string) => {
@@ -447,15 +542,20 @@ export default function AdminPanel() {
           {activeTab === "blog" && (
             <div className="tab-panel">
               <BlogFormTab
-                blogTitle={blogTitle} setBlogTitle={setBlogTitle}
+                blogTitle={blogTitle}
                 blogSlug={blogSlug} setBlogSlug={setBlogSlug}
                 blogKeywords={blogKeywords} setBlogKeywords={setBlogKeywords}
                 blogExcerpt={blogExcerpt} setBlogExcerpt={setBlogExcerpt}
                 blogImage={blogImage} setBlogImage={setBlogImage}
+                handleFeaturedImageUpload={handleFeaturedImageUpload}
+                uploadingFeaturedImage={uploadingFeaturedImage}
+                featuredImageUploadProgress={featuredImageUploadProgress}
                 blogContent={blogContent} setBlogContent={setBlogContent}
                 blogCategories={blogCategories} setBlogCategories={setBlogCategories}
                 blogAuthorId={blogAuthorId} setBlogAuthorId={setBlogAuthorId}
                 blogStatus={blogStatus} setBlogStatus={setBlogStatus}
+                instagramAutoPost={instagramAutoPost} setInstagramAutoPost={setInstagramAutoPost}
+                instagramCaption={instagramCaption} setInstagramCaption={setInstagramCaption}
                 editingBlogId={editingBlogId}
                 categories={categories}
                 authors={authors}
@@ -491,13 +591,17 @@ export default function AdminPanel() {
 
           {activeTab === "category" && (
             <div className="tab-panel">
-              <CategoryFormTab
-                isSubCategory={false}
-                categoryName={categoryName} setCategoryName={setCategoryName}
-                categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
-                categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
-                categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
-                editingCategoryId={editingCategoryId}
+                <CategoryFormTab
+                  isSubCategory={false}
+                  categoryName={categoryName} setCategoryName={setCategoryName}
+                  categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
+                  categoryImage={categoryImage} setCategoryImage={setCategoryImage}
+                  uploadingCategoryImage={uploadingCategoryImage}
+                  categoryImageUploadProgress={categoryImageUploadProgress}
+                  handleCategoryImageUpload={(file) => handleCategoryImageUpload(file, false)}
+                  categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
+                  categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
+                  editingCategoryId={editingCategoryId}
                 categories={categories}
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("category-list") }}
@@ -526,13 +630,17 @@ export default function AdminPanel() {
 
           {activeTab === "sub-category" && (
             <div className="tab-panel">
-              <CategoryFormTab
-                isSubCategory={true}
-                categoryName={categoryName} setCategoryName={setCategoryName}
-                categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
-                categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
-                categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
-                editingCategoryId={editingCategoryId}
+                <CategoryFormTab
+                  isSubCategory={true}
+                  categoryName={categoryName} setCategoryName={setCategoryName}
+                  categoryDesc={categoryDesc} setCategoryDesc={setCategoryDesc}
+                  categoryImage={categoryImage} setCategoryImage={setCategoryImage}
+                  uploadingCategoryImage={uploadingCategoryImage}
+                  categoryImageUploadProgress={categoryImageUploadProgress}
+                  handleCategoryImageUpload={(file) => handleCategoryImageUpload(file, true)}
+                  categoryParentId={categoryParentId} setCategoryParentId={setCategoryParentId}
+                  categoryStatus={categoryStatus} setCategoryStatus={setCategoryStatus}
+                  editingCategoryId={editingCategoryId}
                 categories={categories}
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("sub-category-list") }}

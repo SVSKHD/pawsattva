@@ -1,7 +1,7 @@
 "use client"
 
 import {
-  PlusCircle, Edit, Save, CheckCircle2, CircleDashed,
+  PlusCircle, Edit, Save, CheckCircle2, CircleDashed, Trash2,
   ChevronRight, UploadCloud, Settings2, History
 } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -10,12 +10,23 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Progress } from "@/components/ui/progress"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import Editor from "@/components/editor"
 import { Category, UserProfile } from "@/firebase/firestore"
+import { useState } from "react"
 
 interface BlogFormTabProps {
   blogTitle: string
-  setBlogTitle: (v: string) => void
   blogSlug: string
   setBlogSlug: (v: string) => void
   blogKeywords: string
@@ -24,6 +35,9 @@ interface BlogFormTabProps {
   setBlogExcerpt: (v: string) => void
   blogImage: string
   setBlogImage: (v: string) => void
+  handleFeaturedImageUpload: (file: File) => Promise<void>
+  uploadingFeaturedImage: boolean
+  featuredImageUploadProgress: number
   blogContent: string
   setBlogContent: (v: string) => void
   blogCategories: string[]
@@ -32,6 +46,10 @@ interface BlogFormTabProps {
   setBlogAuthorId: (v: string) => void
   blogStatus: "published" | "draft"
   setBlogStatus: (v: "published" | "draft") => void
+  instagramAutoPost: boolean
+  setInstagramAutoPost: (v: boolean) => void
+  instagramCaption: string
+  setInstagramCaption: (v: string) => void
   editingBlogId: string | null
   categories: Category[]
   authors: UserProfile[]
@@ -46,21 +64,26 @@ interface BlogFormTabProps {
 }
 
 export function BlogFormTab({
-  blogTitle, setBlogTitle,
+  blogTitle,
   blogSlug, setBlogSlug,
   blogKeywords, setBlogKeywords,
   blogExcerpt, setBlogExcerpt,
   blogImage, setBlogImage,
+  handleFeaturedImageUpload, uploadingFeaturedImage, featuredImageUploadProgress,
   blogContent, setBlogContent,
   blogCategories, setBlogCategories,
   blogAuthorId, setBlogAuthorId,
   blogStatus, setBlogStatus,
+  instagramAutoPost, setInstagramAutoPost,
+  instagramCaption, setInstagramCaption,
   editingBlogId,
   categories, authors,
   savedDraft, hasDraftContent,
   restoreDraft, discardDraft, formatDraftTime,
   handleBlogSubmit, handleTitleChange, onCancel,
 }: BlogFormTabProps) {
+  const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
+
   return (
     <div className="space-y-4">
       {/* Draft restore banner */}
@@ -160,13 +183,57 @@ export function BlogFormTab({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="image" className="text-sm font-semibold">Featured Image URL</Label>
-                    <Input
-                      id="image"
-                      placeholder="https://images.unsplash.com/..."
-                      value={blogImage}
-                      onChange={(e) => setBlogImage(e.target.value)}
-                      className="h-11 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl px-4"
-                    />
+                    <div className="space-y-2">
+                      <Input
+                        id="image"
+                        placeholder="https://images.unsplash.com/..."
+                        value={blogImage}
+                        onChange={(e) => setBlogImage(e.target.value)}
+                        className="h-11 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl px-4"
+                      />
+                      <label className="inline-flex items-center gap-2 text-xs font-semibold text-orange-600 bg-orange-500/10 border border-orange-500/20 rounded-xl px-3 py-2 cursor-pointer hover:bg-orange-500/15 transition-colors">
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        {uploadingFeaturedImage ? `Uploading... ${featuredImageUploadProgress}%` : "Upload image (auto-compress)"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingFeaturedImage}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (file) await handleFeaturedImageUpload(file)
+                            e.currentTarget.value = ""
+                          }}
+                        />
+                      </label>
+                      {uploadingFeaturedImage && (
+                        <div className="space-y-1">
+                          <Progress value={featuredImageUploadProgress} className="h-2" />
+                          <p className="text-[11px] text-muted-foreground">
+                            Processing & upload progress: {featuredImageUploadProgress}%
+                          </p>
+                        </div>
+                      )}
+
+                      {blogImage && /^https?:\/\/.+/i.test(blogImage) && (
+                        <div className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-muted/20">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={blogImage} alt="Featured preview" className="max-h-48 w-full object-contain" />
+                          <div className="p-2 border-t border-black/10 dark:border-white/10 flex justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 gap-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                              onClick={() => setConfirmDeleteImage(true)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="keywords" className="text-sm font-semibold">Keywords (SEO)</Label>
@@ -341,20 +408,30 @@ export function BlogFormTab({
                     </Select>
                   </div>
 
-                  {/* Image upload placeholder */}
+                  {/* Instagram publish POC */}
                   <div className="space-y-2 pt-4 border-t border-border/40">
                     <Label className="text-sm font-semibold flex items-center justify-between">
-                      Featured Image
+                      Instagram Sync (POC)
                       <span className="text-xs text-muted-foreground font-normal">Optional</span>
                     </Label>
-                    <div className="border-2 border-dashed border-orange-500/30 rounded-2xl p-6 flex flex-col items-center justify-center gap-2 bg-white/30 dark:bg-black/30 hover:bg-orange-500/5 hover:border-orange-500/50 transition-all cursor-pointer group">
-                      <div className="p-3 rounded-full bg-orange-500/10 text-orange-600 group-hover:bg-orange-500 group-hover:text-white transition-all">
-                        <UploadCloud className="w-6 h-6" />
-                      </div>
-                      <p className="text-sm text-center">
-                        <span className="font-semibold text-orange-600 dark:text-orange-400">Click to upload</span><br />
-                        <span className="text-xs text-muted-foreground">SVG, PNG, JPG (max 2MB)</span>
-                      </p>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={instagramAutoPost}
+                        onChange={(e) => setInstagramAutoPost(e.target.checked)}
+                        className="w-4 h-4 accent-orange-500 rounded"
+                      />
+                      Auto publish to Instagram when visibility is set to Published
+                    </label>
+                    <Textarea
+                      placeholder="Instagram caption / description"
+                      value={instagramCaption}
+                      onChange={(e) => setInstagramCaption(e.target.value)}
+                      className="min-h-[88px] text-sm bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl p-3"
+                    />
+                    <div className="text-[11px] text-muted-foreground space-y-1">
+                      <p>Uses the featured image URL as the Instagram image.</p>
+                      <p>If API credentials are missing or Instagram rejects the post, blog publishing still succeeds.</p>
                     </div>
                   </div>
                 </div>
@@ -383,6 +460,29 @@ export function BlogFormTab({
           </CardFooter>
         </form>
       </Card>
+
+      <AlertDialog open={confirmDeleteImage} onOpenChange={setConfirmDeleteImage}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove featured image?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This only removes it from the blog form. The uploaded file remains in storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setBlogImage("")
+                setConfirmDeleteImage(false)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

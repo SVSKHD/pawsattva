@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "@/firebase/firebase";
 
 const STORAGE_KEY = "pawsattva_reaction_";
 
@@ -22,6 +24,16 @@ export function BlogReactions({ blogId, initialLikes, initialDislikes }: BlogRea
     if (stored === "like" || stored === "dislike") {
       setUserReaction(stored);
     }
+  }, [blogId]);
+
+  useEffect(() => {
+    const blogRef = doc(db, "blogs", blogId);
+    return onSnapshot(blogRef, (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      setLikes(data.likes ?? 0);
+      setDislikes(data.dislikes ?? 0);
+    });
   }, [blogId]);
 
   const handleReaction = async (action: "like" | "dislike") => {
