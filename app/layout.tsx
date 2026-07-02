@@ -3,12 +3,15 @@ import { constructMetadata } from "@/lib/metadata";
 import { Geist_Mono, Pacifico, Montserrat } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/components/auth-provider";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
+import { FirebaseAnalytics } from "@/components/firebase-analytics";
+import PetCursorAura from "@/components/pet-cursor-aura";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -32,10 +35,6 @@ export const viewport: Viewport = {
   themeColor: "#ea580c", // matches primary orange
 };
 
-import { AuthProvider } from "@/components/auth-provider";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner";
-import { FirebaseAnalytics } from "@/components/firebase-analytics";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -49,6 +48,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <TooltipProvider>
+            <PetCursorAura />
             {children}
             <SonnerToaster richColors position="top-center" />
             <FirebaseAnalytics />
@@ -58,4 +58,3 @@ export default function RootLayout({
     </html>
   );
 }
-
