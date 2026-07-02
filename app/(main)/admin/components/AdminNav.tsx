@@ -92,8 +92,21 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
 
   return (
     <>
+      <style>{`
+        @media (max-width: 767px) {
+          .items-start > .admin-nav-desktop-sidebar + .admin-nav-mobile {
+            display: none !important;
+          }
+
+          .items-start > .admin-nav-desktop-sidebar + .admin-nav-mobile + div {
+            width: 100%;
+            min-width: 0;
+          }
+        }
+      `}</style>
+
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden md:flex flex-col w-52 shrink-0 gap-1 self-start sticky top-24">
+      <aside className="admin-nav-desktop-sidebar hidden md:flex flex-col w-52 shrink-0 gap-1 self-start sticky top-24">
         {NAV_GROUPS.map((group) => (
           <div key={group.label} className="mb-3">
             <p className="px-3 mb-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 select-none">
@@ -127,7 +140,7 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
       </aside>
 
       {/* ── Mobile top nav ── */}
-      <div className="md:hidden -mx-3 flex max-w-[calc(100vw-1.5rem)] items-center gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
+      <div className="admin-nav-mobile md:hidden -mx-3 flex max-w-[calc(100vw-1.5rem)] items-center gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
         {NAV_GROUPS.flatMap((g) => g.items).map((item) => {
           const active = isActive(item)
           const Icon = item.icon
