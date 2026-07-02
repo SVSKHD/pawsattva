@@ -2,20 +2,34 @@
 
 import { useEffect, useRef, useState } from "react"
 
+type PointerMode = "none" | "fine" | "touch"
+
+type TouchRipple = {
+  id: number
+  x: number
+  y: number
+  rotation: number
+}
+
 export default function PetCursorAura() {
   const dotRef = useRef<HTMLDivElement | null>(null)
   const glowRef = useRef<HTMLDivElement | null>(null)
   const tailRef = useRef<HTMLDivElement | null>(null)
   const pawRef = useRef<HTMLDivElement | null>(null)
-  const [enabled, setEnabled] = useState(false)
+  const rippleIdRef = useRef(0)
+  const [mode, setMode] = useState<PointerMode>("none")
+  const [ripples, setRipples] = useState<TouchRipple[]>([])
 
   useEffect(() => {
-    const canUseFinePointer = window.matchMedia("(pointer: fine)").matches
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    if (prefersReducedMotion) return
 
-    if (!canUseFinePointer || prefersReducedMotion) return
+    const canUseFinePointer = window.matchMedia("(pointer: fine)").matches
+    setMode(canUseFinePointer ? "fine" : "touch")
+  }, [])
 
-    setEnabled(true)
+  useEffect(() => {
+    if (mode !== "fine") return
 
     let mouseX = window.innerWidth / 2
     let mouseY = window.innerHeight / 2
@@ -72,9 +86,103 @@ export default function PetCursorAura() {
       window.removeEventListener("mousemove", handleMove)
       cancelAnimationFrame(frameId)
     }
-  }, [])
+  }, [mode])
 
-  if (!enabled) return null
+  useEffect(() => {
+    if (mode !== "touch") return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "mouse") return
+
+      const id = rippleIdRef.current + 1
+      rippleIdRef.current = id
+
+      const nextRipple: TouchRipple = {
+        id,
+        x: event.clientX,
+        y: event.clientY,
+        rotation: Math.round(Math.random() * 32 - 16),
+      }
+
+      setRipples((current) => [...current.slice(-5), nextRipple])
+      window.setTimeout(() => {
+        setRipples((current) => current.filter((ripple) => ripple.id !== id))
+      }, 780)
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown, { passive: true })
+
+    return () => window.removeEventListener("pointerdown", handlePointerDown)
+  }, [mode])
+
+  if (mode === "none") return null
+
+  if (mode === "touch") {
+    return (
+      <>
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[9999] overflow-hidden">
+          {ripples.map((ripple) => (
+            <div
+              key={ripple.id}
+              className="touch-paw-ripple absolute left-0 top-0 h-24 w-24"
+              style={{
+                transform: `translate3d(${ripple.x}px, ${ripple.y}px, 0) translate(-50%, -50%) rotate(${ripple.rotation}deg)`,
+              }}
+            >
+              <span className="absolute inset-0 rounded-full border border-orange-300/45 bg-orange-300/10 shadow-[0_0_36px_rgba(249,115,22,0.24)]" />
+              <span className="touch-paw-core absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/70 text-base shadow-[0_12px_34px_rgba(249,115,22,0.22)] backdrop-blur-xl dark:bg-black/35">
+                🐾
+              </span>
+              <span className="touch-paw-tail absolute left-[52%] top-1/2 h-4 w-16 -translate-y-1/2 rounded-full bg-gradient-to-r from-amber-300/35 to-transparent blur-md" />
+            </div>
+          ))}
+        </div>
+
+        <style jsx>{`
+          @keyframes touchPawRipple {
+            0% {
+              opacity: 0;
+              scale: 0.45;
+              filter: blur(0px);
+            }
+            18% {
+              opacity: 1;
+            }
+            100% {
+              opacity: 0;
+              scale: 1.45;
+              filter: blur(2px);
+            }
+          }
+
+          @keyframes touchPawCore {
+            0% { transform: translate(-50%, -50%) scale(0.72) rotate(-6deg); }
+            45% { transform: translate(-50%, -50%) scale(1.05) rotate(5deg); }
+            100% { transform: translate(-50%, -50%) scale(0.92) rotate(0deg); }
+          }
+
+          @keyframes touchPawTail {
+            0% { opacity: 0; transform: translateY(-50%) translateX(-10px) scaleX(0.5); }
+            35% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-50%) translateX(18px) scaleX(1.15); }
+          }
+
+          .touch-paw-ripple {
+            transform-origin: center;
+            animation: touchPawRipple 780ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .touch-paw-core {
+            animation: touchPawCore 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+
+          .touch-paw-tail {
+            animation: touchPawTail 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+        `}</style>
+      </>
+    )
+  }
 
   return (
     <>
