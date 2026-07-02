@@ -127,6 +127,8 @@
   html {
     @apply font-sans;
     font-family: var(--font-montserrat, sans-serif);
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   body {
@@ -134,11 +136,20 @@
     font-family: var(--font-montserrat, sans-serif);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-montserrat, sans-serif);
     letter-spacing: -0.02em;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
   }
 }
 
@@ -258,3 +269,69 @@
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* ── Admin responsive hardening ── */
+.tab-panel,
+.tab-panel > *,
+.tab-panel form,
+.tab-panel [data-slot="card"] {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tab-panel .overflow-x-auto {
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+}
+
+.tab-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tab-panel th,
+.tab-panel td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.tab-panel .recharts-responsive-container,
+.tab-panel .recharts-wrapper,
+.tab-panel .recharts-surface {
+  max-width: 100% !important;
+}
+
+.tab-panel .ProseMirror {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .tab-panel {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  }
+
+  .tab-panel table {
+    min-width: 560px;
+  }
+
+  .tab-panel th,
+  .tab-panel td {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .tab-panel input,
+  .tab-panel textarea,
+  .login-content input,
+  .login-content textarea {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 420px) {
+  .tab-panel table {
+    min-width: 500px;
+  }
+}
