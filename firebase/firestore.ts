@@ -121,6 +121,11 @@ export interface PetFeed {
   createdAt?: any;
 }
 
+const withoutUndefined = <T extends object>(data: T) =>
+  Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  ) as Partial<T>;
+
 // ── USER OPERATIONS ──────────────────────────────────────────────────────────
 
 export const getAdminUsers = async () => {
@@ -310,14 +315,14 @@ export const getCategory = async (id: string) => {
 
 export const addCategory = async (category: Omit<Category, "id">) => {
   return await addDoc(collection(db, "categories"), {
-    ...category,
+    ...withoutUndefined(category),
     createdAt: serverTimestamp(),
   });
 };
 
 export const updateCategory = async (id: string, category: Partial<Category>) => {
   const docRef = doc(db, "categories", id);
-  return await updateDoc(docRef, category);
+  return await updateDoc(docRef, withoutUndefined(category));
 };
 
 export const deleteCategory = async (id: string) => {
