@@ -1,12 +1,22 @@
 "use client"
 
-import { FileText, FolderPlus, Layers, Users, Mail, BarChart3 } from "lucide-react"
+import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_GROUPS = [
   {
     label: "Content",
     items: [
+      {
+        label: "Content Goals",
+        primaryValue: "content-goals",
+        relatedValues: [],
+        icon: Target,
+        activeColor: "text-emerald-600 dark:text-emerald-400",
+        activeBg: "bg-emerald-500/10",
+        activeBorder: "border-emerald-500/20",
+        dot: "bg-emerald-500",
+      },
       {
         label: "Blog Posts",
         primaryValue: "blog-list",

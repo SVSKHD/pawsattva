@@ -32,6 +32,7 @@ import { CategoryFormTab } from "./components/CategoryFormTab"
 import { AnalyticsTab } from "./components/AnalyticsTab"
 import { SubscribersTab } from "./components/SubscribersTab"
 import { UsersTab } from "./components/UsersTab"
+import { ContentGoalsTab } from "./components/ContentGoalsTab"
 import { uploadBlogImage } from "@/lib/image-upload"
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -478,7 +479,7 @@ export default function AdminPanel() {
           Content Hub
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
-          Manage blog articles, categories, and view platform analytics.
+          Plan content goals, manage articles, categories, and view platform analytics.
         </p>
       </div>
 
@@ -529,6 +530,12 @@ export default function AdminPanel() {
                 handleEditBlog={handleEditBlog}
                 handleDeleteBlog={handleDeleteBlog}
               />
+            </div>
+          )}
+
+          {activeTab === "content-goals" && (
+            <div className="tab-panel">
+              <ContentGoalsTab currentUser={user} />
             </div>
           )}
 
