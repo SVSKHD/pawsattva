@@ -121,6 +121,25 @@ export interface PetFeed {
   createdAt?: any;
 }
 
+export type ContentGoalType = "blog" | "instagram";
+export type ContentGoalStatus = "active" | "completed";
+
+export interface ContentGoal {
+  id: string;
+  title: string;
+  description: string;
+  deadline: string;
+  type: ContentGoalType;
+  status: ContentGoalStatus;
+  createdBy: string;
+  createdByName: string;
+  updatedBy?: string;
+  updatedByName?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+  completedAt?: Timestamp | null;
+}
+
 const withoutUndefined = <T extends object>(data: T) =>
   Object.fromEntries(
     Object.entries(data).filter(([, value]) => value !== undefined)
@@ -172,6 +191,54 @@ export const deleteUser = async (userId: string) => {
 };
 
 // ── BLOG OPERATIONS ──────────────────────────────────────────────────────────
+
+export const addContentGoal = async (
+  goal: Omit<ContentGoal, "id" | "createdAt" | "updatedAt" | "completedAt">
+) => {
+  return await addDoc(collection(db, "contentGoals"), {
+    ...withoutUndefined(goal),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    completedAt: goal.status === "completed" ? serverTimestamp() : null,
+  });
+};
+
+export const updateContentGoal = async (
+  id: string,
+  goal: Partial<Omit<ContentGoal, "id" | "createdAt" | "completedAt">>
+) => {
+  const docRef = doc(db, "contentGoals", id);
+  const updates: Record<string, unknown> = {
+    ...withoutUndefined(goal),
+    updatedAt: serverTimestamp(),
+  };
+
+  if (goal.status === "completed") updates.completedAt = serverTimestamp();
+  if (goal.status === "active") updates.completedAt = null;
+
+  return await updateDoc(docRef, updates);
+};
+
+export const deleteContentGoal = async (id: string) => {
+  return await deleteDoc(doc(db, "contentGoals", id));
+};
+
+export const onContentGoalsSnapshot = (
+  callback: (goals: ContentGoal[]) => void,
+  onError?: (error: Error) => void
+) => {
+  const goalsQuery = query(collection(db, "contentGoals"), orderBy("createdAt", "desc"));
+  return onSnapshot(
+    goalsQuery,
+    (snapshot) => {
+      callback(snapshot.docs.map(entry => ({
+        id: entry.id,
+        ...entry.data(),
+      } as ContentGoal)));
+    },
+    onError
+  );
+};
 
 export const getBlogs = async () => {
   const blogsQuery = query(collection(db, "blogs"), orderBy("date", "desc"));
