@@ -7,7 +7,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <main className="relative min-h-screen flex flex-col pb-28 md:pb-0">
+    <main className="relative min-h-screen flex flex-col pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0">
       <Header />
       <div className="flex-1">
         {children}

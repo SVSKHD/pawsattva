@@ -150,7 +150,7 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
       </aside>
 
       {/* ── Mobile top nav ── */}
-      <div className="admin-nav-mobile md:hidden -mx-3 flex max-w-[calc(100vw-1.5rem)] items-center gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
+      <div className="admin-nav-mobile md:hidden -mx-3 flex max-w-[calc(100vw-1.5rem)] snap-x snap-proximity items-center gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
         {NAV_GROUPS.flatMap((g) => g.items).map((item) => {
           const active = isActive(item)
           const Icon = item.icon
@@ -160,7 +160,7 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
               type="button"
               onClick={() => onTabChange(item.primaryValue)}
               className={cn(
-                "flex min-w-max items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-bold whitespace-nowrap border shrink-0 transition-all duration-150",
+                "flex min-h-11 min-w-max snap-start touch-manipulation items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap border shrink-0 transition-[color,background-color,border-color,transform] duration-150 active:scale-95",
                 active
                   ? cn(item.activeBg, item.activeColor, item.activeBorder, "shadow-sm")
                   : "text-muted-foreground border-transparent bg-black/5 dark:bg-white/5 hover:text-foreground"

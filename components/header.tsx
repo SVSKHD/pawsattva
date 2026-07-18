@@ -1,7 +1,8 @@
 "use client";
 
 import { ViewTransition } from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -16,21 +17,34 @@ const navLinks = [
 import { useAuth } from "@/components/auth-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, LayoutDashboard, User, Loader2, Menu, Home, BookOpen } from "lucide-react";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { LogOut, LayoutDashboard, User, Loader2, Menu, Home, BookOpen, PawPrint } from "lucide-react";
 
 import { useEffect, useState } from "react";
+
+const MobileMoreMenu = dynamic(
+  () => import("@/components/mobile-more-menu").then((mod) => mod.MobileMoreMenu),
+  { ssr: false }
+);
+
+function NavPendingHint() {
+  const { pending } = useLinkStatus();
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`nav-pending-hint ${pending ? "is-pending" : ""}`}
+    />
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
   const { user, isAdmin, loading } = useAuth();
   const [isVisible, setIsVisible] = useState(true);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const isRouteActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -73,10 +87,10 @@ export function Header() {
   return (
     <>
       <div
-        className={`fixed top-0 left-0 right-0 z-50 px-4 pt-4 transition-all duration-500 ease-in-out ${isVisible ? "translate-y-0 opacity-100" : "-translate-y-32 opacity-0"
+        className={`fixed top-0 left-0 right-0 z-50 px-3 pt-3 transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:pt-4 ${isVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-32 opacity-0"
           }`}
       >
-        <header className="pointer-events-auto mx-auto w-full max-w-7xl rounded-4xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition-all duration-300 ease-in-out">
+        <header className="pointer-events-auto mx-auto w-full max-w-7xl rounded-4xl border border-white/50 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-shadow duration-300 dark:border-white/10 dark:bg-zinc-950/95 md:bg-white/70 md:backdrop-blur-xl dark:md:bg-zinc-950/75">
           <div className="flex h-16 items-center px-6 md:px-10">
             <Link href="/" className="flex items-center gap-2.5 group transition-transform hover:scale-105 duration-300">
               {/* Logo Wrapper to ensure perfect centering */}
@@ -98,7 +112,7 @@ export function Header() {
 
             <nav className="ml-10 hidden md:flex items-center gap-8">
               {navLinks.map((link) => {
-                const isActive = pathname === link.href;
+                const isActive = isRouteActive(link.href);
                 return (
                   <Link
                     key={link.href}
@@ -183,88 +197,68 @@ export function Header() {
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <nav className={`md:hidden fixed bottom-6 left-4 right-4 z-[60] transition-all duration-500 ease-in-out ${isVisible ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0"
-        }`}>
-        <div className="flex items-center justify-around h-16 bg-white/40 dark:bg-black/40 backdrop-blur-2xl border border-white/30 dark:border-white/10 rounded-3xl shadow-[0_8px_32px_rgba(0,0,0,0.15)] px-4">
+      <nav
+        aria-label="Primary mobile navigation"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+      >
+        <div className="pointer-events-auto mx-auto flex h-[4.5rem] w-full max-w-md items-stretch justify-around rounded-[1.6rem] border border-white/70 bg-white/95 px-1.5 shadow-[0_10px_32px_rgba(24,24,27,0.18)] backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/95">
           <Link
             href="/"
-            className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all ${pathname === "/" ? "text-primary" : "text-muted-foreground"
+            aria-current={pathname === "/" ? "page" : undefined}
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname === "/" ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
               }`}
           >
-            <Home className="w-6 h-6" />
+            <Home className="h-5.5 w-5.5" />
             <span className="text-[10px] font-bold mt-1">HOME</span>
+            <NavPendingHint />
           </Link>
 
           <Link
             href="/blog"
-            className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all ${pathname.startsWith("/blog") ? "text-primary" : "text-muted-foreground"
+            aria-current={pathname.startsWith("/blog") ? "page" : undefined}
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/blog") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
               }`}
           >
-            <BookOpen className="w-6 h-6" />
+            <BookOpen className="h-5.5 w-5.5" />
             <span className="text-[10px] font-bold mt-1">BLOG</span>
+            <NavPendingHint />
           </Link>
 
-          <Drawer>
-            <DrawerTrigger asChild>
-              <button className="flex flex-col items-center justify-center p-2 text-muted-foreground hover:text-primary transition-all">
-                <Menu className="w-6 h-6" />
-                <span className="text-[10px] font-bold mt-1">MORE</span>
-              </button>
-            </DrawerTrigger>
-            <DrawerContent className="rounded-t-[2.5rem] border-t border-white/20 bg-white/85 backdrop-blur-2xl focus:outline-none">
-              <DrawerHeader className="items-center pb-4 border-b border-black/5">
-                <DrawerTitle className="flex items-center gap-2">
-                  <div className="relative w-8 h-8">
-                    <Image src={Paw} alt="Logo" fill className="object-contain" sizes="32px" />
-                  </div>
-                  <span className="text-lg font-[family-name:var(--font-pacifico)] bg-gradient-to-r from-primary to-orange-600 bg-clip-text text-transparent">
-                    Paw Sattva
-                  </span>
-                </DrawerTitle>
-              </DrawerHeader>
-              <div className="grid grid-cols-2 gap-4 p-4 pb-12">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`flex items-center justify-center gap-2 text-base font-semibold p-4 rounded-2xl transition-all ${pathname === link.href
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "bg-black/5 text-muted-foreground hover:bg-black/10 hover:text-foreground"
-                      }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    className="flex items-center justify-center gap-2 text-sm font-semibold p-4 rounded-2xl bg-orange-600/5 text-orange-600 border border-orange-600/10 hover:bg-orange-600/10 transition-all col-span-2"
-                  >
-                    <LayoutDashboard className="w-5 h-5" />
-                    Admin Dashboard
-                  </Link>
-                )}
-                {user && (
-                  <Link
-                    href="/dashboard"
-                    className="flex items-center justify-center gap-2 text-sm font-semibold p-4 rounded-2xl bg-orange-500/5 text-orange-600 border border-orange-500/10 hover:bg-orange-500/10 transition-all col-span-2"
-                  >
-                    <User className="w-5 h-5" />
-                    My Dashboard
-                  </Link>
-                )}
-                {!user && (
-                  <Link href="/login" className="col-span-2 mt-2">
-                    <Button className="w-full h-12 rounded-2xl bg-gradient-to-r from-primary to-orange-600 font-bold shadow-lg shadow-primary/20">
-                      Sign In Now
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </DrawerContent>
-          </Drawer>
+          <Link
+            href="/pet-feed"
+            aria-current={pathname.startsWith("/pet-feed") ? "page" : undefined}
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/pet-feed") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
+              }`}
+          >
+            <PawPrint className="h-5.5 w-5.5" />
+            <span className="mt-1 text-[10px] font-bold">PET PLAN</span>
+            <NavPendingHint />
+          </Link>
+
+          <button
+            type="button"
+            aria-label="Open more navigation options"
+            aria-expanded={isMenuOpen}
+            onPointerDown={() => void import("@/components/mobile-more-menu")}
+            onFocus={() => void import("@/components/mobile-more-menu")}
+            onClick={() => setIsMenuOpen(true)}
+            className={`mobile-nav-item flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 text-muted-foreground transition-[color,background-color,transform] duration-150 active:scale-95 ${isMenuOpen ? "bg-orange-500/10 text-primary" : ""}`}
+          >
+            <Menu className="h-5.5 w-5.5" />
+            <span className="text-[10px] font-bold mt-1">MORE</span>
+          </button>
         </div>
       </nav>
+
+      {isMenuOpen && (
+        <MobileMoreMenu
+          open={isMenuOpen}
+          onOpenChange={setIsMenuOpen}
+          pathname={pathname}
+          isAdmin={isAdmin}
+          hasUser={Boolean(user)}
+        />
+      )}
     </>
   );
 }

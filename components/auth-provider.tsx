@@ -2,8 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { auth, db } from "@/firebase/firebase";
+import { auth } from "@/firebase/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -18,22 +17,39 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [authState, setAuthState] = useState<AuthContextType>({
+    user: null,
+    loading: true,
+    isAdmin: false,
+  });
 
   useEffect(() => {
+    let active = true;
+    let authSequence = 0;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setUser(user);
-        // Check if user exists in Firestore, if not create them
+      const sequence = ++authSequence;
+      if (!user) {
+        if (active && sequence === authSequence) {
+          setAuthState({ user: null, loading: false, isAdmin: false });
+        }
+        return;
+      }
+
+      try {
+        // Firestore is intentionally loaded only for signed-in users. Public visitors
+        // should not pay the download and initialization cost during first paint.
+        const [{ doc, getDoc, setDoc }, { db }] = await Promise.all([
+          import("firebase/firestore"),
+          import("@/firebase/db"),
+        ]);
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
+        let isAdmin = false;
 
         if (userDoc.exists()) {
-          setIsAdmin(userDoc.data().admin === true);
+          isAdmin = userDoc.data().admin === true;
         } else {
-          // New user, default admin false
           await setDoc(userDocRef, {
             email: user.email,
             displayName: user.displayName,
@@ -41,20 +57,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             admin: false,
             createdAt: new Date(),
           });
-          setIsAdmin(false);
         }
-      } else {
-        setUser(null);
-        setIsAdmin(false);
+
+        if (active && sequence === authSequence) {
+          setAuthState({ user, loading: false, isAdmin });
+        }
+      } catch (error) {
+        console.error("Unable to load the user profile:", error);
+        if (active && sequence === authSequence) {
+          setAuthState({ user, loading: false, isAdmin: false });
+        }
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin }}>
+    <AuthContext.Provider value={authState}>
       {children}
     </AuthContext.Provider>
   );

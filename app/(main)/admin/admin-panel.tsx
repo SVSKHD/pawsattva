@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition, useEffect, useRef, useCallback } from "react"
+import { useState, useTransition, useEffect, useRef, useCallback, useMemo } from "react"
+import dynamic from "next/dynamic"
 import Paw from "../../pawsattva.png"
 import { Settings2, ChevronRight, Trash2 } from "lucide-react"
 
@@ -10,9 +11,9 @@ import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 
 import {
-  getBlogs, addBlog, updateBlog, deleteBlog,
+  addBlog, updateBlog, deleteBlog,
   getCategories, addCategory, updateCategory, deleteCategory,
-  getAdminUsers, getSubscriptions, getAppUsers,
+  getAdminUsers, getSubscriptions,
   onUsersSnapshot, onBlogsSnapshot, updateUserRole, updateUser, deleteUser,
   Blog, Category, UserProfile, Subscription
 } from "@/firebase/firestore"
@@ -25,15 +26,48 @@ import { Button } from "@/components/ui/button"
 
 import { AdminNav } from "./components/AdminNav"
 import { BlogListTab } from "./components/BlogListTab"
-import { BlogFormTab } from "./components/BlogFormTab"
-import { CategoryListTab } from "./components/CategoryListTab"
-import { SubCategoryListTab } from "./components/SubCategoryListTab"
-import { CategoryFormTab } from "./components/CategoryFormTab"
-import { AnalyticsTab } from "./components/AnalyticsTab"
-import { SubscribersTab } from "./components/SubscribersTab"
-import { UsersTab } from "./components/UsersTab"
-import { ContentGoalsTab } from "./components/ContentGoalsTab"
-import { uploadBlogImage } from "@/lib/image-upload"
+
+function TabLoading() {
+  return (
+    <div role="status" className="flex min-h-56 items-center justify-center rounded-3xl border border-orange-200/50 bg-orange-50/60 text-sm font-bold text-orange-700 dark:border-white/10 dark:bg-white/5 dark:text-orange-300">
+      <span className="mr-3 inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      Opening this workspace...
+    </div>
+  )
+}
+
+const ContentGoalsTab = dynamic(
+  () => import("./components/ContentGoalsTab").then((mod) => mod.ContentGoalsTab),
+  { loading: TabLoading }
+)
+const BlogFormTab = dynamic(
+  () => import("./components/BlogFormTab").then((mod) => mod.BlogFormTab),
+  { loading: TabLoading }
+)
+const CategoryListTab = dynamic(
+  () => import("./components/CategoryListTab").then((mod) => mod.CategoryListTab),
+  { loading: TabLoading }
+)
+const SubCategoryListTab = dynamic(
+  () => import("./components/SubCategoryListTab").then((mod) => mod.SubCategoryListTab),
+  { loading: TabLoading }
+)
+const CategoryFormTab = dynamic(
+  () => import("./components/CategoryFormTab").then((mod) => mod.CategoryFormTab),
+  { loading: TabLoading }
+)
+const AnalyticsTab = dynamic(
+  () => import("./components/AnalyticsTab").then((mod) => mod.AnalyticsTab),
+  { loading: TabLoading }
+)
+const SubscribersTab = dynamic(
+  () => import("./components/SubscribersTab").then((mod) => mod.SubscribersTab),
+  { loading: TabLoading }
+)
+const UsersTab = dynamic(
+  () => import("./components/UsersTab").then((mod) => mod.UsersTab),
+  { loading: TabLoading }
+)
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -68,36 +102,71 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<UserProfile[]>([])
   const [subscribers, setSubscribers] = useState<Subscription[]>([])
   const [loadingData, setLoadingData] = useState(true)
-
-  const fetchData = async () => {
-    setLoadingData(true)
-    try {
-      const [cats, blogsData, admins, allUsers, subs] = await Promise.all([
-        getCategories(),
-        getBlogs(),
-        getAdminUsers(),
-        getAppUsers(),
-        getSubscriptions(),
-      ])
-      setCategories(cats)
-      setBlogs(blogsData as Blog[])
-      setAuthors(admins)
-      setUsers(allUsers)
-      setSubscribers(subs)
-    } catch {
-      toast.error("Failed to load data from database.")
-    } finally {
-      setLoadingData(false)
-    }
-  }
+  const authorsLoadedRef = useRef(false)
+  const subscriptionsLoadedRef = useRef(false)
 
   useEffect(() => {
     if (!isAdmin) return
-    fetchData()
-    const unsubUsers = onUsersSnapshot(setUsers)
-    const unsubBlogs = onBlogsSnapshot(setBlogs)
-    return () => { unsubUsers(); unsubBlogs() }
+    let active = true
+    let categoriesReady = false
+    let blogsReady = false
+
+    const finishInitialLoad = () => {
+      if (active && categoriesReady && blogsReady) setLoadingData(false)
+    }
+
+    setLoadingData(true)
+    getCategories().then((nextCategories) => {
+      if (!active) return
+      setCategories(nextCategories)
+      categoriesReady = true
+      finishInitialLoad()
+    }).catch(() => {
+      if (!active) return
+      toast.error("Failed to load categories from database.")
+      setLoadingData(false)
+    })
+
+    const unsubBlogs = onBlogsSnapshot((nextBlogs) => {
+      if (!active) return
+      setBlogs(nextBlogs)
+      blogsReady = true
+      finishInitialLoad()
+    }, () => {
+      if (!active) return
+      toast.error("Failed to load blog posts from database.")
+      setLoadingData(false)
+    })
+
+    return () => {
+      active = false
+      unsubBlogs()
+    }
   }, [isAdmin])
+
+  useEffect(() => {
+    if (!isAdmin || (activeTab !== "users" && activeTab !== "analytics")) return
+    return onUsersSnapshot(setUsers)
+  }, [activeTab, isAdmin])
+
+  useEffect(() => {
+    if (!isAdmin || activeTab !== "blog" || authorsLoadedRef.current) return
+    authorsLoadedRef.current = true
+    getAdminUsers().then(setAuthors).catch(() => {
+      authorsLoadedRef.current = false
+      toast.error("Failed to load blog authors.")
+    })
+  }, [activeTab, isAdmin])
+
+  useEffect(() => {
+    const needsSubscribers = activeTab === "subscribers" || activeTab === "analytics"
+    if (!isAdmin || !needsSubscribers || subscriptionsLoadedRef.current) return
+    subscriptionsLoadedRef.current = true
+    getSubscriptions().then(setSubscribers).catch(() => {
+      subscriptionsLoadedRef.current = false
+      toast.error("Failed to load subscribers.")
+    })
+  }, [activeTab, isAdmin])
 
   // ── Blog form state ───────────────────────────────────────────────────────
   const [blogTitle, setBlogTitle] = useState("")
@@ -220,17 +289,27 @@ export default function AdminPanel() {
       .replace(/[\s_-]+/g, "-")
       .replace(/^-+|-+$/g, "")
 
-  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || "Unknown"
+  const getCategoryName = useCallback(
+    (id: string) => categories.find(c => c.id === id)?.name || "Unknown",
+    [categories]
+  )
 
   const [blogSearchQuery, setBlogSearchQuery] = useState("")
-  const filteredBlogsList = blogs.filter(b =>
-    b.title.toLowerCase().includes(blogSearchQuery.toLowerCase())
+  const filteredBlogsList = useMemo(() => {
+    const query = blogSearchQuery.toLowerCase()
+    return blogs.filter((blog) => blog.title.toLowerCase().includes(query))
+  }, [blogSearchQuery, blogs])
+  const filteredUsers = useMemo(() => {
+    const query = userSearchQuery.toLowerCase()
+    return users.filter((profile) =>
+      (profile.displayName || "").toLowerCase().includes(query) ||
+      profile.email.toLowerCase().includes(query)
+    )
+  }, [userSearchQuery, users])
+  const totalPetFeeds = useMemo(
+    () => users.reduce((sum, profile) => sum + (profile.petFeeds?.length || 0), 0),
+    [users]
   )
-  const filteredUsers = users.filter(u =>
-    (u.displayName || "").toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-    u.email.toLowerCase().includes(userSearchQuery.toLowerCase())
-  )
-  const totalPetFeeds = users.reduce((sum, u) => sum + (u.petFeeds?.length || 0), 0)
 
   // ── Blog handlers ─────────────────────────────────────────────────────────
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -304,7 +383,6 @@ export default function AdminPanel() {
 
       resetBlogForm()
       clearDraft()
-      fetchData()
       handleTabChange("blog-list")
     } catch {
       toast.error("Failed to save blog post.")
@@ -314,6 +392,7 @@ export default function AdminPanel() {
   const handleFeaturedImageUpload = async (file: File) => {
     try {
       setUploadingFeaturedImage(true)
+      const { uploadBlogImage } = await import("@/lib/image-upload")
       const result = await uploadBlogImage(file, { folder: "blog-featured-images", targetKB: 240 })
       setBlogImage(result.url)
       toast.success(
@@ -343,7 +422,6 @@ export default function AdminPanel() {
     try {
       await deleteBlog(id)
       toast.success("Blog post deleted.")
-      fetchData()
     } catch {
       toast.error("Failed to delete blog post.")
     }
@@ -375,7 +453,7 @@ export default function AdminPanel() {
         toast.success(`"${categoryName}" created.`)
       }
       resetCategoryForm()
-      fetchData()
+      setCategories(await getCategories())
       handleTabChange(catData.parentId ? "sub-category-list" : "category-list")
     } catch {
       toast.error("Failed to save category.")
@@ -394,6 +472,7 @@ export default function AdminPanel() {
     try {
       setUploadingCategoryImage(true)
       setCategoryImageUploadProgress(0)
+      const { uploadBlogImage } = await import("@/lib/image-upload")
       const result = await uploadBlogImage(file, {
         folder: isSubCategory ? "subcategory-images" : "category-images",
         targetKB: 180,
@@ -419,14 +498,16 @@ export default function AdminPanel() {
       setPendingDeletionCheck({ id, name, subs: relatedSubs }); return
     }
     try {
-      await deleteCategory(id); toast.success("Category deleted."); fetchData()
+      await deleteCategory(id); toast.success("Category deleted.")
+      setCategories(await getCategories())
     } catch { toast.error("Failed to delete category.") }
   }
 
   const confirmDeleteCategory = async (id: string) => {
     try {
       await deleteCategory(id); toast.success("Category deleted.")
-      setPendingDeletionCheck(null); fetchData()
+      setPendingDeletionCheck(null)
+      setCategories(await getCategories())
     } catch { toast.error("Failed to delete category.") }
   }
 
@@ -440,7 +521,7 @@ export default function AdminPanel() {
     if (!editingUserId) return
     try {
       await updateUser(editingUserId, { displayName: editUserName, email: editUserEmail, phone: editUserPhone })
-      toast.success("User updated."); setEditingUserId(null); fetchData()
+      toast.success("User updated."); setEditingUserId(null)
     } catch { toast.error("Failed to update user.") }
   }
 
@@ -448,7 +529,6 @@ export default function AdminPanel() {
     try {
       await updateUserRole(userId, targetState)
       toast.success("User role updated.")
-      fetchData()
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Unknown error"
       toast.error(`Failed to update user role: ${msg}`)
@@ -457,7 +537,7 @@ export default function AdminPanel() {
 
   const handleDeleteUserAccount = async (userId: string) => {
     try {
-      await deleteUser(userId); toast.success("User deleted."); fetchData()
+      await deleteUser(userId); toast.success("User deleted.")
     } catch { toast.error("Failed to delete user.") }
   }
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/firebase/firebase";
+import { db } from "@/firebase/db";
 
 const STORAGE_KEY = "pawsattva_reaction_";
 
