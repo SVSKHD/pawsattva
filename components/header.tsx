@@ -14,6 +14,8 @@ const navLinks = [
   { href: "/pet-feed", label: "Pet Feed" },
 ];
 
+const mobileNavIconClassName = "size-6 shrink-0 stroke-[1.9]";
+
 import { useAuth } from "@/components/auth-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
@@ -92,16 +94,16 @@ export function Header() {
       >
         <header className="pointer-events-auto mx-auto w-full max-w-7xl rounded-4xl border border-white/50 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-shadow duration-300 dark:border-white/10 dark:bg-zinc-950/95 md:bg-white/70 md:backdrop-blur-xl dark:md:bg-zinc-950/75">
           <div className="flex h-16 items-center px-6 md:px-10">
-            <Link href="/" className="flex items-center gap-2.5 group transition-transform hover:scale-105 duration-300">
+            <Link href="/" className="group flex shrink-0 items-center gap-2.5 transition-transform duration-300 hover:scale-105">
               {/* Logo Wrapper to ensure perfect centering */}
-              <div className="relative w-10 h-10 md:w-15 md:h-15 sm:h-15 sm:w-15 flex items-center justify-center">
+              <div className="relative flex size-10 shrink-0 items-center justify-center md:size-12">
                 <Image
                   src={Paw}
                   alt="Logo"
                   fill
                   className="object-contain"
                   priority
-                  sizes="(max-width: 768px) 40px, (max-width: 1200px) 60px, 60px"
+                  sizes="(max-width: 767px) 40px, 48px"
                 />
               </div>
               {/* Logo Text with baseline adjustment for Pacifico font */}
@@ -139,7 +141,7 @@ export function Header() {
               })}
             </nav>
 
-            <div className="ml-auto flex items-center gap-2 md:gap-4">
+            <div className="ml-auto flex h-10 w-[4.75rem] shrink-0 items-center justify-end gap-2 sm:w-auto md:gap-4">
               {isAdmin && (
                 <Link href="/admin" className="hidden sm:flex">
                   <Button
@@ -154,18 +156,22 @@ export function Header() {
               )}
 
               {loading ? (
-                <div className="flex items-center gap-2 bg-white/5 dark:bg-white/5 pl-3 pr-4 py-1.5 rounded-full border border-white/10 animate-pulse">
-                  <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Syncing</span>
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 animate-pulse dark:bg-white/5 sm:w-auto sm:gap-2 sm:px-3">
+                  <Loader2 className="size-4 animate-spin text-orange-500" />
+                  <span className="hidden text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 sm:inline">Syncing</span>
                 </div>
               ) : user ? (
-                <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-1 pr-1 py-1 rounded-full border border-white/10">
-                  <Link href="/dashboard" className="flex items-center gap-2 pl-2 pr-1 overflow-hidden hover:opacity-80 transition-opacity">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
+                <div className="flex h-10 shrink-0 items-center gap-1 rounded-full border border-white/10 bg-white/10 p-1 dark:bg-white/5">
+                  <Link
+                    href="/dashboard"
+                    aria-label="Open user profile"
+                    className="flex size-8 shrink-0 items-center gap-2 overflow-hidden rounded-full transition-opacity hover:opacity-80 lg:w-auto lg:pr-2"
+                  >
+                    <div className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-primary text-[10px] font-bold text-white">
                       {user.photoURL ? (
-                        <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
+                        <Image src={user.photoURL} alt="" fill sizes="32px" className="object-cover" />
                       ) : (
-                        <User className="w-3.5 h-3.5" />
+                        <User className="size-4" />
                       )}
                     </div>
                     <span className="text-xs font-semibold text-foreground truncate max-w-[80px] hidden lg:block">
@@ -176,19 +182,20 @@ export function Header() {
                     variant="ghost"
                     size="icon"
                     onClick={handleSignOut}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                    aria-label="Sign out"
+                    className="size-8 shrink-0 rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <LogOut className="w-4 h-4" />
+                    <LogOut className="size-4" />
                   </Button>
                 </div>
               ) : (
-                <Link href="/login" className="hidden sm:block">
-                  <Button
-                    variant="ghost"
-                    className="rounded-full text-muted-foreground hover:text-foreground hover:bg-white/20 dark:hover:bg-white/10 transition-colors font-semibold"
-                  >
-                    Sign In
-                  </Button>
+                <Link
+                  href="/login"
+                  aria-label="Sign in"
+                  className="flex size-10 min-w-10 shrink-0 items-center justify-center rounded-full px-0 font-semibold text-muted-foreground transition-colors hover:bg-white/20 hover:text-foreground dark:hover:bg-white/10 sm:w-auto sm:px-4"
+                >
+                  <User aria-hidden="true" className="size-4 sm:hidden" />
+                  <span className="hidden sm:inline">Sign In</span>
                 </Link>
               )}
             </div>
@@ -208,7 +215,7 @@ export function Header() {
             className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname === "/" ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
-            <Home className="h-5.5 w-5.5" />
+            <Home aria-hidden="true" className={mobileNavIconClassName} />
             <span className="text-[10px] font-bold mt-1">HOME</span>
             <NavPendingHint />
           </Link>
@@ -219,7 +226,7 @@ export function Header() {
             className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname.startsWith("/blog") ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
-            <BookOpen className="h-5.5 w-5.5" />
+            <BookOpen aria-hidden="true" className={mobileNavIconClassName} />
             <span className="text-[10px] font-bold mt-1">BLOG</span>
             <NavPendingHint />
           </Link>
@@ -230,7 +237,7 @@ export function Header() {
             className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname.startsWith("/pet-feed") ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
-            <PawPrint className="h-5.5 w-5.5" />
+            <PawPrint aria-hidden="true" className={mobileNavIconClassName} />
             <span className="mt-1 text-[10px] font-bold">PET PLAN</span>
             <NavPendingHint />
           </Link>
@@ -244,7 +251,7 @@ export function Header() {
             onClick={() => setIsMenuOpen(true)}
             className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${isMenuOpen ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"}`}
           >
-            <Menu className="h-5.5 w-5.5" />
+            <Menu aria-hidden="true" className={mobileNavIconClassName} />
             <span className="text-[10px] font-bold mt-1">MORE</span>
           </button>
         </div>
