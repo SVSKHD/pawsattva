@@ -240,6 +240,23 @@ export const onContentGoalsSnapshot = (
   );
 };
 
+export const onContentGoalSnapshot = (
+  id: string,
+  callback: (goal: ContentGoal | null) => void,
+  onError?: (error: Error) => void
+) => {
+  return onSnapshot(
+    doc(db, "contentGoals", id),
+    (snapshot) => {
+      callback(snapshot.exists()
+        ? { id: snapshot.id, ...snapshot.data() } as ContentGoal
+        : null
+      );
+    },
+    onError
+  );
+};
+
 export const getBlogs = async () => {
   const blogsQuery = query(collection(db, "blogs"), orderBy("date", "desc"));
   const snapshot = await getDocs(blogsQuery);

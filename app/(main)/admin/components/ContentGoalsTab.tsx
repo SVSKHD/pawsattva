@@ -15,6 +15,7 @@ import {
   Loader2,
   Plus,
   RotateCcw,
+  Share2,
   Target,
   Trash2,
   UserRound,
@@ -277,6 +278,21 @@ export function ContentGoalsTab({ currentUser }: ContentGoalsTabProps) {
     }
   }
 
+  const shareGoal = async (goal: ContentGoal) => {
+    const url = `${window.location.origin}/goal/${goal.id}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: goal.title, text: "PawSattva content goal", url })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      toast.success("Private goal link copied.")
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") return
+      toast.error("Could not share the goal link.")
+    }
+  }
+
   const handleDelete = async () => {
     if (!goalToDelete) return
     setBusyGoalId(goalToDelete.id)
@@ -410,6 +426,17 @@ export function ContentGoalsTab({ currentUser }: ContentGoalsTabProps) {
             aria-label={`Edit ${goal.title}`}
           >
             <Edit3 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-lg border-white/40 bg-white/50 px-3 text-xs text-sky-600 hover:bg-sky-600 hover:text-white dark:bg-black/30"
+            onClick={() => shareGoal(goal)}
+            aria-label={`Share ${goal.title}`}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Share
           </Button>
           <Button
             type="button"
