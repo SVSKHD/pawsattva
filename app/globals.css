@@ -349,6 +349,116 @@ a {
   outline-offset: -3px;
 }
 
+/* iOS-inspired Liquid Glass for the fixed mobile navigation. It uses one
+   isolated backdrop surface and no continuous animation, keeping scroll cheap. */
+.mobile-liquid-glass {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.28) 52%, rgba(255, 255, 255, 0.42));
+  -webkit-backdrop-filter: blur(22px) saturate(185%);
+  backdrop-filter: blur(22px) saturate(185%);
+  box-shadow:
+    0 18px 44px rgba(24, 24, 27, 0.16),
+    0 3px 10px rgba(24, 24, 27, 0.08),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.mobile-liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(110% 85% at 50% -30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.22) 48%, transparent 69%),
+    linear-gradient(105deg, rgba(255, 255, 255, 0.24), transparent 34%, rgba(255, 255, 255, 0.18) 67%, transparent);
+}
+
+.mobile-liquid-glass::after {
+  content: "";
+  position: absolute;
+  right: 5%;
+  bottom: -0.35rem;
+  left: 5%;
+  z-index: -1;
+  height: 1rem;
+  border-radius: 999px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0.12), rgba(255, 255, 255, 0.62), rgba(52, 211, 153, 0.1));
+  filter: blur(8px);
+  opacity: 0.82;
+}
+
+.mobile-nav-item {
+  z-index: 1;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.mobile-nav-item::before {
+  content: "";
+  position: absolute;
+  inset: 0.25rem 0.18rem;
+  z-index: -1;
+  border: 1px solid transparent;
+  border-radius: 1.35rem;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.mobile-nav-item.is-active::before {
+  border-color: rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(255, 235, 224, 0.44) 56%, rgba(255, 255, 255, 0.34));
+  -webkit-backdrop-filter: blur(8px) saturate(165%);
+  backdrop-filter: blur(8px) saturate(165%);
+  box-shadow:
+    0 7px 18px rgba(124, 45, 18, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    inset 0 -1px 0 rgba(249, 115, 22, 0.1);
+  opacity: 1;
+  transform: scale(1);
+}
+
+.dark .mobile-liquid-glass {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: linear-gradient(135deg, rgba(39, 39, 42, 0.72), rgba(9, 9, 11, 0.5) 56%, rgba(39, 39, 42, 0.6));
+  box-shadow:
+    0 18px 46px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dark .mobile-nav-item {
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.52);
+}
+
+.dark .mobile-nav-item.is-active::before {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(249, 115, 22, 0.13) 58%, rgba(255, 255, 255, 0.08));
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(249, 115, 22, 0.14);
+}
+
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  .mobile-liquid-glass {
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  .dark .mobile-liquid-glass {
+    background: rgba(24, 24, 27, 0.96);
+  }
+}
+
 .nav-pending-hint {
   position: absolute;
   top: 0.55rem;

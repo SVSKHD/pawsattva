@@ -201,11 +201,11 @@ export function Header() {
         aria-label="Primary mobile navigation"
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
       >
-        <div className="pointer-events-auto mx-auto flex h-[4.5rem] w-full max-w-md items-stretch justify-around rounded-[1.6rem] border border-white/70 bg-white/95 px-1.5 shadow-[0_10px_32px_rgba(24,24,27,0.18)] backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/95">
+        <div className="mobile-liquid-glass pointer-events-auto mx-auto flex h-[4.5rem] w-full max-w-md items-stretch justify-around rounded-[1.65rem] px-1.5">
           <Link
             href="/"
             aria-current={pathname === "/" ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname === "/" ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname === "/" ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
             <Home className="h-5.5 w-5.5" />
@@ -216,7 +216,7 @@ export function Header() {
           <Link
             href="/blog"
             aria-current={pathname.startsWith("/blog") ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/blog") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname.startsWith("/blog") ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
             <BookOpen className="h-5.5 w-5.5" />
@@ -227,7 +227,7 @@ export function Header() {
           <Link
             href="/pet-feed"
             aria-current={pathname.startsWith("/pet-feed") ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/pet-feed") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${pathname.startsWith("/pet-feed") ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"
               }`}
           >
             <PawPrint className="h-5.5 w-5.5" />
@@ -242,7 +242,7 @@ export function Header() {
             onPointerDown={() => void import("@/components/mobile-more-menu")}
             onFocus={() => void import("@/components/mobile-more-menu")}
             onClick={() => setIsMenuOpen(true)}
-            className={`mobile-nav-item flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 text-muted-foreground transition-[color,background-color,transform] duration-150 active:scale-95 ${isMenuOpen ? "bg-orange-500/10 text-primary" : ""}`}
+            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,transform] duration-150 active:scale-95 ${isMenuOpen ? "is-active text-zinc-950 dark:text-white" : "text-zinc-600 dark:text-zinc-300"}`}
           >
             <Menu className="h-5.5 w-5.5" />
             <span className="text-[10px] font-bold mt-1">MORE</span>
