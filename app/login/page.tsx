@@ -17,6 +17,18 @@ import { useAuth } from "@/components/auth-provider";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
+function getSafeReturnTo() {
+  if (typeof window === "undefined") return "/";
+  const requestedPath = new URLSearchParams(window.location.search).get("returnTo");
+  return requestedPath?.startsWith("/") && !requestedPath.startsWith("//")
+    ? requestedPath
+    : "/";
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Google sign-in failed.";
+}
+
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading } = useAuth();
@@ -24,7 +36,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.push("/");
+      router.replace(getSafeReturnTo());
     }
   }, [user, authLoading, router]);
 
@@ -33,10 +45,10 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, googleProvider);
       toast.success("Signed in with Google!");
-      router.push("/");
-    } catch (error: any) {
+      router.replace(getSafeReturnTo());
+    } catch (error: unknown) {
       console.error(error);
-      toast.error(error.message);
+      toast.error(getErrorMessage(error));
     } finally {
       setLoading(false);
     }
