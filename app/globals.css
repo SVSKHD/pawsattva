@@ -335,3 +335,185 @@
     min-width: 500px;
   }
 }
+
+/* ── Responsive interaction and lightweight motion ── */
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: rgba(249, 115, 22, 0.12);
+}
+
+.mobile-nav-item:focus-visible {
+  outline: 2px solid rgb(249 115 22 / 0.75);
+  outline-offset: -3px;
+}
+
+.nav-pending-hint {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.7rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.nav-pending-hint.is-pending {
+  visibility: visible;
+  animation: nav-pending-in 180ms ease 100ms forwards, nav-pending-pulse 850ms ease-in-out 100ms infinite;
+}
+
+@keyframes nav-pending-in {
+  to { opacity: 0.7; }
+}
+
+@keyframes nav-pending-pulse {
+  50% { transform: scale(1.75); opacity: 0.25; }
+}
+
+.pet-cursor-aura {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pet-cursor-aura {
+    display: block;
+  }
+}
+
+/* Branded loader: compositor-friendly transforms, no JavaScript interval. */
+.loader-orb {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  border-radius: 999px;
+  opacity: 0.24;
+  filter: blur(52px);
+  pointer-events: none;
+}
+
+.loader-orb-one {
+  top: -8rem;
+  left: -7rem;
+  background: rgb(251 146 60);
+}
+
+.loader-orb-two {
+  right: -8rem;
+  bottom: -8rem;
+  background: rgb(52 211 153);
+}
+
+.loader-logo-ring {
+  animation: loader-ring 8s linear infinite;
+}
+
+.loader-logo-ring::before,
+.loader-logo-ring::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: rgb(249 115 22);
+}
+
+.loader-logo-ring::before {
+  top: -0.2rem;
+  left: 50%;
+  width: 0.5rem;
+  height: 0.5rem;
+}
+
+.loader-logo-ring::after {
+  right: 0.25rem;
+  bottom: 0.65rem;
+  width: 0.35rem;
+  height: 0.35rem;
+  background: rgb(16 185 129);
+}
+
+.loader-logo {
+  animation: loader-logo-float 2.8s ease-in-out infinite;
+}
+
+.loader-step {
+  display: inline-block;
+  animation: loader-step 1.35s ease-in-out infinite;
+}
+
+.loader-progress {
+  animation: loader-progress 1.65s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes loader-ring {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes loader-logo-float {
+  50% { transform: translateY(-4px) scale(1.025); }
+}
+
+@keyframes loader-step {
+  0%, 100% { transform: translateY(2px) scale(0.9); opacity: 0.35; }
+  45% { transform: translateY(-5px) scale(1.05); opacity: 1; }
+}
+
+@keyframes loader-progress {
+  from { transform: translateX(-115%); }
+  to { transform: translateX(290%); }
+}
+
+@media (max-width: 767px) {
+  /* Large backdrop filters repaint during scroll on mobile GPUs. */
+  .backdrop-blur-xl,
+  .backdrop-blur-2xl,
+  .backdrop-blur-3xl {
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+  }
+
+  .liquid-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 360px;
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 10px 28px -14px rgba(0, 0, 0, 0.2);
+  }
+
+  .dark .liquid-card {
+    background: rgba(24, 24, 27, 0.94);
+  }
+
+  footer {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 760px;
+  }
+
+  .loader-orb {
+    filter: blur(36px);
+    opacity: 0.17;
+  }
+
+  .mobile-ambient-orb {
+    animation: none !important;
+    filter: blur(56px) !important;
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

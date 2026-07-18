@@ -16,7 +16,7 @@ import {
   arrayUnion,
   increment
 } from "firebase/firestore";
-import { db } from "../firebase/firebase";
+import { db } from "./db";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -305,7 +305,10 @@ export const deleteBlog = async (id: string) => {
 };
 
 // Real-time listener for blogs
-export const onBlogsSnapshot = (callback: (blogs: Blog[]) => void) => {
+export const onBlogsSnapshot = (
+  callback: (blogs: Blog[]) => void,
+  onError?: (error: Error) => void
+) => {
   const blogsQuery = query(collection(db, "blogs"), orderBy("date", "desc"));
   return onSnapshot(blogsQuery, (snapshot) => {
     const blogs = snapshot.docs.map(d => ({
@@ -314,7 +317,7 @@ export const onBlogsSnapshot = (callback: (blogs: Blog[]) => void) => {
       date: d.data().date?.toDate ? d.data().date.toDate().toISOString().split('T')[0] : d.data().date
     } as Blog));
     callback(blogs);
-  });
+  }, onError);
 };
 
 export const incrementBlogLikes = async (blogId: string) => {

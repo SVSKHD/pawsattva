@@ -8,9 +8,17 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SubscriptionForm } from '@/components/subscription-form';
-
+import AdminLoader from '@/components/loader';
+import Paw from '../../pawsattva.png';
 
 import { getBlogs, Blog, getCategories, Category } from '@/firebase/firestore';
+
+const BLOG_BATCH_SIZE = 9;
+const ALL_TOPICS_CATEGORY: Category = {
+  id: 'all',
+  name: 'All Topics',
+  description: 'Explore our latest articles, expert guides, and health tips to keep your pets happy and healthy.',
+};
 
 function decodeEntities(str: string): string {
   const named: Record<string, string> = {
@@ -35,13 +43,11 @@ export default function BlogPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [blogs, setBlogs] = useState<Blog[]>([]);
-const allTopicsCategory: Category = { 
-    id: 'all', 
-    name: 'All Topics', 
-    description: 'Explore our latest articles, expert guides, and health tips to keep your pets happy and healthy.' 
-  };
-  const [categories, setCategories] = useState<Category[]>([allTopicsCategory]);
+  const [categories, setCategories] = useState<Category[]>([ALL_TOPICS_CATEGORY]);
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(BLOG_BATCH_SIZE);
+  const deferredSearchQuery = React.useDeferredValue(searchQuery);
+  const [, startFilterTransition] = React.useTransition();
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -51,7 +57,7 @@ const allTopicsCategory: Category = {
           getCategories()
         ]);
         setBlogs(blogsData);
-        setCategories([allTopicsCategory, ...categoriesData]);
+        setCategories([ALL_TOPICS_CATEGORY, ...categoriesData]);
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -62,28 +68,48 @@ const allTopicsCategory: Category = {
   }, []);
 
   // Only show published posts on the public blog page
-  const publishedBlogs = blogs.filter(b => b.status === 'published');
+  const publishedBlogs = React.useMemo(
+    () => blogs.filter((blog) => blog.status === 'published'),
+    [blogs]
+  );
 
   const selectedCat = categories.find(c => c.id === activeCategory);
   const activeParentId = selectedCat?.parentId || selectedCat?.id || 'all';
   
-  const parentCategories = categories.filter(c => !c.parentId);
-  const subCategories = categories.filter(c => c.parentId === activeParentId);
+  const parentCategories = React.useMemo(
+    () => categories.filter((category) => !category.parentId),
+    [categories]
+  );
+  const subCategories = React.useMemo(
+    () => categories.filter((category) => category.parentId === activeParentId),
+    [activeParentId, categories]
+  );
 
-  const filteredBlogs = publishedBlogs.filter(blog => {
-    // Resolve all category IDs for this blog (new multi + legacy single)
-    const allCatIds: string[] = blog.categoryIds?.length
-      ? blog.categoryIds
-      : blog.categoryId ? [blog.categoryId] : []
+  const filteredBlogs = React.useMemo(() => {
+    const normalizedSearch = deferredSearchQuery.trim().toLowerCase();
 
-    const matchesCategory = activeCategory === 'all' ||
-      allCatIds.includes(activeCategory) ||
-      allCatIds.some(cid => categories.find(c => c.id === cid)?.parentId === activeCategory)
+    return publishedBlogs.filter((blog) => {
+      // Resolve all category IDs for this blog (new multi + legacy single)
+      const allCatIds: string[] = blog.categoryIds?.length
+        ? blog.categoryIds
+        : blog.categoryId ? [blog.categoryId] : []
 
-    const matchesSearch = blog.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      blog.content.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+      const matchesCategory = activeCategory === 'all' ||
+        allCatIds.includes(activeCategory) ||
+        allCatIds.some((categoryId) => categories.find((category) => category.id === categoryId)?.parentId === activeCategory)
+
+      const matchesSearch = !normalizedSearch ||
+        blog.title.toLowerCase().includes(normalizedSearch) ||
+        blog.content.toLowerCase().includes(normalizedSearch);
+      return matchesCategory && matchesSearch;
+    });
+  }, [activeCategory, categories, deferredSearchQuery, publishedBlogs]);
+
+  React.useEffect(() => {
+    setVisibleCount(BLOG_BATCH_SIZE);
+  }, [activeCategory, deferredSearchQuery]);
+
+  const visibleBlogs = filteredBlogs.slice(0, visibleCount);
 
   const featuredPost = publishedBlogs[0];
 
@@ -109,11 +135,7 @@ const allTopicsCategory: Category = {
   const defaultImage = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=2786&auto=format&fit=crop";
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
+    return <AdminLoader img={Paw} title="Gathering fresh pet stories" subtitle="Loading trusted guides and wellness ideas..." />;
   }
 
   return (
@@ -121,8 +143,8 @@ const allTopicsCategory: Category = {
       {/* Search Header */}
       <section className="relative h-[360px] md:h-[420px] lg:h-[450px] pt-24 flex items-center justify-center overflow-hidden">
         {/* Animated Background Spheres */}
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="mobile-ambient-orb absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
+        <div className="mobile-ambient-orb absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
 
         <div className="container mx-auto px-4 relative z-10 text-center">
           <Badge className="mb-6 bg-orange-100 text-orange-600 hover:bg-orange-100 border-none px-4 py-1.5 rounded-full text-sm font-bold tracking-wide uppercase">
@@ -204,7 +226,7 @@ const allTopicsCategory: Category = {
             {parentCategories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
+                onClick={() => startFilterTransition(() => setActiveCategory(cat.id))}
                 className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 border-2 ${activeParentId === cat.id
                   ? "bg-primary text-white border-primary shadow-lg shadow-primary/30"
                   : "bg-background text-muted-foreground border-transparent hover:border-muted hover:bg-muted/30"
@@ -235,7 +257,7 @@ const allTopicsCategory: Category = {
             {subCategories.length > 0 && (
               <div className="flex flex-wrap items-center gap-3 mt-8">
                 <button
-                  onClick={() => setActiveCategory(activeParentId)}
+                  onClick={() => startFilterTransition(() => setActiveCategory(activeParentId))}
                   className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 border ${activeCategory === activeParentId
                     ? "bg-primary/10 text-primary border-primary shadow-sm"
                     : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/60"
@@ -246,7 +268,7 @@ const allTopicsCategory: Category = {
                 {subCategories.map((sub) => (
                   <button
                     key={sub.id}
-                    onClick={() => setActiveCategory(sub.id)}
+                    onClick={() => startFilterTransition(() => setActiveCategory(sub.id))}
                     className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 border ${activeCategory === sub.id
                       ? "bg-primary/10 text-primary border-primary shadow-sm"
                       : "bg-muted/30 text-muted-foreground border-transparent hover:bg-muted/60"
@@ -262,7 +284,7 @@ const allTopicsCategory: Category = {
 
         {/* Blog Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">
-          {filteredBlogs.map((blog) => (
+          {visibleBlogs.map((blog) => (
             <Link
               key={blog.id}
               href={`/blog/${blog.slug}`}
@@ -349,6 +371,19 @@ const allTopicsCategory: Category = {
           ))}
         </div>
 
+        {visibleCount < filteredBlogs.length && (
+          <div className="mt-12 flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-12 rounded-full border-orange-200 px-8 font-bold text-orange-700 active:scale-95 dark:border-orange-900/60 dark:text-orange-300"
+              onClick={() => setVisibleCount((count) => count + BLOG_BATCH_SIZE)}
+            >
+              Show more articles ({filteredBlogs.length - visibleCount} remaining)
+            </Button>
+          </div>
+        )}
+
         {/* Empty State */}
         {filteredBlogs.length === 0 && (
           <div className="py-40 text-center animate-in fade-in zoom-in duration-500">
@@ -357,12 +392,15 @@ const allTopicsCategory: Category = {
             </div>
             <h3 className="text-2xl font-bold mb-2">No articles found</h3>
             <p className="text-muted-foreground max-w-sm mx-auto">
-              We couldn't find any articles matching your search query. Try different keywords or browse other categories.
+              We couldn&apos;t find any articles matching your search query. Try different keywords or browse other categories.
             </p>
             <Button
               variant="outline"
               className="mt-8 rounded-full px-8"
-              onClick={() => { setSearchQuery(''); setActiveCategory('all'); }}
+              onClick={() => {
+                setSearchQuery('');
+                startFilterTransition(() => setActiveCategory('all'));
+              }}
             >
               Clear Filters
             </Button>

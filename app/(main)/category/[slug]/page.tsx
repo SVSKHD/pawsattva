@@ -153,8 +153,8 @@ export default async function CategoryPage({
         ) : (
           <>
             <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-primary/10 to-transparent" />
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
+            <div className="mobile-ambient-orb absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse" />
+            <div className="mobile-ambient-orb absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
           </>
         )}
 

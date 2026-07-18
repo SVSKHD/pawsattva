@@ -62,8 +62,8 @@ export default function Home() {
       {/* ── HERO SECTION ───────────────────────────────────────────────────────── */}
       <section className="relative w-full py-20 lg:py-32 overflow-hidden">
         {/* Animated Background Spheres (Liquid Aesthetic) */}
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-orange-200/40 rounded-full blur-[120px] animate-pulse pointer-events-none" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+        <div className="mobile-ambient-orb absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-orange-200/40 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+        <div className="mobile-ambient-orb absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">

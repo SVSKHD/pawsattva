@@ -2,21 +2,32 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { initAnalytics, logPageView } from "@/firebase/analytics";
 
 export function FirebaseAnalytics() {
   const pathname = usePathname();
 
-  // Initialize analytics once on mount
   useEffect(() => {
-    initAnalytics();
-  }, []);
+    if (!pathname) return;
 
-  // Log page view on every route change
-  useEffect(() => {
-    if (pathname) {
-      logPageView(pathname, document.title);
-    }
+    let cancelled = false;
+    const trackPage = async () => {
+      const { logPageView } = await import("@/firebase/analytics");
+      if (!cancelled) await logPageView(pathname, document.title);
+    };
+
+    const idleId = window.requestIdleCallback?.(
+      () => void trackPage(),
+      { timeout: 2500 }
+    );
+    const timeoutId = idleId === undefined
+      ? window.setTimeout(() => void trackPage(), 1200)
+      : undefined;
+
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
   }, [pathname]);
 
   return null;

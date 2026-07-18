@@ -15,8 +15,8 @@ export default function PetFeedPage() {
   return (
     <div className="min-h-screen bg-background pb-20 pt-32">
       {/* Animated Background Spheres */}
-      <div className="fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse pointer-events-none" />
-      <div className="fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+      <div className="mobile-ambient-orb fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse pointer-events-none" />
+      <div className="mobile-ambient-orb fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-4xl mx-auto text-center mb-16 space-y-6">

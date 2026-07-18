@@ -5,13 +5,55 @@ import Image from "next/image";
 import Link from "next/link";
 import { FaInstagram, FaFacebook, FaTwitter, FaYoutube } from "react-icons/fa";
 import Paw from "../app/pawsattva.png";
-import { getCategories, Category } from "@/firebase/firestore";
+import type { Category } from "@/firebase/firestore";
+
+const CATEGORY_CACHE_KEY = "pawsattva-footer-categories";
 
 export function Footer() {
   const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
-    getCategories().then((data) => setCategories(data)).catch(console.error);
+    let cancelled = false;
+
+    try {
+      const cached = window.sessionStorage.getItem(CATEGORY_CACHE_KEY);
+      if (cached) {
+        setCategories(JSON.parse(cached) as Category[]);
+        return;
+      }
+    } catch {
+      // Storage can be unavailable in private browsing; the footer still works.
+    }
+
+    const loadCategories = async () => {
+      try {
+        const { getCategories } = await import("@/firebase/firestore");
+        const data = await getCategories();
+        if (cancelled) return;
+        setCategories(data);
+        try {
+          window.sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(data));
+        } catch {
+          // Caching is a performance enhancement, not a requirement.
+        }
+      } catch (error) {
+        console.error("Unable to load footer categories:", error);
+      }
+    };
+
+    const idleId = window.requestIdleCallback?.(
+      () => void loadCategories(),
+      { timeout: 3000 }
+    );
+    const timeoutId = idleId === undefined
+      ? window.setTimeout(() => void loadCategories(), 1500)
+      : undefined;
+
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined) window.cancelIdleCallback?.(idleId);
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    };
   }, []);
 
   return (
