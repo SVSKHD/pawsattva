@@ -256,7 +256,7 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/5">
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Age / Weight</p>
-                        <p className="text-sm font-extrabold text-foreground mt-0.5">{feed.ageValue ? `${feed.ageValue} ${feed.ageUnit}` : "Not recorded"} · {feed.weightKg ? `${feed.weightKg} kg` : "—"}</p>
+                        <p className="text-sm font-extrabold text-foreground mt-0.5">{feed.ageValue ? `${feed.ageValue} ${feed.ageUnit}` : "Not recorded"} · {feed.weightKg ? `${feed.weightKg} kg` : "—"}{feed.heightCm ? ` · ${feed.heightCm} cm` : ""}</p>
                       </div>
                       <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/5">
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Body condition</p>

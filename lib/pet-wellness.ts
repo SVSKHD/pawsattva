@@ -4,6 +4,7 @@ export type WeightStatus = "underweight" | "ideal" | "overweight" | "obese"
 export interface BreedReference {
   name: string
   adultWeightRange?: string
+  adultHeightRange?: string
   imageUrl: string
 }
 
@@ -12,12 +13,12 @@ const catFallback = "https://images.unsplash.com/photo-1573865526739-10659fec78a
 
 export const BREEDS: Record<PetType, BreedReference[]> = {
   Dog: [
-    { name: "Labrador", adultWeightRange: "25–36 kg", imageUrl: "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80" },
-    { name: "German Shepherd", adultWeightRange: "22–40 kg", imageUrl: "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?auto=format&fit=crop&w=900&q=80" },
-    { name: "Golden Retriever", adultWeightRange: "25–34 kg", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
-    { name: "Poodle", adultWeightRange: "Varies by size: 3–32 kg", imageUrl: "https://images.unsplash.com/photo-1616149562385-39db17dc445c?auto=format&fit=crop&w=900&q=80" },
-    { name: "Beagle", adultWeightRange: "9–14 kg", imageUrl: "https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=80" },
-    { name: "Indian Pariah", adultWeightRange: "15–30 kg", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
+    { name: "Labrador", adultWeightRange: "25–36 kg", adultHeightRange: "55–62 cm", imageUrl: "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80" },
+    { name: "German Shepherd", adultWeightRange: "22–40 kg", adultHeightRange: "55–65 cm", imageUrl: "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?auto=format&fit=crop&w=900&q=80" },
+    { name: "Golden Retriever", adultWeightRange: "25–34 kg", adultHeightRange: "51–61 cm", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
+    { name: "Poodle", adultWeightRange: "Varies by size: 3–32 kg", adultHeightRange: "Varies by size: 24–62 cm", imageUrl: "https://images.unsplash.com/photo-1616149562385-39db17dc445c?auto=format&fit=crop&w=900&q=80" },
+    { name: "Beagle", adultWeightRange: "9–14 kg", adultHeightRange: "33–41 cm", imageUrl: "https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=80" },
+    { name: "Indian Pariah", adultWeightRange: "15–30 kg", adultHeightRange: "46–64 cm", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
     { name: "Mixed/Other", imageUrl: dogFallback },
   ],
   Cat: [

@@ -14,19 +14,19 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, P
 import { toast } from "sonner"
 import Image from "next/image"
 
-const DRAFT_KEY = "pawsattva.pet-feed.wellness.v1"
+const DRAFT_KEY = "pawsattva.pet-feed.wellness.v2"
 const STEP_KEY = `${DRAFT_KEY}.step`
 
 const initialData = {
   name: "", phone: "", petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
-  sex: "unknown" as "male" | "female" | "unknown", neutered: false, weightKg: "", activityLevel: "moderate" as "low" | "moderate" | "high",
-  ribsScore: 0, waistScore: 0, tuckScore: 0, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
+  sex: "unknown" as "male" | "female" | "unknown", neutered: false, weightKg: "", heightCm: "", activityLevel: "moderate" as "low" | "moderate" | "high",
+  ribsScore: 0, waistScore: 0, tuckScore: 0, bcsAssessmentStarted: false, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
   foodBrand: "", dailyMeals: "2", dailyQuantity: "", treatsPerDay: "0", allergies: "", medicalConditions: "", foodDislikes: "",
   feedingConcerns: "", mealDays: "30", reminders: false, subscribe: true,
 }
 
 type FormData = typeof initialData
-const fieldClass = "h-14 rounded-xl border-white/40 bg-white/70 text-base shadow-sm focus:ring-orange-500/20 dark:bg-black/20"
+const fieldClass = "h-14 w-full rounded-xl border-white/40 bg-white/70 px-4 text-base shadow-sm focus:ring-orange-500/20 dark:bg-black/20"
 const steps = [
   { title: "Pet Parent", description: "About you", icon: User },
   { title: "Pet Profile", description: "Your companion", icon: Dog },
@@ -108,14 +108,16 @@ export function PetFeedForm() {
     : null
   const lifeStage = ageMonths ? getLifeStage(formData.petType, ageMonths) : null
   const weightContext = getWeightContext(Number(formData.weightKg), selectedBreed?.adultWeightRange)
-  const bcsAnswered = formData.ribsScore > 0 && formData.waistScore > 0 && formData.tuckScore > 0
+  const bcsAnswered = formData.bcsAssessmentStarted && formData.ribsScore > 0 && formData.waistScore > 0 && formData.tuckScore > 0
   const bcs = calculateBcs(formData.ribsScore, formData.waistScore, formData.tuckScore)
   const status = getWeightStatus(bcs)
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => setFormData((current) => ({ ...current, [key]: value }))
+  const setObservation = (key: "ribsScore" | "waistScore" | "tuckScore", value: number) =>
+    setFormData((current) => ({ ...current, [key]: value, bcsAssessmentStarted: true }))
 
   const validateStep = () => {
     if (step === 0 && (!formData.name.trim() || !/^\+?[0-9 ()-]{7,20}$/.test(formData.phone))) return "Enter a full name and valid phone number."
-    if (step === 1 && (!formData.petName.trim() || !formData.petBreed || Number(formData.ageValue) <= 0 || Number(formData.weightKg) <= 0)) return "Complete the pet profile with valid positive age and weight values."
+    if (step === 1 && (!formData.petName.trim() || !formData.petBreed || Number(formData.ageValue) <= 0 || Number(formData.weightKg) <= 0 || (formData.heightCm !== "" && Number(formData.heightCm) <= 0))) return "Complete the pet profile with valid positive age and weight values. Height must be positive when provided."
     if (step === 2 && !bcsAnswered) return "Answer all three body-condition questions to calculate the BCS."
     if (step === 3 && (Number(formData.dailyMeals) <= 0 || Number(formData.treatsPerDay) < 0 || Number(formData.mealDays) <= 0 || !formData.dailyQuantity.trim())) return "Enter valid feeding values; negative or empty numeric values are not allowed."
     return null
@@ -134,8 +136,8 @@ export function PetFeedForm() {
       const payload: PetFeed = {
         userId: user?.uid, name: formData.name.trim(), phone: formData.phone.trim(), petName: formData.petName.trim(), petType: formData.petType,
         petBreed: formData.petBreed, ageValue, ageUnit: formData.ageUnit, ageMonths, lifeStage: getLifeStage(formData.petType, ageMonths), sex: formData.sex,
-        neutered: formData.neutered, weightKg: Number(formData.weightKg), activityLevel: formData.activityLevel, breedImageUrl: selectedBreed?.imageUrl,
-        breedReferenceRange: selectedBreed?.adultWeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
+        neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed?.imageUrl,
+        breedReferenceRange: selectedBreed?.adultWeightRange, breedHeightReferenceRange: selectedBreed?.adultHeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
         bodyConditionScore: bcs, weightStatus: status, foodType: formData.foodType, foodBrand: formData.foodBrand.trim(), dailyMeals: Number(formData.dailyMeals),
         dailyQuantity: formData.dailyQuantity.trim(), treatsPerDay: Number(formData.treatsPerDay), allergies: formData.allergies.trim(), medicalConditions: formData.medicalConditions.trim(),
         foodDislikes: formData.foodDislikes.trim(), dietaryConcerns, mealDays: Number(formData.mealDays), reminders: formData.reminders, subscribe: formData.subscribe,
@@ -169,24 +171,26 @@ export function PetFeedForm() {
         <p className="mt-2 text-xs font-medium text-muted-foreground" aria-live="polite">{user ? (draftStatus === "saving" ? "Saving your progress…" : draftStatus === "saved" ? "Progress saved to your account" : "Progress saved on this device") : "Progress saved on this device · Sign in to resume on another device"}</p>
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
-        {step === 0 && <div className="grid gap-5 sm:grid-cols-2">
+        {step === 0 && <div className="grid items-end gap-5 sm:grid-cols-2">
           <Field label="Pet parent’s full name"><Input className={fieldClass} value={formData.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" /></Field>
           <Field label="Phone number"><Input className={fieldClass} type="tel" value={formData.phone} onChange={(e) => set("phone", e.target.value)} autoComplete="tel" /></Field>
         </div>}
         {step === 1 && <div className="space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid items-end gap-5 sm:grid-cols-2">
             <Field label="Pet name"><Input className={fieldClass} value={formData.petName} onChange={(e) => set("petName", e.target.value)} /></Field>
             <Field label="Pet type"><Select value={formData.petType} onValueChange={(value: PetType) => { set("petType", value); set("petBreed", "") }}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Dog">Dog</SelectItem><SelectItem value="Cat">Cat</SelectItem></SelectContent></Select></Field>
             <Field label="Breed"><Select value={formData.petBreed} onValueChange={(value) => set("petBreed", value)}><SelectTrigger className={fieldClass}><SelectValue placeholder="Select breed" /></SelectTrigger><SelectContent>{BREEDS[formData.petType].map((breed) => <SelectItem key={breed.name} value={breed.name}>{breed.name}</SelectItem>)}</SelectContent></Select></Field>
-            <div className="grid grid-cols-[1fr_130px] gap-2"><Field label="Age"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(e) => set("ageValue", e.target.value)} /></Field><Field label="Unit"><Select value={formData.ageUnit} onValueChange={(value: "months" | "years") => set("ageUnit", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select></Field></div>
+            <Field label="Age"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(e) => set("ageValue", e.target.value)} /></Field>
+            <Field label="Age unit"><Select value={formData.ageUnit} onValueChange={(value: "months" | "years") => set("ageUnit", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select></Field>
             <Field label="Sex"><Select value={formData.sex} onValueChange={(value: FormData["sex"]) => set("sex", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">Male</SelectItem><SelectItem value="female">Female</SelectItem><SelectItem value="unknown">Unknown</SelectItem></SelectContent></Select></Field>
             <Field label="Current weight (kg)"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.weightKg} onChange={(e) => set("weightKg", e.target.value)} /></Field>
+            <Field label="Height at shoulder (cm) — optional"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.heightCm} onChange={(e) => set("heightCm", e.target.value)} /></Field>
             <Field label="Activity level"><Select value={formData.activityLevel} onValueChange={(value: FormData["activityLevel"]) => set("activityLevel", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="moderate">Moderate</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select></Field>
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
           {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm sm:grid-cols-[180px_1fr] dark:border-orange-900/20 dark:bg-black/20">
             <Image src={selectedBreed.imageUrl} alt={`${selectedBreed.name} breed reference`} width={360} height={176} className="h-44 w-full object-cover" />
-            <div className="p-5"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><p className="mt-2 text-sm font-semibold">General adult weight reference: {selectedBreed.adultWeightRange ?? "No single reliable range for mixed/other breeds"}</p><p className="mt-2 text-xs text-muted-foreground">General information only—not a diagnostic target or guaranteed ideal weight for your pet.</p></div>
+            <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">References filled automatically</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p></div>
           </div>}
           {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
             <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -205,12 +209,12 @@ export function PetFeedForm() {
         </div>}
         {step === 2 && <div className="space-y-4">
           <p className="text-sm text-stone-700">Choose the description that best matches your pet today. Weight alone is not used for this estimate.</p>
-          <Observation id="ribs" label="How easily can the ribs be felt?" value={formData.ribsScore} onChange={(value) => set("ribsScore", value)} options={["Very easy / prominent", "Easy with a light covering", "Difficult under a heavy covering"]} />
-          <Observation id="waist" label="Waist visibility from above" value={formData.waistScore} onChange={(value) => set("waistScore", value)} options={["Very pronounced", "Clearly visible", "Absent or rounded"]} />
-          <Observation id="tuck" label="Abdominal tuck from the side" value={formData.tuckScore} onChange={(value) => set("tuckScore", value)} options={["Severe tuck", "Visible tuck", "Little or no tuck"]} />
+          <Observation id="ribs" label="How easily can the ribs be felt?" value={formData.ribsScore} onChange={(value) => setObservation("ribsScore", value)} options={["Very easy / prominent", "Easy with a light covering", "Difficult under a heavy covering"]} />
+          <Observation id="waist" label="Waist visibility from above" value={formData.waistScore} onChange={(value) => setObservation("waistScore", value)} options={["Very pronounced", "Clearly visible", "Absent or rounded"]} />
+          <Observation id="tuck" label="Abdominal tuck from the side" value={formData.tuckScore} onChange={(value) => setObservation("tuckScore", value)} options={["Severe tuck", "Visible tuck", "Little or no tuck"]} />
           <div className="rounded-2xl border border-orange-100/70 bg-white/70 p-5 shadow-sm">{bcsAnswered ? <><p className="text-xl font-bold capitalize">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}</> : <p className="font-semibold text-muted-foreground">Answer all three observations to calculate the BCS.</p>}<p className="mt-3 text-xs text-muted-foreground">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
         </div>}
-        {step === 3 && <div className="grid gap-5 sm:grid-cols-2">
+        {step === 3 && <div className="grid items-end gap-5 sm:grid-cols-2">
           <Field label="Food type"><Select value={formData.foodType} onValueChange={(value: FormData["foodType"]) => set("foodType", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="commercial">Commercial/packaged</SelectItem><SelectItem value="home-cooked">Home-cooked</SelectItem><SelectItem value="mixed">Mixed</SelectItem><SelectItem value="raw">Raw</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></Field>
           <Field label="Food brand or recipe"><Input className={fieldClass} value={formData.foodBrand} onChange={(e) => set("foodBrand", e.target.value)} /></Field>
           <Field label="Meals per day"><Input className={fieldClass} type="number" min="1" step="1" value={formData.dailyMeals} onChange={(e) => set("dailyMeals", e.target.value)} /></Field>
@@ -226,17 +230,17 @@ export function PetFeedForm() {
         </div>}
       </CardContent>
       <CardFooter className="flex gap-3 border-t border-border/40 p-7 md:p-10">
-        {step > 0 && <Button variant="outline" className="h-12 rounded-xl" onClick={() => setStep((current) => current - 1)}><ChevronLeft /> Back</Button>}
-        <Button className="h-12 flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 font-bold shadow-lg shadow-orange-500/20 hover:from-orange-600 hover:to-orange-700" disabled={loading} onClick={step === 3 ? submit : next}>{loading ? <><Loader2 className="animate-spin" /> Saving assessment…</> : step === 3 ? "Create wellness report" : <>Continue <ChevronRight /></>}</Button>
+        {step > 0 && <Button variant="outline" className="h-14 rounded-xl px-5" onClick={() => setStep((current) => current - 1)}><ChevronLeft /> Back</Button>}
+        <Button className="h-14 flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 font-bold shadow-lg shadow-orange-500/20 hover:from-orange-600 hover:to-orange-700" disabled={loading} onClick={step === 3 ? submit : next}>{loading ? <><Loader2 className="animate-spin" /> Saving assessment…</> : step === 3 ? "Create wellness report" : <>Continue <ChevronRight /></>}</Button>
       </CardFooter>
     </Card>
     <SupervisionCard />
   </div>
 }
 
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-2"><Label>{label}</Label>{children}</div>
-const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-24 w-full rounded-xl border border-white/40 bg-white/70 p-3 text-sm shadow-sm dark:bg-black/20" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
-const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex min-h-14 items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 shadow-sm dark:bg-black/20"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="min-w-0 space-y-2"><Label className="block min-h-5">{label}</Label>{children}</div>
+const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-28 w-full resize-y rounded-xl border border-white/40 bg-white/70 p-4 text-base shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:bg-black/20" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
+const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex h-14 w-full items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 shadow-sm dark:bg-black/20"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
 
 function WeightReferenceMeter({ score }: { score: number }) { return <div><div className="mb-2 grid grid-cols-3 text-center text-[10px] font-bold sm:text-xs"><span>Below adult range</span><span>Within adult range</span><span>Above adult range</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} aria-current={value === score ? "true" : undefined} className={`h-9 rounded-lg ${value === score ? "scale-110 ring-4 ring-orange-600 ring-offset-2" : ""} ${value <= 3 ? "bg-sky-200" : value <= 6 ? "bg-emerald-300" : "bg-amber-300"}`}><span className="sr-only">Weight reference position {value} of 9</span></div>)}</div></div> }
 
@@ -248,8 +252,8 @@ function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void 
     <article className="wellness-report overflow-hidden rounded-[2rem] bg-[#faf6e9] text-stone-800 shadow-xl">
       <header className="bg-[#173f2c] p-7 text-white md:p-10"><div className="flex items-center gap-3"><PawPrint className="h-9 w-9" /><div><h2 className="text-3xl font-black">Paw Sattva</h2><p className="text-sm text-amber-100">Wellness · Balance · Harmony</p></div></div><p className="mt-6 text-xl font-bold capitalize">{data.lifeStage} wellness report</p><p className="text-sm text-white/75">Assessment date: {assessed.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p></header>
       <div className="grid gap-5 p-6 md:grid-cols-2 md:p-10">
-        <ReportCard title="Pet summary"><ReportGrid items={[["Pet", data.petName], ["Breed", data.petBreed], ["Age", `${data.ageValue} ${data.ageUnit}`], ["Pet parent", data.name], ["Type", data.petType], ["Sex", data.sex], ["Spayed/neutered", data.neutered ? "Yes" : "No"]]} /></ReportCard>
-        <ReportCard title="Key metrics"><ReportGrid items={[["Current weight", `${data.weightKg} kg`], ["General adult breed reference", data.breedReferenceRange ?? "Not available"], ["Body Condition Score", `${data.bodyConditionScore}/9`], ["Classification", status], ["Activity", data.activityLevel]]} /><p className="mt-3 text-xs text-stone-500">Adult breed ranges are informational, not guaranteed ideal weights.</p></ReportCard>
+        <ReportCard title="Pet summary"><ReportGrid items={[["Pet", data.petName], ["Breed", data.petBreed], ["Age", `${data.ageValue} ${data.ageUnit}`], ["Pet parent", data.name], ["Type", data.petType], ["Sex", data.sex], ["Spayed/neutered", data.neutered ? "Yes" : "No"], ["Shoulder height", data.heightCm ? `${data.heightCm} cm` : "Not recorded"]]} /></ReportCard>
+        <ReportCard title="Key metrics"><ReportGrid items={[["Current weight", `${data.weightKg} kg`], ["General adult weight reference", data.breedReferenceRange ?? "Not available"], ["General adult height reference", data.breedHeightReferenceRange ?? "Not available"], ["Body Condition Score", `${data.bodyConditionScore}/9`], ["Classification", status], ["Activity", data.activityLevel]]} /><p className="mt-3 text-xs text-stone-500">Adult breed ranges are informational, not guaranteed ideal weight or height values.</p></ReportCard>
         <ReportCard title="Condition summary"><p className="text-2xl font-black capitalize text-emerald-900">{status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation}</p><p className="mt-3 text-sm font-semibold">{STATUS_COPY[status].guidance}</p>{(data.bodyConditionScore! <= 2 || data.bodyConditionScore! >= 8 || data.medicalConditions || data.dietaryConcerns) && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">Veterinary review is recommended for extreme BCS, sudden weight change, medical conditions, or feeding concerns.</p>}</ReportCard>
         <ReportCard title="Body condition meter"><BcsMeter score={data.bodyConditionScore ?? 5} /><div className="mt-2 flex justify-between text-xs"><span>1: Too thin</span><span>4–5: Ideal</span><span>9: Obese</span></div></ReportCard>
         <ReportCard title="Feeding snapshot"><ReportGrid items={[["Food type", data.foodType], ["Brand/recipe", data.foodBrand || "Not provided"], ["Meals/day", data.dailyMeals], ["Daily quantity", data.dailyQuantity], ["Treats/day", data.treatsPerDay], ["Concerns", data.dietaryConcerns || "None reported"], ["Plan duration", `${data.mealDays} days`]]} /></ReportCard>

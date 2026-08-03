@@ -86,9 +86,11 @@ export interface PetFeedEntry {
   sex?: "male" | "female" | "unknown";
   neutered?: boolean;
   weightKg?: number;
+  heightCm?: number;
   activityLevel?: "low" | "moderate" | "high";
   breedImageUrl?: string;
   breedReferenceRange?: string;
+  breedHeightReferenceRange?: string;
   ribsScore?: number;
   waistScore?: number;
   tuckScore?: number;
@@ -152,9 +154,11 @@ export interface PetFeed {
   sex?: "male" | "female" | "unknown";
   neutered?: boolean;
   weightKg?: number;
+  heightCm?: number;
   activityLevel?: "low" | "moderate" | "high";
   breedImageUrl?: string;
   breedReferenceRange?: string;
+  breedHeightReferenceRange?: string;
   ribsScore?: number;
   waistScore?: number;
   tuckScore?: number;
@@ -596,9 +600,11 @@ export const savePetFeed = async (data: PetFeed) => {
         sex: data.sex,
         neutered: data.neutered,
         weightKg: data.weightKg,
+        heightCm: data.heightCm,
         activityLevel: data.activityLevel,
         breedImageUrl: data.breedImageUrl,
         breedReferenceRange: data.breedReferenceRange,
+        breedHeightReferenceRange: data.breedHeightReferenceRange,
         ribsScore: data.ribsScore,
         waistScore: data.waistScore,
         tuckScore: data.tuckScore,
