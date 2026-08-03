@@ -51,8 +51,9 @@ export const getWeightContext = (weightKg: number, reference?: string) => {
   const domainMin = Math.max(0, range.min * 0.5)
   const domainMax = range.max * 1.5
   const position = Math.max(0, Math.min(100, ((weightKg - domainMin) / (domainMax - domainMin)) * 100))
+  const meterScore = Math.max(1, Math.min(9, Math.round(1 + (position / 100) * 8)))
   const label = weightKg < range.min ? "Below adult reference" : weightKg > range.max ? "Above adult reference" : "Within adult reference"
-  return { ...range, label, position }
+  return { ...range, label, position, meterScore }
 }
 
 export const calculateBcs = (ribs: number, waist: number, tuck: number) =>
