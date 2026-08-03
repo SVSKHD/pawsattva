@@ -279,6 +279,12 @@ export function UsersTab({
                                   <div><span className="text-muted-foreground">Breed:</span> <span className="font-semibold">{feed.petBreed}</span></div>
                                   <div><span className="text-muted-foreground">Meal Days:</span> <span className="font-semibold">{feed.mealDays}</span></div>
                                   <div><span className="text-muted-foreground">Reminders:</span> <span className="font-semibold">{feed.reminders ? "Yes" : "No"}</span></div>
+                                  <div><span className="text-muted-foreground">Age:</span> <span className="font-semibold">{feed.ageValue ? `${feed.ageValue} ${feed.ageUnit}` : "Not recorded"}</span></div>
+                                  <div><span className="text-muted-foreground">Weight:</span> <span className="font-semibold">{feed.weightKg ? `${feed.weightKg} kg` : "Not recorded"}</span></div>
+                                  <div><span className="text-muted-foreground">BCS:</span> <span className="font-semibold">{feed.bodyConditionScore ? `${feed.bodyConditionScore}/9` : "Not assessed"}</span></div>
+                                  <div><span className="text-muted-foreground">Status:</span> <span className="font-semibold capitalize">{feed.weightStatus ?? "Not assessed"}</span></div>
+                                  <div><span className="text-muted-foreground">Food:</span> <span className="font-semibold capitalize">{feed.foodType ?? "Not recorded"}</span></div>
+                                  <div><span className="text-muted-foreground">Feeding:</span> <span className="font-semibold">{feed.dailyMeals ? `${feed.dailyMeals} meals · ${feed.dailyQuantity || "quantity not recorded"}` : "Legacy record"}</span></div>
                                 </div>
                                 {feed.createdAt && (
                                   <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
