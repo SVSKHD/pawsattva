@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Firestore legacy records use mixed timestamp shapes. */
 import {
   collection,
   getDocs,
@@ -76,6 +77,29 @@ export interface PetFeedEntry {
   reminders: boolean;
   subscribe: boolean;
   createdAt?: any;
+  ageValue?: number;
+  ageUnit?: "months" | "years";
+  ageMonths?: number;
+  lifeStage?: "puppy" | "kitten" | "adult" | "senior";
+  sex?: "male" | "female" | "unknown";
+  neutered?: boolean;
+  weightKg?: number;
+  activityLevel?: "low" | "moderate" | "high";
+  breedImageUrl?: string;
+  breedReferenceRange?: string;
+  ribsScore?: number;
+  waistScore?: number;
+  tuckScore?: number;
+  bodyConditionScore?: number;
+  weightStatus?: "underweight" | "ideal" | "overweight" | "obese";
+  foodType?: "commercial" | "home-cooked" | "mixed" | "raw" | "other";
+  foodBrand?: string;
+  dailyMeals?: number;
+  dailyQuantity?: string;
+  treatsPerDay?: number;
+  dietaryConcerns?: string;
+  assessmentVersion?: string;
+  assessedAt?: string;
 }
 
 export interface Category {
@@ -119,6 +143,32 @@ export interface PetFeed {
   reminders: boolean;
   subscribe: boolean;
   createdAt?: any;
+  ageValue?: number;
+  ageUnit?: "months" | "years";
+  ageMonths?: number;
+  lifeStage?: "puppy" | "kitten" | "adult" | "senior";
+  sex?: "male" | "female" | "unknown";
+  neutered?: boolean;
+  weightKg?: number;
+  activityLevel?: "low" | "moderate" | "high";
+  breedImageUrl?: string;
+  breedReferenceRange?: string;
+  ribsScore?: number;
+  waistScore?: number;
+  tuckScore?: number;
+  bodyConditionScore?: number;
+  weightStatus?: "underweight" | "ideal" | "overweight" | "obese";
+  foodType?: "commercial" | "home-cooked" | "mixed" | "raw" | "other";
+  foodBrand?: string;
+  dailyMeals?: number;
+  dailyQuantity?: string;
+  treatsPerDay?: number;
+  allergies?: string;
+  medicalConditions?: string;
+  foodDislikes?: string;
+  dietaryConcerns?: string;
+  assessmentVersion?: string;
+  assessedAt?: string;
 }
 
 export type ContentGoalType = "blog" | "instagram";
@@ -494,9 +544,10 @@ export const getPetFeeds = async () => {
 };
 
 export const savePetFeed = async (data: PetFeed) => {
+  const cleanData = withoutUndefined(data);
   // Save to petFeeds collection
   const feedDoc = await addDoc(collection(db, "petFeeds"), {
-    ...data,
+    ...cleanData,
     createdAt: serverTimestamp(),
   });
 
@@ -505,7 +556,7 @@ export const savePetFeed = async (data: PetFeed) => {
     const userDocRef = doc(db, "users", data.userId);
     await updateDoc(userDocRef, {
       phone: data.phone,
-      petFeeds: arrayUnion({
+      petFeeds: arrayUnion(withoutUndefined({
         petName: data.petName,
         petType: data.petType,
         petBreed: data.petBreed,
@@ -513,7 +564,30 @@ export const savePetFeed = async (data: PetFeed) => {
         reminders: data.reminders,
         subscribe: data.subscribe,
         createdAt: new Date().toISOString(),
-      }),
+        ageValue: data.ageValue,
+        ageUnit: data.ageUnit,
+        ageMonths: data.ageMonths,
+        lifeStage: data.lifeStage,
+        sex: data.sex,
+        neutered: data.neutered,
+        weightKg: data.weightKg,
+        activityLevel: data.activityLevel,
+        breedImageUrl: data.breedImageUrl,
+        breedReferenceRange: data.breedReferenceRange,
+        ribsScore: data.ribsScore,
+        waistScore: data.waistScore,
+        tuckScore: data.tuckScore,
+        bodyConditionScore: data.bodyConditionScore,
+        weightStatus: data.weightStatus,
+        foodType: data.foodType,
+        foodBrand: data.foodBrand,
+        dailyMeals: data.dailyMeals,
+        dailyQuantity: data.dailyQuantity,
+        treatsPerDay: data.treatsPerDay,
+        dietaryConcerns: data.dietaryConcerns,
+        assessmentVersion: data.assessmentVersion,
+        assessedAt: data.assessedAt,
+      })),
     });
   }
 
