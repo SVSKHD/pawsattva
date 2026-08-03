@@ -9,7 +9,7 @@ import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/firebase/db"
 import { signOut } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
-import { UserProfile, PetFeedEntry } from "@/firebase/firestore"
+import { UserProfile } from "@/firebase/firestore"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -237,8 +237,8 @@ export default function DashboardPage() {
                   <div className="relative z-10 space-y-4">
                     {/* Pet Header */}
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-400 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
-                        <Dog className="w-6 h-6" />
+                      <div className="h-14 w-14 overflow-hidden rounded-2xl bg-gradient-to-br from-orange-400 to-amber-500 text-white shadow-lg">
+                        {feed.breedImageUrl ? <Image src={feed.breedImageUrl} alt={`${feed.petBreed || feed.petType} reference`} width={56} height={56} className="h-full w-full object-cover" /> : <Dog className="m-3.5 h-7 w-7" />}
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-extrabold text-foreground tracking-tight">{feed.petName}</h3>
@@ -254,6 +254,14 @@ export default function DashboardPage() {
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/5">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Age / Weight</p>
+                        <p className="text-sm font-extrabold text-foreground mt-0.5">{feed.ageValue ? `${feed.ageValue} ${feed.ageUnit}` : "Not recorded"} · {feed.weightKg ? `${feed.weightKg} kg` : "—"}</p>
+                      </div>
+                      <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/5">
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Body condition</p>
+                        <p className="text-sm font-extrabold capitalize text-foreground mt-0.5">{feed.bodyConditionScore ? `${feed.bodyConditionScore}/9 · ${feed.weightStatus}` : "Not assessed"}</p>
+                      </div>
                       <div className="p-3 rounded-xl bg-white/60 dark:bg-black/20 border border-white/40 dark:border-white/5">
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Meal Plan</p>
                         <p className="text-base font-extrabold text-foreground mt-0.5">{feed.mealDays} Days</p>
