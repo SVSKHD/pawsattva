@@ -8,9 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { PetFeed, savePetFeed } from "@/firebase/firestore"
+import { deletePetFeedDraft, getPetFeedDraft, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
 import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightStatus } from "@/lib/pet-wellness"
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, PawPrint, Printer } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, User, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
 import Image from "next/image"
 
@@ -26,16 +26,21 @@ const initialData = {
 }
 
 type FormData = typeof initialData
-const fieldClass = "h-12 rounded-xl bg-white border-emerald-950/10"
-const steps = ["Pet Parent", "Pet Profile", "Body Condition", "Feeding Details"]
+const fieldClass = "h-14 rounded-xl border-white/40 bg-white/70 text-base shadow-sm focus:ring-orange-500/20 dark:bg-black/20"
+const steps = [
+  { title: "Pet Parent", description: "About you", icon: User },
+  { title: "Pet Profile", description: "Your companion", icon: Dog },
+  { title: "Body Condition", description: "Live BCS estimate", icon: PawPrint },
+  { title: "Feeding Details", description: "Daily routine", icon: UtensilsCrossed },
+]
 
 const Observation = ({ id, label, value, onChange, options }: { id: string; label: string; value: number; onChange: (value: number) => void; options: string[] }) => (
-  <fieldset className="space-y-3 rounded-2xl border border-emerald-900/10 bg-white p-4">
-    <legend className="px-1 font-semibold text-emerald-950">{label}</legend>
+  <fieldset className="space-y-3 rounded-2xl border border-orange-100/70 bg-white/70 p-4 shadow-sm dark:border-orange-900/20 dark:bg-black/20">
+    <legend className="px-1 font-semibold text-foreground">{label}</legend>
     <div className="grid gap-2 sm:grid-cols-3">
       {options.map((option, index) => {
         const score = index === 0 ? 2 : index === 1 ? 5 : 8
-        return <label key={option} className={`cursor-pointer rounded-xl border p-3 text-sm ${value === score ? "border-emerald-700 bg-emerald-50" : "border-stone-200"}`}>
+        return <label key={option} className={`cursor-pointer rounded-xl border p-3 text-sm transition-colors ${value === score ? "border-orange-500 bg-orange-50 text-orange-950 dark:bg-orange-950/30 dark:text-orange-100" : "border-border bg-background/60"}`}>
           <input className="mr-2" type="radio" name={id} checked={value === score} onChange={() => onChange(score)} />{option}
         </label>
       })}
@@ -49,6 +54,9 @@ export function PetFeedForm() {
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState<PetFeed | null>(null)
   const [formData, setFormData] = useState<FormData>(initialData)
+  const [draftReady, setDraftReady] = useState(false)
+  const [accountDraftReady, setAccountDraftReady] = useState(false)
+  const [draftStatus, setDraftStatus] = useState<"local" | "saving" | "saved">("local")
 
   useEffect(() => {
     try {
@@ -57,7 +65,23 @@ export function PetFeedForm() {
       const savedStep = Number(localStorage.getItem(STEP_KEY))
       if (Number.isInteger(savedStep) && savedStep >= 0 && savedStep < steps.length) setStep(savedStep)
     } catch { localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(STEP_KEY) }
+    setDraftReady(true)
   }, [])
+
+  useEffect(() => {
+    if (!user?.uid) { setAccountDraftReady(true); return }
+    let active = true
+    setAccountDraftReady(false)
+    getPetFeedDraft(user.uid).then((draft) => {
+      if (!active || !draft) return
+      setFormData({ ...initialData, ...draft.data } as FormData)
+      if (draft.step >= 0 && draft.step < steps.length) setStep(draft.step)
+      setDraftStatus("saved")
+      toast.info("Your saved Pet Feed assessment has been resumed.")
+    }).catch((error) => console.error("Unable to resume Pet Feed draft:", error))
+      .finally(() => { if (active) setAccountDraftReady(true) })
+    return () => { active = false }
+  }, [user?.uid])
 
   useEffect(() => {
     if (user?.displayName) setFormData((current) => current.name ? current : { ...current, name: user.displayName ?? "" })
@@ -66,6 +90,17 @@ export function PetFeedForm() {
   useEffect(() => {
     if (!submitted) { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); localStorage.setItem(STEP_KEY, String(step)) }
   }, [formData, step, submitted])
+
+  useEffect(() => {
+    if (!draftReady || !accountDraftReady || submitted || !user?.uid) return
+    setDraftStatus("saving")
+    const timer = window.setTimeout(() => {
+      savePetFeedDraft(user.uid, { data: formData, step })
+        .then(() => setDraftStatus("saved"))
+        .catch((error) => { setDraftStatus("local"); console.error("Unable to save Pet Feed draft:", error) })
+    }, 900)
+    return () => window.clearTimeout(timer)
+  }, [accountDraftReady, draftReady, formData, step, submitted, user?.uid])
 
   const selectedBreed = useMemo(() => formData.petBreed ? getBreed(formData.petType, formData.petBreed) : null, [formData.petBreed, formData.petType])
   const bcs = calculateBcs(formData.ribsScore, formData.waistScore, formData.tuckScore)
@@ -100,6 +135,7 @@ export function PetFeedForm() {
         assessmentVersion: "bcs-owner-v1", assessedAt,
       }
       await savePetFeed(payload)
+      if (user?.uid) await deletePetFeedDraft(user.uid)
       localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(STEP_KEY)
       setSubmitted(payload); toast.success("Wellness assessment saved.")
     } catch (cause) { console.error(cause); toast.error("Unable to save the assessment. Please try again.") } finally { setLoading(false) }
@@ -108,14 +144,24 @@ export function PetFeedForm() {
   if (submitted) return <WellnessReport data={submitted} onReset={() => { setSubmitted(null); setStep(0); setFormData({ ...initialData, name: user?.displayName ?? "" }) }} />
 
   return <div className="space-y-6">
-    <Card className="overflow-hidden rounded-[2rem] border-emerald-950/10 bg-[#faf6e9] shadow-xl">
-      <CardHeader className="bg-[#173f2c] p-6 text-white md:p-8">
-        <div className="mb-5 grid grid-cols-4 gap-2" aria-label={`Step ${step + 1} of 4`}>
-          {steps.map((title, index) => <button type="button" key={title} onClick={() => index < step && setStep(index)} className={`rounded-lg px-2 py-2 text-[10px] font-bold sm:text-xs ${index <= step ? "bg-amber-100 text-emerald-950" : "bg-white/10 text-white/65"}`}>{index + 1}. {title}</button>)}
+    <Card className="overflow-hidden rounded-[2.5rem] border-white/40 bg-white/60 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-black/40">
+      <CardHeader className="p-7 pb-2 text-center md:p-10 md:pb-2">
+        <div className="relative mb-8 flex items-start justify-between" aria-label={`Step ${step + 1} of 4`}>
+          <div className="absolute left-[10%] right-[10%] top-5 h-0.5 bg-muted" />
+          {steps.map((item, index) => {
+            const Icon = item.icon
+            const active = index <= step
+            return <button type="button" key={item.title} onClick={() => index < step && setStep(index)} disabled={index > step} className="relative z-10 flex w-1/4 flex-col items-center gap-2 disabled:cursor-default">
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all ${active ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25" : "border-muted bg-background text-muted-foreground"} ${index === step ? "scale-110 ring-4 ring-orange-500/15" : ""}`}><Icon className="h-5 w-5" /></span>
+              <span className={`hidden text-[10px] font-bold uppercase tracking-wider sm:block ${active ? "text-orange-600" : "text-muted-foreground"}`}>{item.title}</span>
+            </button>
+          })}
         </div>
-        <CardTitle className="text-2xl">{steps[step]}</CardTitle>
+        <CardTitle className="text-3xl font-black tracking-tight">{steps[step].title}</CardTitle>
+        <p className="text-sm text-muted-foreground">{steps[step].description}</p>
+        <p className="mt-2 text-xs font-medium text-muted-foreground" aria-live="polite">{user ? (draftStatus === "saving" ? "Saving your progress…" : draftStatus === "saved" ? "Progress saved to your account" : "Progress saved on this device") : "Progress saved on this device · Sign in to resume on another device"}</p>
       </CardHeader>
-      <CardContent className="space-y-5 p-6 md:p-8">
+      <CardContent className="space-y-5 p-7 md:p-10">
         {step === 0 && <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Pet parent’s full name"><Input className={fieldClass} value={formData.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" /></Field>
           <Field label="Phone number"><Input className={fieldClass} type="tel" value={formData.phone} onChange={(e) => set("phone", e.target.value)} autoComplete="tel" /></Field>
@@ -131,18 +177,21 @@ export function PetFeedForm() {
             <Field label="Activity level"><Select value={formData.activityLevel} onValueChange={(value: FormData["activityLevel"]) => set("activityLevel", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="moderate">Moderate</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select></Field>
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
-          {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-emerald-900/10 bg-white sm:grid-cols-[180px_1fr]">
+          {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm sm:grid-cols-[180px_1fr] dark:border-orange-900/20 dark:bg-black/20">
             <Image src={selectedBreed.imageUrl} alt={`${selectedBreed.name} breed reference`} width={360} height={176} className="h-44 w-full object-cover" />
-            <div className="p-5"><p className="text-xl font-bold text-emerald-950">{selectedBreed.name}</p><p className="mt-2 text-sm font-semibold">General adult weight reference: {selectedBreed.adultWeightRange ?? "No single reliable range for mixed/other breeds"}</p><p className="mt-2 text-xs text-stone-600">General information only—not a diagnostic target or guaranteed ideal weight for your pet.</p></div>
+            <div className="p-5"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><p className="mt-2 text-sm font-semibold">General adult weight reference: {selectedBreed.adultWeightRange ?? "No single reliable range for mixed/other breeds"}</p><p className="mt-2 text-xs text-muted-foreground">General information only—not a diagnostic target or guaranteed ideal weight for your pet.</p></div>
           </div>}
         </div>}
         {step === 2 && <div className="space-y-4">
           <p className="text-sm text-stone-700">Choose the description that best matches your pet today. Weight alone is not used for this estimate.</p>
+          <div className="sticky top-24 z-20 rounded-2xl border border-orange-200 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-orange-900/40 dark:bg-zinc-950/95">
+            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Live body-condition estimate</p><p className="text-xl font-black capitalize">BCS {bcs}/9 · {status}</p></div><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">Updates instantly</span></div>
+            <BcsMeter score={bcs} compact />
+          </div>
           <Observation id="ribs" label="How easily can the ribs be felt?" value={formData.ribsScore} onChange={(value) => set("ribsScore", value)} options={["Very easy / prominent", "Easy with a light covering", "Difficult under a heavy covering"]} />
           <Observation id="waist" label="Waist visibility from above" value={formData.waistScore} onChange={(value) => set("waistScore", value)} options={["Very pronounced", "Clearly visible", "Absent or rounded"]} />
           <Observation id="tuck" label="Abdominal tuck from the side" value={formData.tuckScore} onChange={(value) => set("tuckScore", value)} options={["Severe tuck", "Visible tuck", "Little or no tuck"]} />
-          <BcsMeter score={bcs} />
-          <div className="rounded-2xl bg-white p-5"><p className="text-xl font-bold capitalize text-emerald-950">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}<p className="mt-3 text-xs text-stone-600">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
+          <div className="rounded-2xl border border-orange-100/70 bg-white/70 p-5 shadow-sm"><p className="text-xl font-bold capitalize">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}<p className="mt-3 text-xs text-muted-foreground">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
         </div>}
         {step === 3 && <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Food type"><Select value={formData.foodType} onValueChange={(value: FormData["foodType"]) => set("foodType", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="commercial">Commercial/packaged</SelectItem><SelectItem value="home-cooked">Home-cooked</SelectItem><SelectItem value="mixed">Mixed</SelectItem><SelectItem value="raw">Raw</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></Field>
@@ -159,9 +208,9 @@ export function PetFeedForm() {
           <Toggle label="Pet-care tips/subscription" checked={formData.subscribe} onChange={(value) => set("subscribe", value)} />
         </div>}
       </CardContent>
-      <CardFooter className="flex gap-3 p-6 pt-0 md:p-8 md:pt-0">
+      <CardFooter className="flex gap-3 border-t border-border/40 p-7 md:p-10">
         {step > 0 && <Button variant="outline" className="h-12 rounded-xl" onClick={() => setStep((current) => current - 1)}><ChevronLeft /> Back</Button>}
-        <Button className="h-12 flex-1 rounded-xl bg-[#173f2c]" disabled={loading} onClick={step === 3 ? submit : next}>{loading ? <><Loader2 className="animate-spin" /> Saving assessment…</> : step === 3 ? "Create wellness report" : <>Continue <ChevronRight /></>}</Button>
+        <Button className="h-12 flex-1 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 font-bold shadow-lg shadow-orange-500/20 hover:from-orange-600 hover:to-orange-700" disabled={loading} onClick={step === 3 ? submit : next}>{loading ? <><Loader2 className="animate-spin" /> Saving assessment…</> : step === 3 ? "Create wellness report" : <>Continue <ChevronRight /></>}</Button>
       </CardFooter>
     </Card>
     <SupervisionCard />
@@ -169,10 +218,10 @@ export function PetFeedForm() {
 }
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="space-y-2"><Label>{label}</Label>{children}</div>
-const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-24 w-full rounded-xl border border-emerald-950/10 bg-white p-3 text-sm" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
-const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex min-h-12 items-center justify-between rounded-xl border border-emerald-950/10 bg-white px-4"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
+const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-24 w-full rounded-xl border border-white/40 bg-white/70 p-3 text-sm shadow-sm dark:bg-black/20" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
+const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex min-h-14 items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 shadow-sm dark:bg-black/20"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
 
-function BcsMeter({ score }: { score: number }) { return <div className="rounded-2xl bg-white p-4"><div className="mb-2 flex justify-between text-xs font-bold"><span>Underweight</span><span>Ideal</span><span>Overweight</span><span>Obese</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} className={`rounded-lg py-2 text-center text-sm font-bold ${value === score ? "ring-4 ring-emerald-900 ring-offset-2" : ""} ${value <= 3 ? "bg-sky-200" : value <= 5 ? "bg-emerald-300" : value <= 7 ? "bg-amber-300" : "bg-red-300"}`}>{value}</div>)}</div></div> }
+function BcsMeter({ score, compact = false }: { score: number; compact?: boolean }) { return <div className={compact ? "" : "rounded-2xl bg-white p-4"}><div className="mb-2 grid grid-cols-4 text-center text-[10px] font-bold sm:text-xs"><span>Underweight</span><span>Ideal</span><span>Overweight</span><span>Obese</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} aria-current={value === score ? "true" : undefined} className={`rounded-lg py-2 text-center text-xs font-bold sm:text-sm ${value === score ? "scale-110 ring-4 ring-orange-600 ring-offset-2" : ""} ${value <= 3 ? "bg-sky-200 text-sky-950" : value <= 5 ? "bg-emerald-300 text-emerald-950" : value <= 7 ? "bg-amber-300 text-amber-950" : "bg-red-300 text-red-950"}`}>{value}</div>)}</div></div> }
 
 function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void }) {
   const status = data.weightStatus ?? "ideal"; const assessed = data.assessedAt ? new Date(data.assessedAt) : new Date()
