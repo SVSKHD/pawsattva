@@ -39,6 +39,22 @@ export const getLifeStage = (type: PetType, ageMonths: number) => {
   return "senior"
 }
 
+export const getAdultWeightRange = (reference?: string) => {
+  if (!reference) return null
+  const values = reference.match(/\d+(?:\.\d+)?/g)?.map(Number)
+  return values && values.length >= 2 ? { min: values[0], max: values[1] } : null
+}
+
+export const getWeightContext = (weightKg: number, reference?: string) => {
+  const range = getAdultWeightRange(reference)
+  if (!range || !Number.isFinite(weightKg) || weightKg <= 0) return null
+  const domainMin = Math.max(0, range.min * 0.5)
+  const domainMax = range.max * 1.5
+  const position = Math.max(0, Math.min(100, ((weightKg - domainMin) / (domainMax - domainMin)) * 100))
+  const label = weightKg < range.min ? "Below adult reference" : weightKg > range.max ? "Above adult reference" : "Within adult reference"
+  return { ...range, label, position }
+}
+
 export const calculateBcs = (ribs: number, waist: number, tuck: number) =>
   Math.max(1, Math.min(9, Math.round((ribs + waist + tuck) / 3)))
 
