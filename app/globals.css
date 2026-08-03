@@ -49,6 +49,14 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+@media print {
+  body * { visibility: hidden; }
+  .wellness-report, .wellness-report * { visibility: visible; }
+  .wellness-report { position: absolute; inset: 0; width: 100%; box-shadow: none !important; }
+  header, footer, nav, button { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  @page { margin: 10mm; }
+}
+
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
