@@ -181,13 +181,17 @@ export function PetFeedForm() {
             <Image src={selectedBreed.imageUrl} alt={`${selectedBreed.name} breed reference`} width={360} height={176} className="h-44 w-full object-cover" />
             <div className="p-5"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><p className="mt-2 text-sm font-semibold">General adult weight reference: {selectedBreed.adultWeightRange ?? "No single reliable range for mixed/other breeds"}</p><p className="mt-2 text-xs text-muted-foreground">General information only—not a diagnostic target or guaranteed ideal weight for your pet.</p></div>
           </div>}
+          {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
+            <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Live body-condition estimate</p><p className="text-xl font-black capitalize">BCS {bcs}/9 · {status}</p></div>
+              <span className="w-fit rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">Updates instantly</span>
+            </div>
+            <BcsMeter score={bcs} compact />
+            <p className="mt-3 text-xs text-muted-foreground">This owner-assisted estimate will update when you answer the rib, waist and abdominal-tuck questions in the next step. Weight alone is not used.</p>
+          </div>}
         </div>}
         {step === 2 && <div className="space-y-4">
           <p className="text-sm text-stone-700">Choose the description that best matches your pet today. Weight alone is not used for this estimate.</p>
-          <div className="sticky top-24 z-20 rounded-2xl border border-orange-200 bg-white/95 p-4 shadow-xl backdrop-blur-xl dark:border-orange-900/40 dark:bg-zinc-950/95">
-            <div className="mb-3 flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Live body-condition estimate</p><p className="text-xl font-black capitalize">BCS {bcs}/9 · {status}</p></div><span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">Updates instantly</span></div>
-            <BcsMeter score={bcs} compact />
-          </div>
           <Observation id="ribs" label="How easily can the ribs be felt?" value={formData.ribsScore} onChange={(value) => set("ribsScore", value)} options={["Very easy / prominent", "Easy with a light covering", "Difficult under a heavy covering"]} />
           <Observation id="waist" label="Waist visibility from above" value={formData.waistScore} onChange={(value) => set("waistScore", value)} options={["Very pronounced", "Clearly visible", "Absent or rounded"]} />
           <Observation id="tuck" label="Abdominal tuck from the side" value={formData.tuckScore} onChange={(value) => set("tuckScore", value)} options={["Severe tuck", "Visible tuck", "Little or no tuck"]} />
