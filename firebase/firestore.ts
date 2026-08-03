@@ -15,7 +15,9 @@ import {
   Timestamp,
   onSnapshot,
   arrayUnion,
-  increment
+  increment,
+  setDoc,
+  deleteField
 } from "firebase/firestore";
 import { db } from "./db";
 
@@ -169,6 +171,12 @@ export interface PetFeed {
   dietaryConcerns?: string;
   assessmentVersion?: string;
   assessedAt?: string;
+}
+
+export interface PetFeedDraft {
+  data: Record<string, unknown>;
+  step: number;
+  updatedAt?: any;
 }
 
 export type ContentGoalType = "blog" | "instagram";
@@ -532,6 +540,23 @@ export const addSubscription = async (sub: Omit<Subscription, "id" | "subscribed
 };
 
 // ── PET FEED OPERATIONS ─────────────────────────────────────────────────────
+
+export const getPetFeedDraft = async (userId: string): Promise<PetFeedDraft | null> => {
+  const snapshot = await getDoc(doc(db, "users", userId));
+  return snapshot.exists() && snapshot.data().petFeedDraft
+    ? snapshot.data().petFeedDraft as PetFeedDraft
+    : null;
+};
+
+export const savePetFeedDraft = async (userId: string, draft: Omit<PetFeedDraft, "updatedAt">) => {
+  await setDoc(doc(db, "users", userId), {
+    petFeedDraft: { ...draft, updatedAt: serverTimestamp() },
+  }, { merge: true });
+};
+
+export const deletePetFeedDraft = async (userId: string) => {
+  await updateDoc(doc(db, "users", userId), { petFeedDraft: deleteField() });
+};
 
 export const getPetFeeds = async () => {
   const q = query(collection(db, "petFeeds"), orderBy("createdAt", "desc"));
