@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { deletePetFeedDraft, getPetFeedDraft, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
-import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightStatus } from "@/lib/pet-wellness"
+import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, User, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
 import Image from "next/image"
@@ -20,7 +20,7 @@ const STEP_KEY = `${DRAFT_KEY}.step`
 const initialData = {
   name: "", phone: "", petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
   sex: "unknown" as "male" | "female" | "unknown", neutered: false, weightKg: "", activityLevel: "moderate" as "low" | "moderate" | "high",
-  ribsScore: 5, waistScore: 5, tuckScore: 5, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
+  ribsScore: 0, waistScore: 0, tuckScore: 0, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
   foodBrand: "", dailyMeals: "2", dailyQuantity: "", treatsPerDay: "0", allergies: "", medicalConditions: "", foodDislikes: "",
   feedingConcerns: "", mealDays: "30", reminders: false, subscribe: true,
 }
@@ -103,6 +103,12 @@ export function PetFeedForm() {
   }, [accountDraftReady, draftReady, formData, step, submitted, user?.uid])
 
   const selectedBreed = useMemo(() => formData.petBreed ? getBreed(formData.petType, formData.petBreed) : null, [formData.petBreed, formData.petType])
+  const ageMonths = formData.ageValue && Number(formData.ageValue) > 0
+    ? (formData.ageUnit === "years" ? Number(formData.ageValue) * 12 : Number(formData.ageValue))
+    : null
+  const lifeStage = ageMonths ? getLifeStage(formData.petType, ageMonths) : null
+  const weightContext = getWeightContext(Number(formData.weightKg), selectedBreed?.adultWeightRange)
+  const bcsAnswered = formData.ribsScore > 0 && formData.waistScore > 0 && formData.tuckScore > 0
   const bcs = calculateBcs(formData.ribsScore, formData.waistScore, formData.tuckScore)
   const status = getWeightStatus(bcs)
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => setFormData((current) => ({ ...current, [key]: value }))
@@ -110,6 +116,7 @@ export function PetFeedForm() {
   const validateStep = () => {
     if (step === 0 && (!formData.name.trim() || !/^\+?[0-9 ()-]{7,20}$/.test(formData.phone))) return "Enter a full name and valid phone number."
     if (step === 1 && (!formData.petName.trim() || !formData.petBreed || Number(formData.ageValue) <= 0 || Number(formData.weightKg) <= 0)) return "Complete the pet profile with valid positive age and weight values."
+    if (step === 2 && !bcsAnswered) return "Answer all three body-condition questions to calculate the BCS."
     if (step === 3 && (Number(formData.dailyMeals) <= 0 || Number(formData.treatsPerDay) < 0 || Number(formData.mealDays) <= 0 || !formData.dailyQuantity.trim())) return "Enter valid feeding values; negative or empty numeric values are not allowed."
     return null
   }
@@ -183,11 +190,17 @@ export function PetFeedForm() {
           </div>}
           {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
             <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Live body-condition estimate</p><p className="text-xl font-black capitalize">BCS {bcs}/9 · {status}</p></div>
+              <div><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Dynamic wellness context</p><p className="text-xl font-black capitalize">{lifeStage ? `${lifeStage} · ${formData.weightKg || "—"} kg` : "Enter age and weight"}</p></div>
               <span className="w-fit rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">Updates instantly</span>
             </div>
-            <BcsMeter score={bcs} compact />
-            <p className="mt-3 text-xs text-muted-foreground">This owner-assisted estimate will update when you answer the rib, waist and abdominal-tuck questions in the next step. Weight alone is not used.</p>
+            {weightContext && lifeStage && (lifeStage === "adult" || lifeStage === "senior") ? <div className="mb-5 rounded-xl bg-muted/50 p-3">
+              <div className="mb-2 flex justify-between gap-3 text-xs font-semibold"><span>{weightContext.label}</span><span>Adult reference {weightContext.min}–{weightContext.max} kg</span></div>
+              <div className="relative h-3 rounded-full bg-gradient-to-r from-sky-200 via-emerald-300 to-amber-300"><span className="absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white bg-orange-600 shadow" style={{ left: `${weightContext.position}%` }} /></div>
+              <p className="mt-2 text-[11px] text-muted-foreground">This compares current weight with a general adult breed reference only; it is not an obesity diagnosis.</p>
+            </div> : <p className="mb-5 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground">{lifeStage === "puppy" || lifeStage === "kitten" ? "Growing pets are not compared with adult weight ranges. Body condition is assessed in the next step." : "Enter a valid age and weight to see life-stage and weight context."}</p>}
+            <div className="mb-3"><p className="text-xs font-bold uppercase tracking-widest text-orange-600">Owner-assisted body condition</p><p className="text-lg font-black capitalize">{bcsAnswered ? `BCS ${bcs}/9 · ${status}` : "BCS pending · Complete the next step"}</p></div>
+            <BcsMeter score={bcsAnswered ? bcs : undefined} compact />
+            <p className="mt-3 text-xs text-muted-foreground">BCS updates from rib feel, waist visibility and abdominal tuck—not from weight or age alone.</p>
           </div>}
         </div>}
         {step === 2 && <div className="space-y-4">
@@ -195,7 +208,7 @@ export function PetFeedForm() {
           <Observation id="ribs" label="How easily can the ribs be felt?" value={formData.ribsScore} onChange={(value) => set("ribsScore", value)} options={["Very easy / prominent", "Easy with a light covering", "Difficult under a heavy covering"]} />
           <Observation id="waist" label="Waist visibility from above" value={formData.waistScore} onChange={(value) => set("waistScore", value)} options={["Very pronounced", "Clearly visible", "Absent or rounded"]} />
           <Observation id="tuck" label="Abdominal tuck from the side" value={formData.tuckScore} onChange={(value) => set("tuckScore", value)} options={["Severe tuck", "Visible tuck", "Little or no tuck"]} />
-          <div className="rounded-2xl border border-orange-100/70 bg-white/70 p-5 shadow-sm"><p className="text-xl font-bold capitalize">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}<p className="mt-3 text-xs text-muted-foreground">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
+          <div className="rounded-2xl border border-orange-100/70 bg-white/70 p-5 shadow-sm">{bcsAnswered ? <><p className="text-xl font-bold capitalize">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}</> : <p className="font-semibold text-muted-foreground">Answer all three observations to calculate the BCS.</p>}<p className="mt-3 text-xs text-muted-foreground">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
         </div>}
         {step === 3 && <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Food type"><Select value={formData.foodType} onValueChange={(value: FormData["foodType"]) => set("foodType", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="commercial">Commercial/packaged</SelectItem><SelectItem value="home-cooked">Home-cooked</SelectItem><SelectItem value="mixed">Mixed</SelectItem><SelectItem value="raw">Raw</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></Field>
@@ -225,7 +238,7 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-24 w-full rounded-xl border border-white/40 bg-white/70 p-3 text-sm shadow-sm dark:bg-black/20" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
 const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex min-h-14 items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 shadow-sm dark:bg-black/20"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
 
-function BcsMeter({ score, compact = false }: { score: number; compact?: boolean }) { return <div className={compact ? "" : "rounded-2xl bg-white p-4"}><div className="mb-2 grid grid-cols-4 text-center text-[10px] font-bold sm:text-xs"><span>Underweight</span><span>Ideal</span><span>Overweight</span><span>Obese</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} aria-current={value === score ? "true" : undefined} className={`rounded-lg py-2 text-center text-xs font-bold sm:text-sm ${value === score ? "scale-110 ring-4 ring-orange-600 ring-offset-2" : ""} ${value <= 3 ? "bg-sky-200 text-sky-950" : value <= 5 ? "bg-emerald-300 text-emerald-950" : value <= 7 ? "bg-amber-300 text-amber-950" : "bg-red-300 text-red-950"}`}>{value}</div>)}</div></div> }
+function BcsMeter({ score, compact = false }: { score?: number; compact?: boolean }) { return <div className={compact ? "" : "rounded-2xl bg-white p-4"}><div className="mb-2 grid grid-cols-4 text-center text-[10px] font-bold sm:text-xs"><span>Underweight</span><span>Ideal</span><span>Overweight</span><span>Obese</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} aria-current={value === score ? "true" : undefined} className={`rounded-lg py-2 text-center text-xs font-bold sm:text-sm ${value === score ? "scale-110 ring-4 ring-orange-600 ring-offset-2" : score === undefined ? "opacity-65" : ""} ${value <= 3 ? "bg-sky-200 text-sky-950" : value <= 5 ? "bg-emerald-300 text-emerald-950" : value <= 7 ? "bg-amber-300 text-amber-950" : "bg-red-300 text-red-950"}`}>{value}</div>)}</div></div> }
 
 function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void }) {
   const status = data.weightStatus ?? "ideal"; const assessed = data.assessedAt ? new Date(data.assessedAt) : new Date()
