@@ -26,6 +26,7 @@ import {
   RemoveFormatting,
 } from "lucide-react";
 import { uploadBlogImage } from "@/lib/image-upload";
+import { toast } from "sonner";
 
 interface EditorProps {
   value: string;
@@ -47,7 +48,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
       }),
       Underline,
       Image.configure({
-        allowBase64: true,
+        allowBase64: false,
         HTMLAttributes: { class: "rounded-xl max-w-full h-auto" },
       }),
       Link.configure({
@@ -114,13 +115,9 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
       setIsUploadingImage(true);
       const result = await uploadBlogImage(file, { folder: "blog-content-images", targetKB: 200 });
       editor.chain().focus().setImage({ src: result.url }).run();
-    } catch {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const src = e.target?.result as string;
-        if (src) editor?.chain().focus().setImage({ src }).run();
-      };
-      reader.readAsDataURL(file);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown upload error";
+      toast.error(`Image upload failed: ${message}. Please try again.`);
     } finally {
       setIsUploadingImage(false);
     }
