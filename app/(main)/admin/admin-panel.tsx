@@ -97,9 +97,19 @@ interface BlogDraft {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function AdminPanel() {
-  const { user, loading: authLoading, isAdmin } = useAuth()
+  const { user, loading: authLoading, isAdmin, role } = useAuth()
   const router = useRouter()
   const [, startTransition] = useTransition()
+  const isFullAdmin = role === "admin"
+  const allowedTabs = useMemo(
+    () => isFullAdmin
+      ? new Set([
+        "content-goals", "page-seo", "blog-list", "blog", "category-list",
+        "category", "sub-category-list", "sub-category", "users", "subscribers", "analytics",
+      ])
+      : new Set(["blog-list", "blog", "category-list", "category", "sub-category-list", "sub-category"]),
+    [isFullAdmin]
+  )
 
   // Auth guard
   useEffect(() => {
@@ -113,8 +123,12 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState("blog-list")
 
   const handleTabChange = (tab: string) => {
-    startTransition(() => setActiveTab(tab))
+    startTransition(() => setActiveTab(allowedTabs.has(tab) ? tab : "blog-list"))
   }
+
+  useEffect(() => {
+    if (!allowedTabs.has(activeTab)) setActiveTab("blog-list")
+  }, [activeTab, allowedTabs])
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([])
@@ -166,9 +180,9 @@ export default function AdminPanel() {
   }, [isAdmin])
 
   useEffect(() => {
-    if (!isAdmin || (activeTab !== "users" && activeTab !== "analytics")) return
+    if (!isFullAdmin || (activeTab !== "users" && activeTab !== "analytics")) return
     return onUsersSnapshot(setUsers)
-  }, [activeTab, isAdmin])
+  }, [activeTab, isFullAdmin])
 
   useEffect(() => {
     if (!isAdmin || activeTab !== "blog" || authorsLoadedRef.current) return
@@ -181,13 +195,13 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const needsSubscribers = activeTab === "subscribers" || activeTab === "analytics"
-    if (!isAdmin || !needsSubscribers || subscriptionsLoadedRef.current) return
+    if (!isFullAdmin || !needsSubscribers || subscriptionsLoadedRef.current) return
     subscriptionsLoadedRef.current = true
     getSubscriptions().then(setSubscribers).catch(() => {
       subscriptionsLoadedRef.current = false
       toast.error("Failed to load subscribers.")
     })
-  }, [activeTab, isAdmin])
+  }, [activeTab, isFullAdmin])
 
   // ── Blog form state ───────────────────────────────────────────────────────
   const [blogTitle, setBlogTitle] = useState("")
@@ -586,9 +600,9 @@ export default function AdminPanel() {
     } catch { toast.error("Failed to update user.") }
   }
 
-  const handleToggleAdmin = async (userId: string, targetState: boolean) => {
+  const handleChangeUserRole = async (userId: string, nextRole: NonNullable<UserProfile["role"]>) => {
     try {
-      await updateUserRole(userId, targetState)
+      await updateUserRole(userId, nextRole)
       toast.success("User role updated.")
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : "Unknown error"
@@ -620,19 +634,21 @@ export default function AdminPanel() {
           Content Hub
         </h1>
         <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
-          Plan content goals, manage articles, categories, and view platform analytics.
+          {isFullAdmin
+            ? "Plan content goals, manage articles, categories, and view platform analytics."
+            : "Create and manage blog posts, categories, and sub-categories."}
         </p>
       </div>
 
       {/* ── Mobile nav ── */}
       <div className="md:hidden mb-6">
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={role === "author" ? "author" : "admin"} />
       </div>
 
       {/* ── Body: sidebar + content ── */}
       <div className="flex gap-4 sm:gap-6 md:gap-8 items-start">
         {/* Sidebar (desktop only) */}
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={role === "author" ? "author" : "admin"} />
 
         {/* Tab content */}
         <div className="flex-1 min-w-0">
@@ -674,7 +690,7 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === "content-goals" && (
+          {isFullAdmin && activeTab === "content-goals" && (
             <div className="tab-panel">
               <ContentGoalsTab currentUser={user} />
             </div>
@@ -789,13 +805,13 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === "page-seo" && (
+          {isFullAdmin && activeTab === "page-seo" && (
             <div className="tab-panel">
               <PageSeoTab />
             </div>
           )}
 
-          {activeTab === "analytics" && (
+          {isFullAdmin && activeTab === "analytics" && (
             <div className="tab-panel">
               <AnalyticsTab
                 users={users}
@@ -806,13 +822,13 @@ export default function AdminPanel() {
             </div>
           )}
 
-          {activeTab === "subscribers" && (
+          {isFullAdmin && activeTab === "subscribers" && (
             <div className="tab-panel">
               <SubscribersTab subscribers={subscribers} />
             </div>
           )}
 
-          {activeTab === "users" && (
+          {isFullAdmin && activeTab === "users" && (
             <div className="tab-panel">
               <UsersTab
                 users={users}
@@ -829,7 +845,7 @@ export default function AdminPanel() {
                 handleEditUser={handleEditUser}
                 handleSaveUser={handleSaveUser}
                 setEditingUserId={setEditingUserId}
-                handleToggleAdmin={handleToggleAdmin}
+                handleChangeUserRole={handleChangeUserRole}
                 handleDeleteUserAccount={handleDeleteUserAccount}
               />
             </div>

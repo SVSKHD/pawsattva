@@ -67,6 +67,7 @@ export interface UserProfile {
   photoURL?: string;
   phone?: string;
   admin: boolean;
+  role?: "user" | "author" | "admin";
   petFeeds?: PetFeedEntry[];
   createdAt?: any;
 }
@@ -255,9 +256,9 @@ export const onUsersSnapshot = (callback: (users: UserProfile[]) => void) => {
   });
 };
 
-export const updateUserRole = async (userId: string, isAdmin: boolean) => {
+export const updateUserRole = async (userId: string, role: NonNullable<UserProfile["role"]>) => {
   const docRef = doc(db, "users", userId);
-  return await updateDoc(docRef, { admin: isAdmin });
+  return await updateDoc(docRef, { role, admin: role === "admin" || role === "author" });
 };
 
 export const updateUser = async (userId: string, data: Partial<UserProfile>) => {
