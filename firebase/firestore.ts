@@ -389,7 +389,7 @@ export const getBlog = async (id: string) => {
 
 export const addBlog = async (blog: Omit<Blog, "id" | "date">) => {
   return await addDoc(collection(db, "blogs"), {
-    ...blog,
+    ...withoutUndefined(blog),
     date: serverTimestamp(),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -399,7 +399,7 @@ export const addBlog = async (blog: Omit<Blog, "id" | "date">) => {
 export const updateBlog = async (id: string, blog: Partial<Blog>) => {
   const docRef = doc(db, "blogs", id);
   return await updateDoc(docRef, {
-    ...blog,
+    ...withoutUndefined(blog),
     updatedAt: serverTimestamp(),
   });
 };
