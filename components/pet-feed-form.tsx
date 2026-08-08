@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { deletePetFeedDraft, getPetFeedDraft, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
+import { deletePetFeedDraft, getPetFeedDraft, getUserProfile, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
 import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, User, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
@@ -84,8 +84,30 @@ export function PetFeedForm() {
   }, [user?.uid])
 
   useEffect(() => {
-    if (user?.displayName) setFormData((current) => current.name ? current : { ...current, name: user.displayName ?? "" })
-  }, [user])
+    if (!user?.uid) return
+    let active = true
+
+    getUserProfile(user.uid)
+      .then((profile) => {
+        if (!active) return
+        const profileName = profile?.displayName || user.displayName || ""
+        const profilePhone = profile?.phone || user.phoneNumber || ""
+
+        setFormData((current) => ({
+          ...current,
+          name: current.name || profileName,
+          phone: current.phone || profilePhone,
+        }))
+      })
+      .catch((error) => {
+        console.error("Unable to prefill Pet Care profile:", error)
+        if (active && user.displayName) {
+          setFormData((current) => current.name ? current : { ...current, name: user.displayName ?? "" })
+        }
+      })
+
+    return () => { active = false }
+  }, [user?.displayName, user?.phoneNumber, user?.uid])
 
   useEffect(() => {
     if (!submitted) { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); localStorage.setItem(STEP_KEY, String(step)) }
