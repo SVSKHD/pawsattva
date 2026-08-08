@@ -191,7 +191,7 @@ export default async function BlogPostPage({
       <BlogViewTracker blogId={blog.id} title={blog.title} />
 
       {/* Hero */}
-      <header className="relative w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
+      <header className="relative w-full overflow-hidden bg-zinc-950 pt-24 sm:pt-28 lg:min-h-[720px]">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
@@ -200,67 +200,69 @@ export default async function BlogPostPage({
           priority
           sizes="100vw"
         />
-        {/* Layered gradient instead of flat overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/80" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,146,60,0.18),transparent_30%),linear-gradient(110deg,rgba(0,0,0,0.84),rgba(0,0,0,0.5)_50%,rgba(0,0,0,0.26))]" />
+        <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-background via-background/45 to-transparent" />
 
-        <div className="relative z-10 flex flex-col justify-end min-h-[inherit] pt-24 sm:pt-28">
-          <div className="container mx-auto px-3 sm:px-4 pb-6 sm:pb-14">
+        <div className="relative z-10 min-h-[calc(100svh-2rem)] px-4 pb-8 sm:min-h-[680px] sm:pb-12 lg:flex lg:items-end">
+          <div className="container mx-auto">
             {/* Breadcrumbs */}
-            <nav className="flex items-center text-white/70 text-xs sm:text-sm mb-3 sm:mb-6 gap-1.5 sm:gap-2">
-              <Link href="/" className="hover:text-white inline-flex items-center gap-1">
-                <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Home
+            <nav className="mb-4 flex max-w-full items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs text-white/72 [scrollbar-width:none] sm:mb-7 sm:gap-2 sm:text-sm">
+              <Link href="/" className="inline-flex items-center gap-1 hover:text-white">
+                <Home className="h-3.5 w-3.5" /> Home
               </Link>
-              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
               <Link href="/blog" className="hover:text-white">Blog</Link>
               {category?.name && (
                 <>
-                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-white/90">{category.name}</span>
                 </>
               )}
             </nav>
 
-            <div className="max-w-4xl">
-              <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-3 sm:mb-5 uppercase tracking-wider text-[10px] sm:text-xs px-2.5 py-0.5 sm:px-3 sm:py-1">
+            <div className="grid items-end gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
+              <div className="rounded-[1.75rem] border border-white/18 bg-black/28 p-5 shadow-2xl shadow-black/35 backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:max-w-4xl">
+              <Badge className="mb-4 rounded-full border border-white/20 bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white hover:bg-orange-600">
                 {category?.name || 'Uncategorized'}
               </Badge>
-              <h1 className="text-2xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-4 sm:mb-6 leading-[1.1] sm:leading-[1.05] tracking-tight drop-shadow-sm">
+              <h1 className="text-balance text-3xl font-black leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-5xl md:text-6xl lg:text-7xl">
                 {blog.title}
               </h1>
 
               {blog.excerpt && (
-                <p className="text-lg md:text-xl text-white/85 max-w-3xl mb-8 font-light leading-relaxed hidden md:block">
+                <p className="mt-5 max-w-3xl text-pretty text-base font-light leading-relaxed text-white/86 sm:text-lg md:text-xl">
                   {blog.excerpt}
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center text-white/90 gap-x-4 sm:gap-x-6 gap-y-2 sm:gap-y-3">
-                <div className="flex items-center">
-                  <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-2 sm:mr-3 border-2 border-white text-sm sm:text-lg shadow-md">
+              <div className="mt-6 flex flex-col gap-4 text-white/90 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="flex min-w-0 items-center">
+                  <div className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-white bg-orange-100 text-base font-bold text-orange-600 shadow-md">
                     {authorInitial}
                   </div>
-                  <div className="leading-tight">
-                    <div className="font-medium text-sm sm:text-base">{authorName}</div>
-                    <div className="text-[10px] sm:text-xs text-white/70">Pet Care Expert</div>
+                  <div className="min-w-0 leading-tight">
+                    <div className="truncate text-sm font-semibold sm:text-base">{authorName}</div>
+                    <div className="text-xs text-white/65">Pet Care Expert</div>
                   </div>
                 </div>
-                <div className="h-8 w-px bg-white/20 hidden sm:block" />
-                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>{blog.date}</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>{readTime} min read</span>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
-                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>{wordCount.toLocaleString()} words</span>
+
+                <div className="grid grid-cols-3 gap-2 text-[11px] sm:flex sm:flex-wrap sm:text-sm">
+                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span className="truncate">{blog.date}</span>
+                  </span>
+                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
+                    <Clock className="h-3.5 w-3.5" />
+                    {readTime} min
+                  </span>
+                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    {wordCount.toLocaleString()}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5 md:mb-5">
+              <div className="mt-5 flex flex-wrap items-center gap-3">
                 {wordCount <= 1000 && (
                   <ReadAloud
                     title={blog.title}
@@ -269,30 +271,41 @@ export default async function BlogPostPage({
                   />
                 )}
                 {(blog.views ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <Eye className="w-4 h-4" />
+                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
+                    <Eye className="h-4 w-4" />
                     <span>{(blog.views ?? 0).toLocaleString()} views</span>
                   </div>
                 )}
                 {(blog.likes ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <ThumbsUp className="w-4 h-4" />
+                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
+                    <ThumbsUp className="h-4 w-4" />
                     <span>{(blog.likes ?? 0).toLocaleString()} likes</span>
                   </div>
                 )}
                 {(blog.commentsCount ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-sm text-white/80">
-                    <MessageCircle className="w-4 h-4" />
+                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
+                    <MessageCircle className="h-4 w-4" />
                     <span>{(blog.commentsCount ?? 0).toLocaleString()} comments</span>
                   </div>
                 )}
               </div>
+              </div>
+
+              {blog.excerpt && (
+                <aside className="hidden rounded-[1.75rem] border border-white/16 bg-white/12 p-5 text-white shadow-xl shadow-black/25 backdrop-blur-xl lg:block">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-200">Quick read</p>
+                  <p className="mt-3 text-sm font-light italic leading-7 text-white/82">
+                    {blog.excerpt}
+                  </p>
+                  <div className="mt-5 h-1 w-20 rounded-full bg-orange-400" />
+                </aside>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-8 sm:py-14 lg:py-16">
         <div className="flex flex-col lg:flex-row gap-12 xl:gap-16 relative">
           {/* Sticky share rail — desktop only */}
           <div className="hidden xl:flex flex-col items-center sticky top-28 h-fit">
@@ -306,9 +319,9 @@ export default async function BlogPostPage({
 
           {/* Main */}
           <main className="lg:w-2/3 min-w-0 w-full">
-            <Card className="overflow-hidden border-none sm:border sm:border-orange-100/50 shadow-none sm:shadow-xl sm:shadow-black/5 rounded-3xl">
+            <Card className="-mt-16 overflow-hidden rounded-[1.75rem] border border-orange-100/60 bg-background/96 shadow-xl shadow-black/10 backdrop-blur sm:-mt-24 sm:rounded-[2rem] lg:mt-0">
               <CardContent
-                className={`p-2 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
+                className={`p-5 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
               >
                 {wordCount > 1000 && (
                   <section className="mb-8 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm dark:border-orange-900/50 dark:from-orange-950/30 dark:to-amber-950/20" aria-label="Long article listening suggestion">
@@ -335,9 +348,12 @@ export default async function BlogPostPage({
                 )}
 
                 {blog.excerpt && (
-                  <p className="text-xl font-light text-muted-foreground mb-10 italic border-l-4 border-orange-300 pl-6 leading-relaxed md:hidden">
-                    {blog.excerpt}
-                  </p>
+                  <section className="mb-8 rounded-2xl border border-orange-100 bg-orange-50/70 p-5 shadow-sm dark:border-orange-900/40 dark:bg-orange-950/20 md:hidden">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Excerpt</p>
+                    <p className="mt-2 text-base font-light italic leading-7 text-foreground/80">
+                      {blog.excerpt}
+                    </p>
+                  </section>
                 )}
 
                 <div className="overflow-hidden break-words max-w-full w-full blog-rich-content">
