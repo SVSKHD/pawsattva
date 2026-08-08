@@ -8,12 +8,14 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  role: "user" | "author" | "admin";
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isAdmin: false,
+  role: "user",
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -21,6 +23,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     user: null,
     loading: true,
     isAdmin: false,
+    role: "user",
   });
 
   useEffect(() => {
@@ -31,7 +34,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const sequence = ++authSequence;
       if (!user) {
         if (active && sequence === authSequence) {
-          setAuthState({ user: null, loading: false, isAdmin: false });
+          setAuthState({ user: null, loading: false, isAdmin: false, role: "user" });
         }
         return;
       }
@@ -46,26 +49,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const userDocRef = doc(db, "users", user.uid);
         const userDoc = await getDoc(userDocRef);
         let isAdmin = false;
+        let role: AuthContextType["role"] = "user";
 
         if (userDoc.exists()) {
-          isAdmin = userDoc.data().admin === true;
+          const data = userDoc.data();
+          role = data.role === "author" ? "author" : data.admin === true ? "admin" : "user";
+          isAdmin = role === "admin" || role === "author";
         } else {
           await setDoc(userDocRef, {
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
             admin: false,
+            role: "user",
             createdAt: new Date(),
           });
         }
 
         if (active && sequence === authSequence) {
-          setAuthState({ user, loading: false, isAdmin });
+          setAuthState({ user, loading: false, isAdmin, role });
         }
       } catch (error) {
         console.error("Unable to load the user profile:", error);
         if (active && sequence === authSequence) {
-          setAuthState({ user, loading: false, isAdmin: false });
+          setAuthState({ user, loading: false, isAdmin: false, role: "user" });
         }
       }
     });
