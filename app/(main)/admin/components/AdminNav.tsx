@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target } from "lucide-react"
+import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_GROUPS = [
@@ -16,6 +16,16 @@ const NAV_GROUPS = [
         activeBg: "bg-emerald-500/10",
         activeBorder: "border-emerald-500/20",
         dot: "bg-emerald-500",
+      },
+      {
+        label: "Page SEO",
+        primaryValue: "page-seo",
+        relatedValues: [],
+        icon: SearchCheck,
+        activeColor: "text-sky-600 dark:text-sky-400",
+        activeBg: "bg-sky-500/10",
+        activeBorder: "border-sky-500/20",
+        dot: "bg-sky-500",
       },
       {
         label: "Blog Posts",

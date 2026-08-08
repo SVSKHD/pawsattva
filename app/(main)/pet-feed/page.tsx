@@ -1,16 +1,20 @@
-import { Metadata } from "next";
-import { constructMetadata } from "@/lib/metadata";
+import type { Metadata } from "next";
+import { getManagedPageMetadata } from "@/lib/page-seo";
 import { PetFeedForm } from "@/components/pet-feed-form"
 import { PetCareAuthGate } from "@/components/pet-care-auth-gate"
 import { Badge } from "@/components/ui/badge"
 
-export const metadata: Metadata = constructMetadata({
-  title: "Pet Feed Planner",
-  description:
-    "Get personalized feeding schedules and nutrition plans tailored to your pet's breed, age, and activity level.",
-  keywords: ["pet food", "feeding schedule", "dog diet", "cat diet", "meal plan"],
-  pathname: "/pet-feed",
-});
+export const revalidate = 300
+
+export async function generateMetadata(): Promise<Metadata> {
+  return getManagedPageMetadata("pet-feed", {
+    title: "Pet Feed Planner",
+    description:
+      "Get personalized feeding schedules and nutrition plans tailored to your pet's breed, age, and activity level.",
+    keywords: ["pet food", "feeding schedule", "dog diet", "cat diet", "meal plan"],
+    pathname: "/pet-feed",
+  })
+}
 
 export default function PetFeedPage() {
   return (

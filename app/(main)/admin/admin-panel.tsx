@@ -44,6 +44,10 @@ const BlogFormTab = dynamic(
   () => import("./components/BlogFormTab").then((mod) => mod.BlogFormTab),
   { loading: TabLoading }
 )
+const PageSeoTab = dynamic(
+  () => import("./components/PageSeoTab").then((mod) => mod.PageSeoTab),
+  { loading: TabLoading }
+)
 const CategoryListTab = dynamic(
   () => import("./components/CategoryListTab").then((mod) => mod.CategoryListTab),
   { loading: TabLoading }
@@ -724,6 +728,12 @@ export default function AdminPanel() {
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("sub-category-list") }}
               />
+            </div>
+          )}
+
+          {activeTab === "page-seo" && (
+            <div className="tab-panel">
+              <PageSeoTab />
             </div>
           )}
 
