@@ -17,7 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
-import { getBlogs, getCategories } from "@/firebase/firestore";
+import { Blog, getBlogs, getCategories } from "@/firebase/firestore";
 
 const DEFAULT_BLOG_IMAGE = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=1200&auto=format&fit=crop";
 
@@ -35,6 +35,18 @@ const formatBlogDate = (value: unknown) => {
     : date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 };
 
+const blogTimestamp = (blog: Blog) => {
+  const rawDate = blog.updatedAt || blog.createdAt || blog.date;
+  const date = rawDate && typeof rawDate === "object" && "toDate" in rawDate
+    ? rawDate.toDate()
+    : new Date(String(rawDate || ""));
+
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const primaryCategoryId = (blog: Blog) =>
+  blog.categoryIds?.[0] || blog.categoryId;
+
 export const revalidate = 300
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -48,8 +60,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const [allBlogs, categories] = await Promise.all([\n    getBlogs().catch((error) => { console.error("Unable to load homepage blogs:", error); return []; }),\n    getCategories().catch((error) => { console.error("Unable to load homepage categories:", error); return []; }),\n  ]);
-  const latestBlogs = allBlogs.filter((blog) => blog.status === "published").slice(0, 3);
+  const [allBlogs, categories] = await Promise.all([
+    getBlogs().catch((error) => {
+      console.error("Unable to load homepage blogs:", error);
+      return [];
+    }),
+    getCategories().catch((error) => {
+      console.error("Unable to load homepage categories:", error);
+      return [];
+    }),
+  ]);
+  const latestBlogs = allBlogs
+    .filter((blog) => blog.status === "published")
+    .sort((a, b) => blogTimestamp(b) - blogTimestamp(a))
+    .slice(0, 3);
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
 
   return (
@@ -132,7 +156,7 @@ export default async function Home() {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-20">
             <h2 className="text-4xl md:text-5xl font-extrabold mb-6 tracking-tight">The <span className="text-primary italic">Sattva</span> Standard</h2>
-            <p className="text-lg text-muted-foreground font-medium italic">We don't just provide tips; we provide a philosophy for pet longevity and happiness.</p>
+            <p className="text-lg text-muted-foreground font-medium italic">We don&apos;t just provide tips; we provide a philosophy for pet longevity and happiness.</p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-10">
@@ -201,7 +225,7 @@ export default async function Home() {
                     />
                     <div className="absolute top-4 left-4">
                       <Badge className="bg-white/90 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg ring-1 ring-black/5">
-                        {categoryNames.get(blog.categoryId) || "Pet Care"}
+                        {categoryNames.get(primaryCategoryId(blog)) || "Pet Care"}
                       </Badge>
                     </div>
                   </div>
