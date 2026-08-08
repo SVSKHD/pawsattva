@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Cat, Copy, Dog, ExternalLink, Instagram, MessageCircle, Share2, X } from "lucide-react"
+import { Cat, Copy, Dog, ExternalLink, MessageCircle, Share2, X } from "lucide-react"
+import { FaInstagram } from "react-icons/fa"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { siteConfig } from "@/lib/metadata"
@@ -128,7 +129,7 @@ export function SocialPetGuide() {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Button asChild variant="outline" className="h-11 justify-start rounded-xl">
               <a href={siteConfig.links.instagram} target="_blank" rel="noreferrer">
-                <Instagram className="h-4 w-4 text-pink-600" />
+                <FaInstagram className="h-4 w-4 text-pink-600" />
                 Instagram
                 <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-50" />
               </a>
