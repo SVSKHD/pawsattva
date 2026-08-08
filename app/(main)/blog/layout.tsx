@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import type { ReactNode } from "react"
 import { getManagedPageMetadata } from "@/lib/page-seo"
 
+export const revalidate = 300
+
 export async function generateMetadata(): Promise<Metadata> {
   return getManagedPageMetadata("blog", {
     title: "Blog — Pet Care Guides & Tips",
