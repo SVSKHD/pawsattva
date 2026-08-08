@@ -1,5 +1,6 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { SocialPetGuide } from "@/components/social-pet-guide";
 
 export default function MainLayout({
   children,
@@ -13,6 +14,7 @@ export default function MainLayout({
         {children}
       </div>
       <Footer />
+      <SocialPetGuide />
     </main>
   );
 }
