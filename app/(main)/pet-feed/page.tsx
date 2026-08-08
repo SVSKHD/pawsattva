@@ -4,6 +4,8 @@ import { PetFeedForm } from "@/components/pet-feed-form"
 import { PetCareAuthGate } from "@/components/pet-care-auth-gate"
 import { Badge } from "@/components/ui/badge"
 
+export const revalidate = 300
+
 export async function generateMetadata(): Promise<Metadata> {
   return getManagedPageMetadata("pet-feed", {
     title: "Pet Feed Planner",
