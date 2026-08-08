@@ -67,7 +67,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
     editorProps: {
       attributes: {
         class:
-          "prose prose-lg dark:prose-invert max-w-none min-h-[300px] p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
+          "prose prose-lg dark:prose-invert max-w-none min-h-full p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
       },
       handlePaste: (_view, event) => {
         const items = event.clipboardData?.items;
@@ -168,7 +168,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   };
 
   if (!editor) {
-    return <div className="h-[300px] w-full bg-muted animate-pulse rounded-2xl" />;
+    return <div className="h-[480px] w-full bg-muted animate-pulse rounded-2xl" />;
   }
 
   return (
@@ -247,7 +247,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
       </div>
 
       {/* Editor body */}
-      <div className="border border-black/10 dark:border-white/10 rounded-b-2xl bg-white/50 dark:bg-black/50 overflow-hidden">
+      <div className="h-[480px] overflow-y-auto overscroll-contain border border-black/10 dark:border-white/10 rounded-b-2xl bg-white/50 dark:bg-black/50">
         <EditorContent editor={editor} />
       </div>
 
@@ -410,6 +410,12 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         }
         .tiptap-editor-wrapper .tiptap:focus-visible {
           outline: none;
+        }
+        .tiptap-editor-wrapper .tiptap {
+          min-height: 100%;
+        }
+        .tiptap-editor-wrapper [contenteditable="true"] {
+          scroll-margin-block: 1rem;
         }
         .tiptap-editor-wrapper .tiptap img {
           max-width: 100%;
