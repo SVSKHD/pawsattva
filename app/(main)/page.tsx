@@ -1,6 +1,6 @@
 import React from 'react';
-import { Metadata } from 'next';
-import { constructMetadata } from '@/lib/metadata';
+import type { Metadata } from 'next';
+import { getManagedPageMetadata } from '@/lib/page-seo';
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -48,13 +48,15 @@ const latestBlogsSnapshot = [
   }
 ];
 
-export const metadata: Metadata = constructMetadata({
-  title: "Premium Pet Care & Nutrition",
-  description:
-    "Welcome to Paw Sattva — The ultimate haven for pet wellness, nutrition, and harmony.",
-  keywords: ["pet community", "pet health", "holistic pet care"],
-  pathname: "/",
-});
+export async function generateMetadata(): Promise<Metadata> {
+  return getManagedPageMetadata("home", {
+    title: "Premium Pet Care & Nutrition",
+    description:
+      "Welcome to Paw Sattva — The ultimate haven for pet wellness, nutrition, and harmony.",
+    keywords: ["pet community", "pet health", "holistic pet care"],
+    pathname: "/",
+  })
+}
 
 export default function Home() {
   return (
