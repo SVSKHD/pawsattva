@@ -33,7 +33,17 @@ function pickBestVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | n
 
 const SPEEDS = [0.8, 1, 1.25, 1.5, 2] as const;
 
-export function ReadAloud({ title, plainText, excerpt }: { title: string; plainText: string; excerpt?: string }) {
+export function ReadAloud({
+  title,
+  plainText,
+  excerpt,
+  variant = 'hero',
+}: {
+  title: string;
+  plainText: string;
+  excerpt?: string;
+  variant?: 'hero' | 'card';
+}) {
   const [supported, setSupported] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -239,7 +249,9 @@ export function ReadAloud({ title, plainText, excerpt }: { title: string; plainT
           className={`inline-flex items-center gap-2 text-sm font-medium rounded-full px-4 py-1.5 transition-all border
             ${active
               ? 'bg-orange-500 text-white border-orange-500 hover:bg-orange-600'
-              : 'bg-white/10 text-white/90 border-white/30 hover:bg-white/20 backdrop-blur-sm'
+              : variant === 'card'
+                ? 'bg-white text-orange-700 border-orange-200 hover:bg-orange-50 shadow-sm'
+                : 'bg-white/10 text-white/90 border-white/30 hover:bg-white/20 backdrop-blur-sm'
             }`}
         >
           <Headphones className="w-4 h-4" />
@@ -247,7 +259,7 @@ export function ReadAloud({ title, plainText, excerpt }: { title: string; plainT
         </button>
 
         {excerpt && !active && (
-          <p className="mt-2 text-sm text-white/65 italic max-w-xl leading-relaxed line-clamp-2">
+          <p className={`mt-2 max-w-xl text-sm italic leading-relaxed line-clamp-2 ${variant === 'card' ? 'text-orange-950/70 dark:text-orange-100/70' : 'text-white/65'}`}>
             {excerpt}
           </p>
         )}
