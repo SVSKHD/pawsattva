@@ -186,6 +186,17 @@ export interface PetFeedDraft {
 export type ContentGoalType = "blog" | "instagram";
 export type ContentGoalStatus = "active" | "completed";
 
+export type PageSeoKey = "home" | "blog" | "pet-feed";
+
+export interface PageSeoConfig {
+  key: PageSeoKey;
+  title: string;
+  description: string;
+  keywords: string[];
+  image?: string;
+  updatedAt?: any;
+}
+
 export interface ContentGoal {
   id: string;
   title: string;
@@ -257,6 +268,31 @@ export const updateUser = async (userId: string, data: Partial<UserProfile>) => 
 export const deleteUser = async (userId: string) => {
   const docRef = doc(db, "users", userId);
   return await deleteDoc(docRef);
+};
+
+// ── PAGE SEO OPERATIONS ──────────────────────────────────────────────────────
+
+export const getPageSeoConfig = async (key: PageSeoKey): Promise<PageSeoConfig | null> => {
+  const snapshot = await getDoc(doc(db, "pageSeo", key));
+  return snapshot.exists()
+    ? { key, ...snapshot.data() } as PageSeoConfig
+    : null;
+};
+
+export const getPageSeoConfigs = async (): Promise<PageSeoConfig[]> => {
+  const snapshot = await getDocs(collection(db, "pageSeo"));
+  return snapshot.docs.map((entry) => ({
+    key: entry.id as PageSeoKey,
+    ...entry.data(),
+  } as PageSeoConfig));
+};
+
+export const savePageSeoConfig = async (config: PageSeoConfig) => {
+  const { key, ...data } = config;
+  await setDoc(doc(db, "pageSeo", key), {
+    ...withoutUndefined(data),
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 };
 
 // ── BLOG OPERATIONS ──────────────────────────────────────────────────────────
