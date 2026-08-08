@@ -1,7 +1,7 @@
 import "server-only"
 
 import type { Metadata } from "next"
-import { getPageSeoConfig, PageSeoKey } from "@/firebase/firestore"
+import { getPageSeoConfig, type PageSeoKey } from "@/firebase/firestore"
 import { constructMetadata } from "@/lib/metadata"
 
 interface PageMetadataDefaults {
