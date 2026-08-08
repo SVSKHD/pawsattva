@@ -8,7 +8,7 @@ import {
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
@@ -35,7 +35,7 @@ interface UsersTabProps {
   handleEditUser: (u: UserProfile) => void
   handleSaveUser: () => void
   setEditingUserId: (v: string | null) => void
-  handleToggleAdmin: (userId: string, targetState: boolean) => void
+  handleChangeUserRole: (userId: string, role: NonNullable<UserProfile["role"]>) => void
   handleDeleteUserAccount: (userId: string) => void
 }
 
@@ -47,8 +47,11 @@ export function UsersTab({
   expandedUserId, setExpandedUserId,
   currentUserId,
   handleEditUser, handleSaveUser, setEditingUserId,
-  handleToggleAdmin, handleDeleteUserAccount,
+  handleChangeUserRole, handleDeleteUserAccount,
 }: UsersTabProps) {
+  const getRole = (profile: UserProfile): NonNullable<UserProfile["role"]> =>
+    profile.role === "author" ? "author" : profile.admin ? "admin" : "user"
+
   return (
     <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
       <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
@@ -175,14 +178,23 @@ export function UsersTab({
                     {/* Role cell */}
                     <td className="px-2 sm:px-6 py-3 sm:py-5">
                       <div className="flex items-center justify-center gap-2">
-                        <span className={`text-xs font-bold uppercase tracking-tight ${u.admin ? "text-orange-600" : "text-muted-foreground"}`}>
-                          {u.admin ? "Admin" : "User"}
+                        <span className={`text-xs font-bold uppercase tracking-tight ${getRole(u) !== "user" ? "text-orange-600" : "text-muted-foreground"}`}>
+                          {getRole(u)}
                         </span>
-                        <Switch
-                          checked={u.admin}
-                          onCheckedChange={(checked) => handleToggleAdmin(u.id, checked)}
+                        <Select
+                          value={getRole(u)}
+                          onValueChange={(value: NonNullable<UserProfile["role"]>) => handleChangeUserRole(u.id, value)}
                           disabled={u.id === currentUserId}
-                        />
+                        >
+                          <SelectTrigger className="h-9 w-[116px] rounded-xl bg-white/50 text-xs font-bold dark:bg-black/50">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="user">User</SelectItem>
+                            <SelectItem value="author">Author</SelectItem>
+                            <SelectItem value="admin">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </td>
 
