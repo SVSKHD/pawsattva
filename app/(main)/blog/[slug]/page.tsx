@@ -31,6 +31,7 @@ import { ReadAloud } from './read-aloud';
 import { BlogReactions } from '@/components/blog-reactions';
 import { BlogViewTracker } from '@/components/blog-view-tracker';
 import { BlogComments } from '@/components/blog-comments';
+import { BlogHeroParallax } from './blog-hero-parallax';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -189,14 +190,18 @@ export default async function BlogPostPage({
       {/* Scroll progress + back-to-top (client) */}
       <ReadingEnhancements toc={toc} />
       <BlogViewTracker blogId={blog.id} title={blog.title} />
+      <BlogHeroParallax />
 
       {/* Hero */}
-      <header className="relative w-full overflow-hidden bg-zinc-950 pt-24 sm:pt-28 lg:min-h-[720px]">
+      <header
+        data-blog-hero
+        className="blog-hero-parallax relative w-full overflow-hidden bg-zinc-950 pt-24 sm:pt-28 lg:min-h-[720px]"
+      >
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
           fill
-          className="object-cover"
+          className="blog-hero-image object-cover"
           priority
           sizes="100vw"
         />
@@ -221,11 +226,17 @@ export default async function BlogPostPage({
             </nav>
 
             <div className="grid items-end gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
-              <div className="rounded-[1.75rem] border border-white/18 bg-black/28 p-5 shadow-2xl shadow-black/35 backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:max-w-4xl">
+              <div
+                data-blog-hero-panel
+                className="blog-hero-panel rounded-[1.75rem] border border-white/18 bg-black/28 p-5 shadow-2xl shadow-black/35 backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:max-w-4xl"
+              >
               <Badge className="mb-4 rounded-full border border-white/20 bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white hover:bg-orange-600">
                 {category?.name || 'Uncategorized'}
               </Badge>
-              <h1 className="text-balance text-3xl font-black leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-5xl md:text-6xl lg:text-7xl">
+              <h1
+                data-blog-hero-title
+                className="blog-hero-title text-balance text-3xl font-black leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-5xl md:text-6xl lg:text-7xl"
+              >
                 {blog.title}
               </h1>
 
@@ -292,7 +303,10 @@ export default async function BlogPostPage({
               </div>
 
               {blog.excerpt && (
-                <aside className="hidden rounded-[1.75rem] border border-white/16 bg-white/12 p-5 text-white shadow-xl shadow-black/25 backdrop-blur-xl lg:block">
+                <aside
+                  data-blog-hero-quick-read
+                  className="blog-hero-quick-read hidden rounded-[1.75rem] border border-white/16 bg-white/12 p-5 text-white shadow-xl shadow-black/25 backdrop-blur-xl lg:block"
+                >
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-200">Quick read</p>
                   <p className="mt-3 text-sm font-light italic leading-7 text-white/82">
                     {blog.excerpt}
@@ -319,7 +333,10 @@ export default async function BlogPostPage({
 
           {/* Main */}
           <main className="lg:w-2/3 min-w-0 w-full">
-            <Card className="-mt-16 overflow-hidden rounded-[1.75rem] border border-orange-100/60 bg-background/96 shadow-xl shadow-black/10 backdrop-blur sm:-mt-24 sm:rounded-[2rem] lg:mt-0">
+            <Card
+              data-blog-article-card
+              className="blog-article-card -mt-16 overflow-hidden rounded-[1.75rem] border border-orange-100/60 bg-background/96 shadow-xl shadow-black/10 backdrop-blur sm:-mt-24 sm:rounded-[2rem] lg:mt-0"
+            >
               <CardContent
                 className={`p-5 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
               >
@@ -578,6 +595,54 @@ export default async function BlogPostPage({
 
       {/* Drop cap + figcaption styling scoped to blog content */}
       <style>{`
+        .blog-hero-parallax {
+          --blog-hero-progress: 0;
+          isolation: isolate;
+        }
+        .blog-hero-image {
+          transform: translate3d(0, calc(var(--blog-hero-progress) * 72px), 0) scale(calc(1 + var(--blog-hero-progress) * 0.08));
+          transform-origin: center;
+          transition: transform 120ms linear;
+          will-change: transform;
+        }
+        .blog-hero-panel {
+          transform: translate3d(0, calc(var(--blog-hero-progress) * -92px), 0);
+          opacity: calc(1 - var(--blog-hero-progress) * 0.56);
+          transition: transform 120ms linear, opacity 120ms linear, background-color 180ms ease;
+          will-change: transform, opacity;
+        }
+        .blog-hero-title {
+          transform: translate3d(calc(var(--blog-hero-progress) * -26px), calc(var(--blog-hero-progress) * -26px), 0);
+          opacity: calc(1 - var(--blog-hero-progress) * 0.28);
+          transition: transform 120ms linear, opacity 120ms linear;
+          will-change: transform, opacity;
+        }
+        .blog-hero-quick-read {
+          transform: translate3d(0, calc(var(--blog-hero-progress) * -42px), 0);
+          opacity: calc(1 - var(--blog-hero-progress) * 0.44);
+          transition: transform 120ms linear, opacity 120ms linear;
+          will-change: transform, opacity;
+        }
+        .blog-article-card {
+          transform: translate3d(0, calc(var(--blog-hero-progress) * -30px), 0);
+          transition: transform 120ms linear, box-shadow 180ms ease, background-color 180ms ease;
+          will-change: transform;
+        }
+        [data-blog-hero][data-scrolled="true"] + .container .blog-article-card {
+          background-color: hsl(var(--background));
+          box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .blog-hero-image,
+          .blog-hero-panel,
+          .blog-hero-title,
+          .blog-hero-quick-read,
+          .blog-article-card {
+            transform: none !important;
+            opacity: 1 !important;
+            transition: none !important;
+          }
+        }
         .blog-rich-content .prose > p:first-of-type::first-letter {
           float: left;
           font-size: 4.5rem;
