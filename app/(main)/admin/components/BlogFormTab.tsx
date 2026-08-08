@@ -58,6 +58,7 @@ interface BlogFormTabProps {
   discardDraft: () => void
   formatDraftTime: (iso: string) => string
   handleBlogSubmit: (e: React.FormEvent<HTMLFormElement>) => void
+  isSavingBlog: boolean
   handleTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onCancel: () => void
 }
@@ -79,7 +80,7 @@ export function BlogFormTab({
   categories, authors,
   savedDraft, hasDraftContent,
   restoreDraft, discardDraft, formatDraftTime,
-  handleBlogSubmit, handleTitleChange, onCancel,
+  handleBlogSubmit, isSavingBlog, handleTitleChange, onCancel,
 }: BlogFormTabProps) {
   const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
 
@@ -141,7 +142,7 @@ export function BlogFormTab({
                       : "Draft a new article. Select a category and set its publishing status."}
                   </CardDescription>
                 </div>
-                {savedDraft && hasDraftContent() && !editingBlogId && (
+                {savedDraft && hasDraftContent() && (
                   <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20 font-semibold shrink-0 mt-1">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Autosaved {formatDraftTime(savedDraft.savedAt)}
@@ -415,6 +416,7 @@ export function BlogFormTab({
             <Button
               type="button"
               variant="outline"
+              disabled={isSavingBlog}
               className="h-10 sm:h-11 px-5 sm:px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold w-full sm:w-auto"
               onClick={onCancel}
             >
@@ -422,12 +424,17 @@ export function BlogFormTab({
             </Button>
             <Button
               type="submit"
+              disabled={isSavingBlog}
               className="h-10 sm:h-11 px-6 sm:px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0 w-full sm:w-auto"
             >
-              <Save className="w-4 h-4" />
-              {editingBlogId
-                ? "Update Article"
-                : `Save ${blogStatus === "draft" ? "Draft" : "Post"}`}
+              {isSavingBlog
+                ? <CircleDashed className="w-4 h-4 animate-spin" />
+                : <Save className="w-4 h-4" />}
+              {isSavingBlog
+                ? "Saving..."
+                : editingBlogId
+                  ? "Update Article"
+                  : `Save ${blogStatus === "draft" ? "Draft" : "Post"}`}
             </Button>
           </CardFooter>
         </form>
