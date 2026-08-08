@@ -48,6 +48,8 @@ const latestBlogsSnapshot = [
   }
 ];
 
+export const revalidate = 300
+
 export async function generateMetadata(): Promise<Metadata> {
   return getManagedPageMetadata("home", {
     title: "Premium Pet Care & Nutrition",
