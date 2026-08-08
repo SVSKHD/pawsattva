@@ -393,7 +393,9 @@ export default function AdminPanel() {
         status: blogStatus as "published" | "draft",
         instagramAutoPost,
         instagramCaption: instagramCaption.trim(),
-        instagramPostStatus: instagramAutoPost && blogStatus === "published" ? "pending" as const : undefined,
+        ...(instagramAutoPost && blogStatus === "published"
+          ? { instagramPostStatus: "pending" as const }
+          : {}),
       }
       const payloadSize = new TextEncoder().encode(JSON.stringify(blogData)).length
       if (payloadSize > MAX_BLOG_PAYLOAD_BYTES) {
