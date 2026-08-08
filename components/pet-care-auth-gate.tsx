@@ -1,6 +1,7 @@
 "use client"
 
 import { ReactNode, useState } from "react"
+import Link from "next/link"
 import { signInWithPopup } from "firebase/auth"
 import { Loader2, PawPrint } from "lucide-react"
 import { toast } from "sonner"
@@ -76,16 +77,26 @@ export function PetCareAuthGate({ children }: { children: ReactNode }) {
               Continue with Google so we can prefill your details, securely save your progress, and keep your pet care plan connected to your account.
             </DialogDescription>
           </DialogHeader>
-          <Button
-            type="button"
-            variant="outline"
-            className="mt-3 h-12 w-full gap-3 rounded-xl bg-background font-semibold shadow-sm"
-            onClick={handleGoogleSignIn}
-            disabled={signingIn}
-          >
-            {signingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-            {signingIn ? "Signing in…" : "Continue with Google"}
-          </Button>
+          <div className="mt-3 space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 w-full gap-3 rounded-xl bg-background font-semibold shadow-sm"
+              onClick={handleGoogleSignIn}
+              disabled={signingIn}
+            >
+              {signingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
+              {signingIn ? "Signing in…" : "Continue with Google"}
+            </Button>
+            <div className="grid grid-cols-2 gap-3">
+              <Button asChild type="button" variant="ghost" className="rounded-xl">
+                <Link href="/">Back to Home</Link>
+              </Button>
+              <Button asChild type="button" variant="ghost" className="rounded-xl">
+                <Link href="/blog">Browse Blogs</Link>
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
