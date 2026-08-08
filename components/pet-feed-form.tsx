@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { deletePetFeedDraft, getPetFeedDraft, getUserProfile, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
 import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, User, UtensilsCrossed } from "lucide-react"
@@ -26,7 +27,8 @@ const initialData = {
 }
 
 type FormData = typeof initialData
-const fieldClass = "h-14 w-full rounded-xl border-white/40 bg-white/70 px-4 text-base shadow-sm focus:ring-orange-500/20 dark:bg-black/20"
+const controlClass = "!h-14 w-full rounded-xl border border-orange-100/80 bg-white/85 px-4 text-base shadow-sm transition-colors placeholder:text-muted-foreground/55 focus-visible:border-orange-300 focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
+const textareaClass = "min-h-28 w-full resize-y rounded-xl border border-orange-100/80 bg-white/85 p-4 text-base shadow-sm transition-colors placeholder:text-muted-foreground/55 focus-visible:border-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
 const steps = [
   { title: "Pet Parent", description: "About you", icon: User },
   { title: "Pet Profile", description: "Your companion", icon: Dog },
@@ -194,20 +196,20 @@ export function PetFeedForm() {
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
         {step === 0 && <div className="grid items-end gap-5 sm:grid-cols-2">
-          <Field label="Pet parent’s full name"><Input className={fieldClass} value={formData.name} onChange={(e) => set("name", e.target.value)} autoComplete="name" /></Field>
-          <Field label="Phone number"><Input className={fieldClass} type="tel" value={formData.phone} onChange={(e) => set("phone", e.target.value)} autoComplete="tel" /></Field>
+          <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" />
+          <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" />
         </div>}
         {step === 1 && <div className="space-y-5">
           <div className="grid items-end gap-5 sm:grid-cols-2">
-            <Field label="Pet name"><Input className={fieldClass} value={formData.petName} onChange={(e) => set("petName", e.target.value)} /></Field>
-            <Field label="Pet type"><Select value={formData.petType} onValueChange={(value: PetType) => { set("petType", value); set("petBreed", "") }}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Dog">Dog</SelectItem><SelectItem value="Cat">Cat</SelectItem></SelectContent></Select></Field>
-            <Field label="Breed"><Select value={formData.petBreed} onValueChange={(value) => set("petBreed", value)}><SelectTrigger className={fieldClass}><SelectValue placeholder="Select breed" /></SelectTrigger><SelectContent>{BREEDS[formData.petType].map((breed) => <SelectItem key={breed.name} value={breed.name}>{breed.name}</SelectItem>)}</SelectContent></Select></Field>
-            <Field label="Age"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(e) => set("ageValue", e.target.value)} /></Field>
-            <Field label="Age unit"><Select value={formData.ageUnit} onValueChange={(value: "months" | "years") => set("ageUnit", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="months">Months</SelectItem><SelectItem value="years">Years</SelectItem></SelectContent></Select></Field>
-            <Field label="Sex"><Select value={formData.sex} onValueChange={(value: FormData["sex"]) => set("sex", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="male">Male</SelectItem><SelectItem value="female">Female</SelectItem><SelectItem value="unknown">Unknown</SelectItem></SelectContent></Select></Field>
-            <Field label="Current weight (kg)"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.weightKg} onChange={(e) => set("weightKg", e.target.value)} /></Field>
-            <Field label="Height at shoulder (cm) — optional"><Input className={fieldClass} type="number" min="0.1" step="0.1" value={formData.heightCm} onChange={(e) => set("heightCm", e.target.value)} /></Field>
-            <Field label="Activity level"><Select value={formData.activityLevel} onValueChange={(value: FormData["activityLevel"]) => set("activityLevel", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="low">Low</SelectItem><SelectItem value="moderate">Moderate</SelectItem><SelectItem value="high">High</SelectItem></SelectContent></Select></Field>
+            <InputField label="Pet name" value={formData.petName} onChange={(value) => set("petName", value)} />
+            <SelectField label="Pet type" value={formData.petType} onChange={(value) => { set("petType", value as PetType); set("petBreed", "") }} options={[["Dog", "Dog"], ["Cat", "Cat"]]} />
+            <SelectField label="Breed" value={formData.petBreed} onChange={(value) => set("petBreed", value)} placeholder="Select breed" options={BREEDS[formData.petType].map((breed) => [breed.name, breed.name])} />
+            <InputField label="Age" type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(value) => set("ageValue", value)} />
+            <SelectField label="Age unit" value={formData.ageUnit} onChange={(value) => set("ageUnit", value as FormData["ageUnit"])} options={[["months", "Months"], ["years", "Years"]]} />
+            <SelectField label="Sex" value={formData.sex} onChange={(value) => set("sex", value as FormData["sex"])} options={[["male", "Male"], ["female", "Female"], ["unknown", "Unknown"]]} />
+            <InputField label="Current weight (kg)" type="number" min="0.1" step="0.1" value={formData.weightKg} onChange={(value) => set("weightKg", value)} />
+            <InputField label="Height at shoulder (cm)" type="number" min="0.1" step="0.1" value={formData.heightCm} onChange={(value) => set("heightCm", value)} optional hint="Helpful for larger breeds, but not required for the report." />
+            <SelectField label="Activity level" value={formData.activityLevel} onChange={(value) => set("activityLevel", value as FormData["activityLevel"])} options={[["low", "Low"], ["moderate", "Moderate"], ["high", "High"]]} />
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
           {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm sm:grid-cols-[180px_1fr] dark:border-orange-900/20 dark:bg-black/20">
@@ -237,18 +239,18 @@ export function PetFeedForm() {
           <div className="rounded-2xl border border-orange-100/70 bg-white/70 p-5 shadow-sm">{bcsAnswered ? <><p className="text-xl font-bold capitalize">Estimated BCS {bcs}/9 · {status}</p><p className="mt-2 text-sm">{STATUS_COPY[status].explanation} {STATUS_COPY[status].guidance}</p>{(bcs <= 2 || bcs >= 8) && <p className="mt-3 flex gap-2 text-sm font-semibold text-red-700"><AlertTriangle className="h-5 w-5 shrink-0" />Extreme scores should be reviewed promptly by a veterinarian.</p>}</> : <p className="font-semibold text-muted-foreground">Answer all three observations to calculate the BCS.</p>}<p className="mt-3 text-xs text-muted-foreground">Owner-provided screening estimate only; this is not a veterinary diagnosis.</p></div>
         </div>}
         {step === 3 && <div className="grid items-end gap-5 sm:grid-cols-2">
-          <Field label="Food type"><Select value={formData.foodType} onValueChange={(value: FormData["foodType"]) => set("foodType", value)}><SelectTrigger className={fieldClass}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="commercial">Commercial/packaged</SelectItem><SelectItem value="home-cooked">Home-cooked</SelectItem><SelectItem value="mixed">Mixed</SelectItem><SelectItem value="raw">Raw</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></Field>
-          <Field label="Food brand or recipe"><Input className={fieldClass} value={formData.foodBrand} onChange={(e) => set("foodBrand", e.target.value)} /></Field>
-          <Field label="Meals per day"><Input className={fieldClass} type="number" min="1" step="1" value={formData.dailyMeals} onChange={(e) => set("dailyMeals", e.target.value)} /></Field>
-          <Field label="Total food quantity per day"><Input className={fieldClass} placeholder="e.g. 450 g or 3 cups" value={formData.dailyQuantity} onChange={(e) => set("dailyQuantity", e.target.value)} /></Field>
-          <Field label="Treats per day"><Input className={fieldClass} type="number" min="0" step="1" value={formData.treatsPerDay} onChange={(e) => set("treatsPerDay", e.target.value)} /></Field>
-          <Field label="Requested feeding-plan duration (days)"><Input className={fieldClass} type="number" min="1" step="1" value={formData.mealDays} onChange={(e) => set("mealDays", e.target.value)} /></Field>
-          <TextField label="Allergies" value={formData.allergies} onChange={(value) => set("allergies", value)} />
-          <TextField label="Known medical conditions" value={formData.medicalConditions} onChange={(value) => set("medicalConditions", value)} />
-          <TextField label="Food dislikes" value={formData.foodDislikes} onChange={(value) => set("foodDislikes", value)} />
-          <TextField label="Other feeding concerns" value={formData.feedingConcerns} onChange={(value) => set("feedingConcerns", value)} />
-          <Toggle label="Feeding reminders" checked={formData.reminders} onChange={(value) => set("reminders", value)} />
-          <Toggle label="Pet-care tips/subscription" checked={formData.subscribe} onChange={(value) => set("subscribe", value)} />
+          <SelectField label="Food type" value={formData.foodType} onChange={(value) => set("foodType", value as FormData["foodType"])} options={[["commercial", "Commercial/packaged"], ["home-cooked", "Home-cooked"], ["mixed", "Mixed"], ["raw", "Raw"], ["other", "Other"]]} />
+          <InputField label="Food brand or recipe" value={formData.foodBrand} onChange={(value) => set("foodBrand", value)} optional />
+          <InputField label="Meals per day" type="number" min="1" step="1" value={formData.dailyMeals} onChange={(value) => set("dailyMeals", value)} />
+          <InputField label="Total food quantity per day" placeholder="e.g. 450 g or 3 cups" value={formData.dailyQuantity} onChange={(value) => set("dailyQuantity", value)} />
+          <InputField label="Treats per day" type="number" min="0" step="1" value={formData.treatsPerDay} onChange={(value) => set("treatsPerDay", value)} />
+          <InputField label="Requested feeding-plan duration (days)" type="number" min="1" step="1" value={formData.mealDays} onChange={(value) => set("mealDays", value)} />
+          <TextField label="Allergies" placeholder="Chicken, wheat, dairy, etc." value={formData.allergies} onChange={(value) => set("allergies", value)} />
+          <TextField label="Known medical conditions" placeholder="Kidney disease, skin issues, diabetes, etc." value={formData.medicalConditions} onChange={(value) => set("medicalConditions", value)} />
+          <TextField label="Food dislikes" placeholder="Foods your pet refuses or avoids." value={formData.foodDislikes} onChange={(value) => set("foodDislikes", value)} />
+          <TextField label="Other feeding concerns" placeholder="Vomiting, loose stools, picky eating, appetite changes, etc." value={formData.feedingConcerns} onChange={(value) => set("feedingConcerns", value)} />
+          <Toggle label="Feeding reminders" hint="Remind me to review and log feeding regularly." checked={formData.reminders} onChange={(value) => set("reminders", value)} />
+          <Toggle label="Pet-care tips/subscription" hint="Receive helpful Paw Sattva care updates." checked={formData.subscribe} onChange={(value) => set("subscribe", value)} />
         </div>}
       </CardContent>
       <CardFooter className="flex gap-3 border-t border-border/40 p-7 md:p-10">
@@ -260,9 +262,128 @@ export function PetFeedForm() {
   </div>
 }
 
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div className="min-w-0 space-y-2"><Label className="block min-h-5">{label}</Label>{children}</div>
-const TextField = ({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) => <Field label={label}><textarea className="min-h-28 w-full resize-y rounded-xl border border-white/40 bg-white/70 p-4 text-base shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:bg-black/20" value={value} onChange={(e) => onChange(e.target.value)} /></Field>
-const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) => <div className="flex h-14 w-full items-center justify-between rounded-xl border border-white/40 bg-white/70 px-4 shadow-sm dark:bg-black/20"><Label>{label}</Label><Switch checked={checked} onCheckedChange={onChange} /></div>
+const Field = ({
+  label,
+  children,
+  optional = false,
+  hint,
+}: {
+  label: string
+  children: React.ReactNode
+  optional?: boolean
+  hint?: string
+}) => (
+  <div className="min-w-0 space-y-2">
+    <div className="flex min-h-5 items-center justify-between gap-2">
+      <Label className="text-sm font-semibold leading-none text-foreground">{label}</Label>
+      {optional && (
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+          Optional
+        </span>
+      )}
+    </div>
+    {children}
+    {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+  </div>
+)
+
+const InputField = ({
+  label,
+  value,
+  onChange,
+  optional = false,
+  hint,
+  ...props
+}: Omit<React.ComponentProps<typeof Input>, "value" | "onChange"> & {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  optional?: boolean
+  hint?: string
+}) => (
+  <Field label={label} optional={optional} hint={hint}>
+    <Input
+      {...props}
+      className={controlClass}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  </Field>
+)
+
+const SelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  optional = false,
+  hint,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: [string, string][]
+  optional?: boolean
+  hint?: string
+  placeholder?: string
+}) => (
+  <Field label={label} optional={optional} hint={hint}>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger className={controlClass}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(([optionValue, optionLabel]) => (
+          <SelectItem key={optionValue} value={optionValue}>{optionLabel}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </Field>
+)
+
+const TextField = ({
+  label,
+  value,
+  onChange,
+  optional = true,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  optional?: boolean
+  placeholder?: string
+}) => (
+  <Field label={label} optional={optional}>
+    <Textarea
+      className={textareaClass}
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  </Field>
+)
+
+const Toggle = ({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string
+  checked: boolean
+  onChange: (value: boolean) => void
+  hint?: string
+}) => (
+  <div className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-orange-100/80 bg-white/85 px-4 py-3 shadow-sm dark:border-orange-900/35 dark:bg-black/25">
+    <div className="min-w-0">
+      <Label className="text-sm font-semibold leading-none text-foreground">{label}</Label>
+      {hint && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+    </div>
+    <Switch checked={checked} onCheckedChange={onChange} />
+  </div>
+)
 
 function WeightReferenceMeter({ score }: { score: number }) { return <div><div className="mb-2 grid grid-cols-3 text-center text-[10px] font-bold sm:text-xs"><span>Below adult range</span><span>Within adult range</span><span>Above adult range</span></div><div className="grid grid-cols-9 gap-1">{Array.from({ length: 9 }, (_, index) => index + 1).map((value) => <div key={value} aria-current={value === score ? "true" : undefined} className={`h-9 rounded-lg ${value === score ? "scale-110 ring-4 ring-orange-600 ring-offset-2" : ""} ${value <= 3 ? "bg-sky-200" : value <= 6 ? "bg-emerald-300" : "bg-amber-300"}`}><span className="sr-only">Weight reference position {value} of 9</span></div>)}</div></div> }
 
