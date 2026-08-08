@@ -48,7 +48,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function Home() {
-  const [allBlogs, categories] = await Promise.all([getBlogs(), getCategories()]);
+  const [allBlogs, categories] = await Promise.all([\n    getBlogs().catch((error) => { console.error("Unable to load homepage blogs:", error); return []; }),\n    getCategories().catch((error) => { console.error("Unable to load homepage categories:", error); return []; }),\n  ]);
   const latestBlogs = allBlogs.filter((blog) => blog.status === "published").slice(0, 3);
   const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
 
