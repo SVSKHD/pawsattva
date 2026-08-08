@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Metadata } from 'next';
 import { getManagedPageMetadata } from '@/lib/page-seo';
 import Image from "next/image";
@@ -18,35 +17,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
-import Paw from "../pawsattva.png";
+import { getBlogs, getCategories } from "@/firebase/firestore";
 
-// Latest Blogs for the snapshot section
-const latestBlogsSnapshot = [
-  {
-    title: "Understanding Pet Nutrition: A Complete Guide",
-    category: "Nutrition",
-    date: "Mar 20, 2026",
-    readTime: "8 min read",
-    image: "https://images.unsplash.com/photo-1548191265-cc70d3d45ba1?q=80&w=800&auto=format&fit=crop",
-    slug: "understanding-pet-nutrition",
-  },
-  {
-    title: "5 Tips for Outdoor Activities with Dogs",
-    category: "Training",
-    date: "Mar 15, 2026",
-    readTime: "5 min read",
-    image: "https://images.unsplash.com/photo-1551717743-499438096569?q=80&w=800&auto=format&fit=crop",
-    slug: "outdoor-activities-dogs",
-  },
-  {
-    title: "Common Household Hazards for Cats",
-    category: "Health",
-    date: "Mar 12, 2026",
-    readTime: "6 min read",
-    image: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?q=80&w=800&auto=format&fit=crop",
-    slug: "cat-hazards",
-  }
-];
+const DEFAULT_BLOG_IMAGE = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=1200&auto=format&fit=crop";
+
+const plainText = (html: string) =>
+  html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
+
+const readTime = (content: string) =>
+  `${Math.max(1, Math.ceil(plainText(content).split(" ").filter(Boolean).length / 200))} min read`;
+
+const formatBlogDate = (value: unknown) => {
+  if (!value) return "Recent";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+};
 
 export const revalidate = 300
 
@@ -60,7 +47,11 @@ export async function generateMetadata(): Promise<Metadata> {
   })
 }
 
-export default function Home() {
+export default async function Home() {
+  const [allBlogs, categories] = await Promise.all([\n    getBlogs().catch((error) => { console.error("Unable to load homepage blogs:", error); return []; }),\n    getCategories().catch((error) => { console.error("Unable to load homepage categories:", error); return []; }),\n  ]);
+  const latestBlogs = allBlogs.filter((blog) => blog.status === "published").slice(0, 3);
+  const categoryNames = new Map(categories.map((category) => [category.id, category.name]));
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* ── HERO SECTION ───────────────────────────────────────────────────────── */}
@@ -96,21 +87,6 @@ export default function Home() {
                   </Button>
                 </Link>
               </div>
-              <div className="pt-8 flex items-center justify-center lg:justify-start gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
-                <div className="flex -space-x-3">
-                  {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-background bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
-                      <Image src={`https://i.pravatar.cc/100?img=${i + 10}`} alt="User" width={40} height={40} className="rounded-full" />
-                    </div>
-                  ))}
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-1 text-orange-500">
-                    {"★★★★★".split("").map((s, i) => <span key={i}>{s}</span>)}
-                  </div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Loved by 10k+ Pet Families</p>
-                </div>
-              </div>
             </div>
 
             {/* Hero Image / Visual */}
@@ -133,8 +109,8 @@ export default function Home() {
                       <Heart className="w-6 h-6 fill-current" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg leading-tight">Expert Veterinary Advice</h4>
-                      <p className="text-sm text-foreground/70 font-medium">Verified by nutritionists for your peace of mind.</p>
+                      <h4 className="font-bold text-lg leading-tight">Nutrition-Led Guidance</h4>
+                      <p className="text-sm text-foreground/70 font-medium">Built around practical pet nutrition and everyday wellness.</p>
                     </div>
                   </div>
                 </div>
@@ -176,8 +152,8 @@ export default function Home() {
                 shadow: "shadow-orange-500/20"
               },
               {
-                title: "Premium Community",
-                desc: "Join thousands of other pet owners sharing experiences and growing together.",
+                title: "Pet Parent Community",
+                desc: "Explore useful stories and guidance created for responsible pet parents.",
                 icon: Heart,
                 color: "bg-pink-500",
                 shadow: "shadow-pink-500/20"
@@ -212,12 +188,12 @@ export default function Home() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-10">
-            {latestBlogsSnapshot.map((blog, idx) => (
-              <Link key={idx} href={`/blog/${blog.slug}`} className="group block">
+            {latestBlogs.map((blog) => (
+              <Link key={blog.id} href={`/blog/${blog.slug}`} className="group block">
                 <div className="liquid-card h-full flex flex-col overflow-hidden transition-all duration-500 group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] group-hover:-translate-y-1">
                   <div className="relative h-56 w-full overflow-hidden">
                     <Image
-                      src={blog.image}
+                      src={blog.image || DEFAULT_BLOG_IMAGE}
                       alt={blog.title}
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -225,7 +201,7 @@ export default function Home() {
                     />
                     <div className="absolute top-4 left-4">
                       <Badge className="bg-white/90 dark:bg-black/80 backdrop-blur-md text-foreground border-none px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-lg ring-1 ring-black/5">
-                        {blog.category}
+                        {categoryNames.get(blog.categoryId) || "Pet Care"}
                       </Badge>
                     </div>
                   </div>
@@ -233,17 +209,20 @@ export default function Home() {
                     <div className="flex items-center gap-4 text-[10px] font-bold text-primary/70 uppercase tracking-widest mb-4">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="w-3 h-3 text-orange-500" />
-                        {blog.date}
+                        {formatBlogDate(blog.date)}
                       </span>
                       <span className="w-1 h-1 rounded-full bg-zinc-300" />
                       <span className="flex items-center gap-1.5">
                         <Clock className="w-3 h-3" />
-                        {blog.readTime}
+                        {readTime(blog.content)}
                       </span>
                     </div>
-                    <h3 className="text-xl font-bold mb-6 line-clamp-2 leading-snug group-hover:text-primary transition-colors">
+                    <h3 className="text-xl font-bold mb-3 line-clamp-2 leading-snug group-hover:text-primary transition-colors">
                       {blog.title}
                     </h3>
+                    <p className="mb-6 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                      {blog.excerpt || plainText(blog.content).slice(0, 150)}
+                    </p>
                     <div className="mt-auto flex items-center justify-between pt-6 border-t border-muted/50">
                       <span className="text-xs font-bold text-foreground/60 group-hover:text-primary transition-colors flex items-center gap-1">
                         Read Journal <ArrowUpRight className="w-3.5 h-3.5" />
@@ -254,56 +233,18 @@ export default function Home() {
               </Link>
             ))}
           </div>
+          {latestBlogs.length === 0 && (
+            <div className="rounded-[2rem] border border-dashed border-orange-200 bg-orange-50/50 px-6 py-12 text-center dark:border-orange-900/40 dark:bg-orange-950/10">
+              <h3 className="text-xl font-bold">Original stories are coming soon</h3>
+              <p className="mt-2 text-sm text-muted-foreground">Published articles from the Paw Sattva admin will appear here automatically.</p>
+            </div>
+          )}
         </div>
       </section>
 
       {/* ── CTA / COMMUNITY ──────────────────────────────────────────────────── */}
       <NewsletterCTA />
 
-      {/* ── TESTIMONIALS ──────────────────────────────────────────────────────── */}
-      <section className="py-24 relative overflow-hidden">
-        <div className="container mx-auto px-4">
-          <h2 className="text-4xl lg:text-5xl font-extrabold text-center mb-20 tracking-tight">Whisker-Approved <span className="text-primary italic">Stories</span></h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
-            {[
-              {
-                name: "Marcus Thorne",
-                role: "Labrador Parent",
-                quote: "Paw Sattva has completely changed how I feed Duke. His coat is shinier and his energy levels are through the roof!",
-                avatar: "https://i.pravatar.cc/100?img=12"
-              },
-              {
-                name: "Elena Rodriguez",
-                role: "Feline Enthusiast",
-                quote: "The grooming guides are so detailed. My cats actually enjoy brushing time now, which is a miracle!",
-                avatar: "https://i.pravatar.cc/100?img=26"
-              },
-              {
-                name: "Sarah Jenkins",
-                role: "Puppy Parent",
-                quote: "I was overwhelmed as a first-time owner, but the Sattva training principles gave me so much confidence.",
-                avatar: "https://i.pravatar.cc/100?img=33"
-              }
-            ].map((t, i) => (
-              <div key={i} className="liquid-card p-10 flex flex-col h-full bg-white/50 backdrop-blur-3xl border-white/40">
-                <div className="flex items-center gap-4 mb-8">
-                  <Image src={t.avatar} alt={t.name} width={56} height={56} className="rounded-2xl border-2 border-primary/20" />
-                  <div>
-                    <h4 className="font-bold text-lg leading-none mb-1">{t.name}</h4>
-                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{t.role}</p>
-                  </div>
-                </div>
-                <p className="text-lg font-medium italic text-foreground/80 leading-relaxed group-hover:text-foreground transition-colors">
-                  "{t.quote}"
-                </p>
-                <div className="mt-8 flex gap-1 text-orange-400">
-                  {"★★★★★".split("").map((s, i) => <span key={i} className="text-xl">★</span>)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
     </div>
   );
