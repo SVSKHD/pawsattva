@@ -10,6 +10,7 @@ const NAV_GROUPS = [
       {
         label: "Content Goals",
         primaryValue: "content-goals",
+        adminOnly: true,
         relatedValues: [],
         icon: Target,
         activeColor: "text-emerald-600 dark:text-emerald-400",
@@ -20,6 +21,7 @@ const NAV_GROUPS = [
       {
         label: "Page SEO",
         primaryValue: "page-seo",
+        adminOnly: true,
         relatedValues: [],
         icon: SearchCheck,
         activeColor: "text-sky-600 dark:text-sky-400",
@@ -65,6 +67,7 @@ const NAV_GROUPS = [
       {
         label: "Users",
         primaryValue: "users",
+        adminOnly: true,
         relatedValues: [],
         icon: Users,
         activeColor: "text-blue-600 dark:text-blue-400",
@@ -75,6 +78,7 @@ const NAV_GROUPS = [
       {
         label: "Subscribers",
         primaryValue: "subscribers",
+        adminOnly: true,
         relatedValues: [],
         icon: Mail,
         activeColor: "text-violet-600 dark:text-violet-400",
@@ -90,6 +94,7 @@ const NAV_GROUPS = [
       {
         label: "Analytics",
         primaryValue: "analytics",
+        adminOnly: true,
         relatedValues: [],
         icon: BarChart3,
         activeColor: "text-emerald-600 dark:text-emerald-400",
@@ -104,9 +109,15 @@ const NAV_GROUPS = [
 interface AdminNavProps {
   activeTab: string
   onTabChange: (tab: string) => void
+  role?: "admin" | "author"
 }
 
-export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
+export function AdminNav({ activeTab, onTabChange, role = "admin" }: AdminNavProps) {
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => role === "admin" || !item.adminOnly),
+  })).filter((group) => group.items.length > 0)
+
   const isActive = (item: (typeof NAV_GROUPS)[0]["items"][0]) =>
     activeTab === item.primaryValue || item.relatedValues.includes(activeTab)
 
@@ -127,7 +138,7 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
 
       {/* ── Desktop sidebar ── */}
       <aside className="admin-nav-desktop-sidebar hidden md:flex flex-col w-52 shrink-0 gap-1 self-start sticky top-24">
-        {NAV_GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-3">
             <p className="px-3 mb-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 select-none">
               {group.label}
@@ -161,7 +172,7 @@ export function AdminNav({ activeTab, onTabChange }: AdminNavProps) {
 
       {/* ── Mobile top nav ── */}
       <div className="admin-nav-mobile md:hidden -mx-3 flex max-w-[calc(100vw-1.5rem)] snap-x snap-proximity items-center gap-1.5 overflow-x-auto px-3 pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-pan-x">
-        {NAV_GROUPS.flatMap((g) => g.items).map((item) => {
+        {visibleGroups.flatMap((g) => g.items).map((item) => {
           const active = isActive(item)
           const Icon = item.icon
           return (
