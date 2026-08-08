@@ -1,4 +1,3 @@
-import React from 'react';
 import type { Metadata } from 'next';
 import { getManagedPageMetadata } from '@/lib/page-seo';
 import Image from "next/image";
@@ -18,7 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
-import Paw from "../pawsattva.png";
 import { getBlogs, getCategories } from "@/firebase/firestore";
 
 const DEFAULT_BLOG_IMAGE = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=1200&auto=format&fit=crop";
@@ -111,8 +109,8 @@ export default async function Home() {
                       <Heart className="w-6 h-6 fill-current" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg leading-tight">Expert Veterinary Advice</h4>
-                      <p className="text-sm text-foreground/70 font-medium">Verified by nutritionists for your peace of mind.</p>
+                      <h4 className="font-bold text-lg leading-tight">Nutrition-Led Guidance</h4>
+                      <p className="text-sm text-foreground/70 font-medium">Built around practical pet nutrition and everyday wellness.</p>
                     </div>
                   </div>
                 </div>
@@ -154,8 +152,8 @@ export default async function Home() {
                 shadow: "shadow-orange-500/20"
               },
               {
-                title: "Premium Community",
-                desc: "Join thousands of other pet owners sharing experiences and growing together.",
+                title: "Pet Parent Community",
+                desc: "Explore useful stories and guidance created for responsible pet parents.",
                 icon: Heart,
                 color: "bg-pink-500",
                 shadow: "shadow-pink-500/20"
