@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { constructMetadata } from "@/lib/metadata";
 import { PetFeedForm } from "@/components/pet-feed-form"
+import { PetCareAuthGate } from "@/components/pet-care-auth-gate"
 import { Badge } from "@/components/ui/badge"
 
 export const metadata: Metadata = constructMetadata({
@@ -32,7 +33,9 @@ export default function PetFeedPage() {
         </div>
 
         <div className="max-w-3xl mx-auto">
-          <PetFeedForm />
+          <PetCareAuthGate>
+            <PetFeedForm />
+          </PetCareAuthGate>
         </div>
 
         {/* Feature Highlights */}
