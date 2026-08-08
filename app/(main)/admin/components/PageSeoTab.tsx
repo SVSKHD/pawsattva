@@ -1,6 +1,7 @@
 "use client"
 
-import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import type { FormEvent, ReactNode } from "react"
 import { CheckCircle2, Loader2, SearchCheck } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -10,8 +11,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
   getPageSeoConfigs,
-  PageSeoConfig,
-  PageSeoKey,
+  type PageSeoConfig,
+  type PageSeoKey,
   savePageSeoConfig,
 } from "@/firebase/firestore"
 
@@ -163,7 +164,7 @@ export function PageSeoTab() {
   )
 }
 
-function SeoField({ label, healthy, hint, children }: { label: string; healthy: boolean; hint: string; children: React.ReactNode }) {
+function SeoField({ label, healthy, hint, children }: { label: string; healthy: boolean; hint: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
       <Label className="flex items-center justify-between gap-3">
