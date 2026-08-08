@@ -13,6 +13,7 @@ import {
   Home,
   ThumbsUp,
   Eye,
+  Headphones,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -260,11 +261,13 @@ export default async function BlogPostPage({
               </div>
 
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5 md:mb-5">
-                <ReadAloud
-                  title={blog.title}
-                  plainText={plainText}
-                  excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
-                />
+                {wordCount <= 1000 && (
+                  <ReadAloud
+                    title={blog.title}
+                    plainText={plainText}
+                    excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
+                  />
+                )}
                 {(blog.views ?? 0) > 0 && (
                   <div className="flex items-center gap-2 text-sm text-white/80">
                     <Eye className="w-4 h-4" />
@@ -307,6 +310,30 @@ export default async function BlogPostPage({
               <CardContent
                 className={`p-2 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
               >
+                {wordCount > 1000 && (
+                  <section className="mb-8 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm dark:border-orange-900/50 dark:from-orange-950/30 dark:to-amber-950/20" aria-label="Long article listening suggestion">
+                    <div className="flex items-start gap-4">
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white shadow-md shadow-orange-500/20">
+                        <Headphones className="h-5 w-5" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-lg font-bold text-orange-950 dark:text-orange-100">This is a detailed {wordCount.toLocaleString()}-word guide</h2>
+                        <p className="mt-1 text-sm leading-relaxed text-orange-950/70 dark:text-orange-100/70">
+                          Long periods of screen reading can cause eye fatigue. Listening may feel more comfortable—especially if you want to rest your eyes while still learning.
+                        </p>
+                        <div className="mt-4">
+                          <ReadAloud
+                            title={blog.title}
+                            plainText={plainText}
+                            excerpt="Listen from the beginning, pause anytime, and adjust the playback speed."
+                            variant="card"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
                 {blog.excerpt && (
                   <p className="text-xl font-light text-muted-foreground mb-10 italic border-l-4 border-orange-300 pl-6 leading-relaxed md:hidden">
                     {blog.excerpt}
