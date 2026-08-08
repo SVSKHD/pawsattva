@@ -226,6 +226,13 @@ export const getAppUsers = async () => {
   } as UserProfile));
 };
 
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  const snapshot = await getDoc(doc(db, "users", userId));
+  return snapshot.exists()
+    ? { id: snapshot.id, ...snapshot.data() } as UserProfile
+    : null;
+};
+
 // Real-time listener for users
 export const onUsersSnapshot = (callback: (users: UserProfile[]) => void) => {
   return onSnapshot(collection(db, "users"), (snapshot) => {
