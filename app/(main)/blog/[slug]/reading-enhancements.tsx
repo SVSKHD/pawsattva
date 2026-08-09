@@ -5,7 +5,7 @@ import { ArrowUp } from 'lucide-react';
 
 type TocItem = { id: string; text: string; level: number };
 
-function ReadingEnhancements({ toc }: { toc: TocItem[] }) {
+function ReadingEnhancements({ toc, title }: { toc: TocItem[]; title?: string }) {
   const [progress, setProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
 
@@ -62,6 +62,13 @@ function ReadingEnhancements({ toc }: { toc: TocItem[] }) {
   return (
     <>
       {/* Top scroll progress bar */}
+      <div className={`fixed left-3 right-3 top-3 z-50 mx-auto flex max-w-3xl items-center gap-3 rounded-full border border-white/30 bg-white/68 px-4 py-2 text-xs font-bold text-foreground shadow-xl shadow-black/10 backdrop-blur-2xl transition-all duration-300 dark:border-white/10 dark:bg-black/50 ${showTop ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0 pointer-events-none'}`}>
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <span className="tabular-nums text-orange-600">{Math.round(progress)}%</span>
+        <div className="absolute bottom-0 left-4 right-4 h-0.5 overflow-hidden rounded-full bg-orange-500/15">
+          <div className="h-full bg-orange-500 transition-[width] duration-100" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
       <div
         className="fixed top-0 left-0 right-0 h-1 z-50 bg-transparent pointer-events-none"
         aria-hidden
