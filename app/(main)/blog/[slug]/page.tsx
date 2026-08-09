@@ -13,7 +13,6 @@ import {
   Home,
   ThumbsUp,
   Eye,
-  Headphones,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,7 +30,6 @@ import { ReadAloud } from './read-aloud';
 import { BlogReactions } from '@/components/blog-reactions';
 import { BlogViewTracker } from '@/components/blog-view-tracker';
 import { BlogComments } from '@/components/blog-comments';
-import { BlogHeroParallax } from './blog-hero-parallax';
 
 const roboto = Roboto({
   weight: ['300', '400', '500', '700'],
@@ -186,140 +184,122 @@ export default async function BlogPostPage({
   const authorInitial = authorName[0];
 
   return (
-    <div className="bg-background min-h-screen">
+    <div className="blog-reading-page relative min-h-screen overflow-hidden bg-background">
       {/* Scroll progress + back-to-top (client) */}
-      <ReadingEnhancements toc={toc} />
+      <ReadingEnhancements toc={toc} title={blog.title} />
       <BlogViewTracker blogId={blog.id} title={blog.title} />
-      <BlogHeroParallax />
+      <div className="blog-atmosphere fixed inset-0 z-0 opacity-70" aria-hidden>
+        <Image
+          src={(blog?.image || defaultImage) as string}
+          alt=""
+          fill
+          className="object-cover"
+          sizes="100vw"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/60 to-background" />
+      </div>
 
       {/* Hero */}
-      <header
-        data-blog-hero
-        className="blog-hero-parallax relative w-full overflow-hidden bg-zinc-950 pt-24 sm:pt-28 lg:min-h-[720px]"
-      >
+      <header className="relative z-10 w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
           fill
-          className="blog-hero-image object-cover"
+          className="object-cover"
           priority
           sizes="100vw"
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,146,60,0.18),transparent_30%),linear-gradient(110deg,rgba(0,0,0,0.84),rgba(0,0,0,0.5)_50%,rgba(0,0,0,0.26))]" />
-        <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-background via-background/45 to-transparent" />
+        {/* Layered gradient instead of flat overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/40 to-black/80" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-        <div className="relative z-10 min-h-[calc(100svh-2rem)] px-4 pb-8 sm:min-h-[680px] sm:pb-12 lg:flex lg:items-end">
-          <div className="container mx-auto">
+        <div className="relative z-10 flex flex-col justify-end min-h-[inherit] pt-24 sm:pt-28">
+          <div className="container mx-auto px-3 sm:px-4 pb-6 sm:pb-14">
             {/* Breadcrumbs */}
-            <nav className="mb-4 flex max-w-full items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs text-white/72 [scrollbar-width:none] sm:mb-7 sm:gap-2 sm:text-sm">
-              <Link href="/" className="inline-flex items-center gap-1 hover:text-white">
-                <Home className="h-3.5 w-3.5" /> Home
+            <nav className="flex items-center text-white/70 text-xs sm:text-sm mb-3 sm:mb-6 gap-1.5 sm:gap-2">
+              <Link href="/" className="hover:text-white inline-flex items-center gap-1">
+                <Home className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Home
               </Link>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <Link href="/blog" className="hover:text-white">Blog</Link>
               {category?.name && (
                 <>
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span className="text-white/90">{category.name}</span>
                 </>
               )}
             </nav>
 
-            <div className="grid items-end gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
-              <div
-                data-blog-hero-panel
-                className="blog-hero-panel rounded-[1.75rem] border border-white/18 bg-black/28 p-5 shadow-2xl shadow-black/35 backdrop-blur-xl sm:rounded-[2rem] sm:p-8 lg:max-w-4xl"
-              >
-              <Badge className="mb-4 rounded-full border border-white/20 bg-orange-500 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white hover:bg-orange-600">
+            <div className="max-w-4xl">
+              <Badge className="bg-orange-500 hover:bg-orange-600 text-white mb-3 sm:mb-5 uppercase tracking-wider text-[10px] sm:text-xs px-2.5 py-0.5 sm:px-3 sm:py-1">
                 {category?.name || 'Uncategorized'}
               </Badge>
-              <h1
-                data-blog-hero-title
-                className="blog-hero-title text-balance text-3xl font-black leading-[1.04] tracking-tight text-white drop-shadow-sm sm:text-5xl md:text-6xl lg:text-7xl"
-              >
+              <h1 className="text-2xl sm:text-4xl md:text-6xl lg:text-7xl font-extrabold text-white mb-4 sm:mb-6 leading-[1.1] sm:leading-[1.05] tracking-tight drop-shadow-sm">
                 {blog.title}
               </h1>
 
               {blog.excerpt && (
-                <p className="mt-5 max-w-3xl text-pretty text-base font-light leading-relaxed text-white/86 sm:text-lg md:text-xl">
+                <p className="text-lg md:text-xl text-white/85 max-w-3xl mb-8 font-light leading-relaxed hidden md:block">
                   {blog.excerpt}
                 </p>
               )}
 
-              <div className="mt-6 flex flex-col gap-4 text-white/90 sm:flex-row sm:flex-wrap sm:items-center">
-                <div className="flex min-w-0 items-center">
-                  <div className="mr-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-white bg-orange-100 text-base font-bold text-orange-600 shadow-md">
+              <div className="flex flex-wrap items-center text-white/90 gap-x-4 sm:gap-x-6 gap-y-2 sm:gap-y-3">
+                <div className="flex items-center">
+                  <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold mr-2 sm:mr-3 border-2 border-white text-sm sm:text-lg shadow-md">
                     {authorInitial}
                   </div>
-                  <div className="min-w-0 leading-tight">
-                    <div className="truncate text-sm font-semibold sm:text-base">{authorName}</div>
-                    <div className="text-xs text-white/65">Pet Care Expert</div>
+                  <div className="leading-tight">
+                    <div className="font-medium text-sm sm:text-base">{authorName}</div>
+                    <div className="text-[10px] sm:text-xs text-white/70">Pet Care Expert</div>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-3 gap-2 text-[11px] sm:flex sm:flex-wrap sm:text-sm">
-                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
-                    <Calendar className="h-3.5 w-3.5" />
-                    <span className="truncate">{blog.date}</span>
-                  </span>
-                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
-                    <Clock className="h-3.5 w-3.5" />
-                    {readTime} min
-                  </span>
-                  <span className="inline-flex items-center justify-center gap-1.5 rounded-full border border-white/14 bg-white/10 px-2.5 py-2 sm:justify-start">
-                    <BookOpen className="h-3.5 w-3.5" />
-                    {wordCount.toLocaleString()}
-                  </span>
+                <div className="h-8 w-px bg-white/20 hidden sm:block" />
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>{blog.date}</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>{readTime} min read</span>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                  <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>{wordCount.toLocaleString()} words</span>
                 </div>
               </div>
 
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                {wordCount <= 1000 && (
-                  <ReadAloud
-                    title={blog.title}
-                    plainText={plainText}
-                    excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
-                  />
-                )}
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-3 sm:mt-5 md:mb-5">
+                <ReadAloud
+                  title={blog.title}
+                  plainText={plainText}
+                  excerpt={blog.excerpt || plainText.slice(0, 140).trimEnd() + '…'}
+                />
                 {(blog.views ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
-                    <Eye className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <Eye className="w-4 h-4" />
                     <span>{(blog.views ?? 0).toLocaleString()} views</span>
                   </div>
                 )}
                 {(blog.likes ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
-                    <ThumbsUp className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <ThumbsUp className="w-4 h-4" />
                     <span>{(blog.likes ?? 0).toLocaleString()} likes</span>
                   </div>
                 )}
                 {(blog.commentsCount ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs text-white/82 sm:text-sm">
-                    <MessageCircle className="h-4 w-4" />
+                  <div className="flex items-center gap-2 text-sm text-white/80">
+                    <MessageCircle className="w-4 h-4" />
                     <span>{(blog.commentsCount ?? 0).toLocaleString()} comments</span>
                   </div>
                 )}
               </div>
-              </div>
-
-              {blog.excerpt && (
-                <aside
-                  data-blog-hero-quick-read
-                  className="blog-hero-quick-read hidden rounded-[1.75rem] border border-white/16 bg-white/12 p-5 text-white shadow-xl shadow-black/25 backdrop-blur-xl lg:block"
-                >
-                  <p className="text-xs font-black uppercase tracking-[0.22em] text-orange-200">Quick read</p>
-                  <p className="mt-3 text-sm font-light italic leading-7 text-white/82">
-                    {blog.excerpt}
-                  </p>
-                  <div className="mt-5 h-1 w-20 rounded-full bg-orange-400" />
-                </aside>
-              )}
             </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 sm:py-14 lg:py-16">
+      <div className="container relative z-10 mx-auto px-4 py-10 sm:py-16">
         <div className="flex flex-col lg:flex-row gap-12 xl:gap-16 relative">
           {/* Sticky share rail — desktop only */}
           <div className="hidden xl:flex flex-col items-center sticky top-28 h-fit">
@@ -333,44 +313,25 @@ export default async function BlogPostPage({
 
           {/* Main */}
           <main className="lg:w-2/3 min-w-0 w-full">
-            <Card
-              data-blog-article-card
-              className="blog-article-card -mt-16 overflow-hidden rounded-[1.75rem] border border-orange-100/60 bg-background/96 shadow-xl shadow-black/10 backdrop-blur sm:-mt-24 sm:rounded-[2rem] lg:mt-0"
-            >
+            <Card className="blog-glass-card overflow-hidden border border-white/40 shadow-2xl shadow-black/10 rounded-[1.75rem] sm:rounded-[2rem]">
               <CardContent
-                className={`p-5 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
+                className={`p-2 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
               >
-                {wordCount > 1000 && (
-                  <section className="mb-8 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-5 shadow-sm dark:border-orange-900/50 dark:from-orange-950/30 dark:to-amber-950/20" aria-label="Long article listening suggestion">
-                    <div className="flex items-start gap-4">
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white shadow-md shadow-orange-500/20">
-                        <Headphones className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-lg font-bold text-orange-950 dark:text-orange-100">This is a detailed {wordCount.toLocaleString()}-word guide</h2>
-                        <p className="mt-1 text-sm leading-relaxed text-orange-950/70 dark:text-orange-100/70">
-                          Long periods of screen reading can cause eye fatigue. Listening may feel more comfortable—especially if you want to rest your eyes while still learning.
-                        </p>
-                        <div className="mt-4">
-                          <ReadAloud
-                            title={blog.title}
-                            plainText={plainText}
-                            excerpt="Listen from the beginning, pause anytime, and adjust the playback speed."
-                            variant="card"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </section>
-                )}
+                <details className="mb-6 rounded-2xl border border-orange-100/60 bg-white/55 p-4 text-sm shadow-sm backdrop-blur-xl lg:hidden">
+                  <summary className="cursor-pointer font-black text-orange-700">Contents</summary>
+                  <ul className="mt-3 space-y-1">
+                    {toc.map((item) => (
+                      <li key={item.id} className={item.level === 3 ? "pl-4" : ""}>
+                        <a href={`#${item.id}`} className="block py-1 text-muted-foreground hover:text-orange-600">{item.text}</a>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
 
                 {blog.excerpt && (
-                  <section className="mb-8 rounded-2xl border border-orange-100 bg-orange-50/70 p-5 shadow-sm dark:border-orange-900/40 dark:bg-orange-950/20 md:hidden">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-orange-600">Excerpt</p>
-                    <p className="mt-2 text-base font-light italic leading-7 text-foreground/80">
-                      {blog.excerpt}
-                    </p>
-                  </section>
+                  <p className="text-xl font-light text-muted-foreground mb-10 italic border-l-4 border-orange-300 pl-6 leading-relaxed md:hidden">
+                    {blog.excerpt}
+                  </p>
                 )}
 
                 <div className="overflow-hidden break-words max-w-full w-full blog-rich-content">
@@ -481,7 +442,7 @@ export default async function BlogPostPage({
             <div className="lg:sticky lg:top-28 space-y-10">
               {/* Table of contents */}
               {toc.length > 0 && (
-                <Card className="border border-orange-100/60 rounded-3xl shadow-sm">
+                <Card className="border border-white/35 bg-white/55 rounded-3xl shadow-sm backdrop-blur-2xl">
                   <CardContent className="p-6">
                     <h3 className="text-sm font-bold mb-4 flex items-center uppercase tracking-widest text-muted-foreground">
                       <span className="w-6 h-0.5 bg-orange-500 mr-3 rounded-full" />
@@ -595,53 +556,35 @@ export default async function BlogPostPage({
 
       {/* Drop cap + figcaption styling scoped to blog content */}
       <style>{`
-        .blog-hero-parallax {
-          --blog-hero-progress: 0;
-          isolation: isolate;
+        .blog-atmosphere {
+          filter: blur(18px) saturate(1.18);
+          transform: scale(1.05);
         }
-        .blog-hero-image {
-          transform: translate3d(0, calc(var(--blog-hero-progress) * 72px), 0) scale(calc(1 + var(--blog-hero-progress) * 0.08));
-          transform-origin: center;
-          transition: transform 120ms linear;
-          will-change: transform;
+        .blog-glass-card {
+          background:
+            linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.56));
+          backdrop-filter: blur(28px) saturate(135%);
+          -webkit-backdrop-filter: blur(28px) saturate(135%);
+          box-shadow:
+            0 24px 70px rgba(31, 66, 35, 0.14),
+            inset 0 1px 0 rgba(255,255,255,0.74);
         }
-        .blog-hero-panel {
-          transform: translate3d(0, calc(var(--blog-hero-progress) * -92px), 0);
-          opacity: calc(1 - var(--blog-hero-progress) * 0.56);
-          transition: transform 120ms linear, opacity 120ms linear, background-color 180ms ease;
-          will-change: transform, opacity;
-        }
-        .blog-hero-title {
-          transform: translate3d(calc(var(--blog-hero-progress) * -26px), calc(var(--blog-hero-progress) * -26px), 0);
-          opacity: calc(1 - var(--blog-hero-progress) * 0.28);
-          transition: transform 120ms linear, opacity 120ms linear;
-          will-change: transform, opacity;
-        }
-        .blog-hero-quick-read {
-          transform: translate3d(0, calc(var(--blog-hero-progress) * -42px), 0);
-          opacity: calc(1 - var(--blog-hero-progress) * 0.44);
-          transition: transform 120ms linear, opacity 120ms linear;
-          will-change: transform, opacity;
-        }
-        .blog-article-card {
-          transform: translate3d(0, calc(var(--blog-hero-progress) * -30px), 0);
-          transition: transform 120ms linear, box-shadow 180ms ease, background-color 180ms ease;
-          will-change: transform;
-        }
-        [data-blog-hero][data-scrolled="true"] + .container .blog-article-card {
-          background-color: hsl(var(--background));
-          box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+          .blog-glass-card {
+            background: rgba(255,255,255,0.94);
+          }
         }
         @media (prefers-reduced-motion: reduce) {
-          .blog-hero-image,
-          .blog-hero-panel,
-          .blog-hero-title,
-          .blog-hero-quick-read,
-          .blog-article-card {
-            transform: none !important;
-            opacity: 1 !important;
-            transition: none !important;
+          .blog-atmosphere {
+            filter: blur(10px);
+            transform: none;
           }
+        }
+        .blog-rich-content .prose :is(table) {
+          display: block;
+          max-height: 360px;
+          overflow: auto;
+          border-radius: 1rem;
         }
         .blog-rich-content .prose > p:first-of-type::first-letter {
           float: left;
