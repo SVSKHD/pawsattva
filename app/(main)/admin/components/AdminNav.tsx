@@ -2,8 +2,21 @@
 
 import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { LucideIcon } from "lucide-react"
 
-const NAV_GROUPS = [
+type NavItem = {
+  label: string
+  primaryValue: string
+  relatedValues: string[]
+  icon: LucideIcon
+  activeColor: string
+  activeBg: string
+  activeBorder: string
+  dot: string
+  adminOnly?: boolean
+}
+
+const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Content",
     items: [
@@ -118,7 +131,7 @@ export function AdminNav({ activeTab, onTabChange, role = "admin" }: AdminNavPro
     items: group.items.filter((item) => role === "admin" || !item.adminOnly),
   })).filter((group) => group.items.length > 0)
 
-  const isActive = (item: (typeof NAV_GROUPS)[0]["items"][0]) =>
+  const isActive = (item: NavItem) =>
     activeTab === item.primaryValue || item.relatedValues.includes(activeTab)
 
   return (
