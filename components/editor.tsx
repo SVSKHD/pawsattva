@@ -21,12 +21,12 @@ import {
   Quote,
   ImageIcon,
   Link as LinkIcon,
+  ShoppingBag,
   Undo,
   Redo,
   RemoveFormatting,
 } from "lucide-react";
 import { uploadBlogImage } from "@/lib/image-upload";
-import { toast } from "sonner";
 
 interface EditorProps {
   value: string;
@@ -39,6 +39,12 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   const [instagramUrl, setInstagramUrl] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageUrlError, setImageUrlError] = useState("");
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [productName, setProductName] = useState("");
+  const [productUrl, setProductUrl] = useState("");
+  const [productPrice, setProductPrice] = useState("");
+  const [productNote, setProductNote] = useState("");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const editor = useEditor({
@@ -48,7 +54,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
       }),
       Underline,
       Image.configure({
-        allowBase64: false,
+        allowBase64: true,
         HTMLAttributes: { class: "rounded-xl max-w-full h-auto" },
       }),
       Link.configure({
@@ -68,7 +74,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
     editorProps: {
       attributes: {
         class:
-          "prose prose-lg dark:prose-invert max-w-none min-h-full p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
+          "prose prose-lg dark:prose-invert max-w-none min-h-[300px] p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
       },
       handlePaste: (_view, event) => {
         const items = event.clipboardData?.items;
@@ -89,7 +95,10 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         const text = event.clipboardData?.getData("text/plain")?.trim();
         if (text && /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg|bmp|avif)(\?.*)?$/i.test(text)) {
           event.preventDefault();
-          editor?.chain().focus().setImage({ src: text }).run();
+          void validateImageUrl(text).then((ok) => {
+            if (ok) editor?.chain().focus().setImage({ src: text }).run();
+            else alert("Please try another URL. This image URL does not look like a match.");
+          });
           return true;
         }
 
@@ -109,18 +118,24 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
     },
   });
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- TipTap editor instance is intentionally captured for upload insertion
   const insertUploadedImage = useCallback(async (file: File) => {
     if (!editor) return;
     try {
       setIsUploadingImage(true);
       const result = await uploadBlogImage(file, { folder: "blog-content-images", targetKB: 200 });
       editor.chain().focus().setImage({ src: result.url }).run();
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown upload error";
-      toast.error(`Image upload failed: ${message}. Please try again.`);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const src = e.target?.result as string;
+        if (src) editor?.chain().focus().setImage({ src }).run();
+      };
+      reader.readAsDataURL(file);
     } finally {
       setIsUploadingImage(false);
     }
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   }, [editor]);
 
   // Sync external value changes (e.g. draft restore, editing existing blog)
@@ -132,13 +147,41 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
     }
   }, [value, editor]);
 
-  const insertImage = useCallback(() => {
+  const validateImageUrl = (url: string) =>
+    new Promise<boolean>((resolve) => {
+      const img = new window.Image();
+      img.onload = () => resolve(img.naturalWidth > 16 && img.naturalHeight > 16);
+      img.onerror = () => resolve(false);
+      img.referrerPolicy = "no-referrer";
+      img.src = url;
+    });
+
+  const insertImage = useCallback(async () => {
     const url = imageUrl.trim();
     if (!url || !editor) return;
+    setImageUrlError("");
+    const ok = await validateImageUrl(url);
+    if (!ok) {
+      setImageUrlError("Please try another URL. This image URL does not look like a match.")
+      return;
+    }
     editor.chain().focus().setImage({ src: url }).run();
     setImageUrl("");
     setShowImageModal(false);
   }, [editor, imageUrl]);
+
+  const handleInsertProduct = () => {
+    if (!productName.trim() || !productUrl.trim() || !editor) return;
+    const marker = `[product:${JSON.stringify({
+      title: productName.trim(),
+      url: productUrl.trim(),
+      price: productPrice.trim(),
+      note: productNote.trim(),
+    })}]`;
+    editor.chain().focus().insertContent(`<p>${marker}</p>`).run();
+    setProductName(""); setProductUrl(""); setProductPrice(""); setProductNote("");
+    setShowProductModal(false);
+  };
 
   const setLink = useCallback(() => {
     if (!editor) return;
@@ -165,7 +208,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   };
 
   if (!editor) {
-    return <div className="h-[480px] w-full bg-muted animate-pulse rounded-2xl" />;
+    return <div className="h-[300px] w-full bg-muted animate-pulse rounded-2xl" />;
   }
 
   return (
@@ -229,6 +272,9 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         <ToolbarBtn onClick={() => setShowImageModal(true)} title="Insert Image">
           <ImageIcon className="w-4 h-4" />
         </ToolbarBtn>
+        <ToolbarBtn onClick={() => setShowProductModal(true)} title="Insert Product">
+          <ShoppingBag className="w-4 h-4" />
+        </ToolbarBtn>
 
         <ToolbarSep />
 
@@ -244,7 +290,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
       </div>
 
       {/* Editor body */}
-      <div className="h-[480px] overflow-y-auto overscroll-contain border border-black/10 dark:border-white/10 rounded-b-2xl bg-white/50 dark:bg-black/50">
+      <div className="border border-black/10 dark:border-white/10 rounded-b-2xl bg-white/50 dark:bg-black/50 overflow-hidden">
         <EditorContent editor={editor} />
       </div>
 
@@ -263,6 +309,14 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
           Insert Instagram
         </button>
         <span className="text-xs text-muted-foreground">Embed posts, reels & IGTV</span>
+        <button
+          type="button"
+          onClick={() => setShowProductModal(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500 hover:text-white"
+        >
+          <ShoppingBag className="w-4 h-4" />
+          Insert Product
+        </button>
       </div>
 
       {/* Image URL modal */}
@@ -281,7 +335,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
           <input
             type="url"
             value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
+            onChange={(e) => { setImageUrl(e.target.value); setImageUrlError(""); }}
             placeholder="https://example.com/photo.jpg"
             className="w-full h-12 px-4 rounded-xl text-sm bg-white/60 dark:bg-black/40
               border border-black/10 dark:border-white/10
@@ -293,6 +347,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
           <p className="text-[11px] text-muted-foreground mt-2">
             Supports JPG, PNG, GIF, WebP, SVG, and other image formats.
           </p>
+          {imageUrlError && <p className="mt-2 text-xs font-semibold text-red-600">{imageUrlError}</p>}
           <label
             className={`mt-3 inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
               isUploadingImage
@@ -338,6 +393,31 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
             >
               Insert Image
             </button>
+          </div>
+        </ModalOverlay>
+      )}
+
+      {/* Product modal */}
+      {showProductModal && (
+        <ModalOverlay onClose={() => setShowProductModal(false)}>
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <ShoppingBag className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Insert Product</h3>
+              <p className="text-xs text-muted-foreground">Add product recommendations inside the blog</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <input value={productName} onChange={(e) => setProductName(e.target.value)} placeholder="Product name" className="w-full h-11 rounded-xl border border-black/10 bg-white/60 px-4 text-sm dark:border-white/10 dark:bg-black/40" />
+            <input type="url" value={productUrl} onChange={(e) => setProductUrl(e.target.value)} placeholder="Product URL" className="w-full h-11 rounded-xl border border-black/10 bg-white/60 px-4 text-sm dark:border-white/10 dark:bg-black/40" />
+            <input value={productPrice} onChange={(e) => setProductPrice(e.target.value)} placeholder="Price, e.g. ₹699 (optional)" className="w-full h-11 rounded-xl border border-black/10 bg-white/60 px-4 text-sm dark:border-white/10 dark:bg-black/40" />
+            <textarea value={productNote} onChange={(e) => setProductNote(e.target.value)} placeholder="Why it helps (optional)" className="min-h-20 w-full rounded-xl border border-black/10 bg-white/60 px-4 py-3 text-sm dark:border-white/10 dark:bg-black/40" />
+          </div>
+          <div className="flex justify-end gap-3 mt-5">
+            <button type="button" onClick={() => setShowProductModal(false)} className="h-10 px-5 rounded-xl text-sm font-semibold text-muted-foreground bg-black/5 dark:bg-white/5">Cancel</button>
+            <button type="button" onClick={handleInsertProduct} disabled={!productName.trim() || !productUrl.trim()} className="h-10 px-6 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40">Insert Product</button>
           </div>
         </ModalOverlay>
       )}
@@ -407,12 +487,6 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         }
         .tiptap-editor-wrapper .tiptap:focus-visible {
           outline: none;
-        }
-        .tiptap-editor-wrapper .tiptap {
-          min-height: 100%;
-        }
-        .tiptap-editor-wrapper [contenteditable="true"] {
-          scroll-margin-block: 1rem;
         }
         .tiptap-editor-wrapper .tiptap img {
           max-width: 100%;

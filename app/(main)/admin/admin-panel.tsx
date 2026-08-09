@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 
 import {
   addBlog, updateBlog, deleteBlog,
+  approveBlog, requestBlogDelete, rejectBlogDeleteRequest,
   getCategories, addCategory, updateCategory, deleteCategory,
   getAdminUsers, getSubscriptions,
   onUsersSnapshot, onBlogsSnapshot, updateUserRole, updateUser, deleteUser,
@@ -76,23 +77,6 @@ const UsersTab = dynamic(
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const DRAFT_KEY = "pawsattva_blog_draft"
-const MAX_BLOG_PAYLOAD_BYTES = 900_000
-
-interface BlogDraft {
-  blogTitle: string
-  blogSlug: string
-  blogKeywords: string
-  blogExcerpt: string
-  blogImage: string
-  blogContent: string
-  blogCategories: string[]
-  blogAuthorId: string
-  blogStatus: "published" | "draft"
-  instagramAutoPost: boolean
-  instagramCaption: string
-  editingBlogId: string | null
-  savedAt: string
-}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -101,6 +85,8 @@ export default function AdminPanel() {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const isFullAdmin = role === "admin"
+  const isAuthor = role === "author"
+  const userId = user?.uid
   const allowedTabs = useMemo(
     () => isFullAdmin
       ? new Set([
@@ -127,6 +113,7 @@ export default function AdminPanel() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp restored/linked tabs after role changes
     if (!allowedTabs.has(activeTab)) setActiveTab("blog-list")
   }, [activeTab, allowedTabs])
 
@@ -150,6 +137,7 @@ export default function AdminPanel() {
       if (active && categoriesReady && blogsReady) setLoadingData(false)
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- existing initial-load state reset
     setLoadingData(true)
     getCategories().then((nextCategories) => {
       if (!active) return
@@ -217,7 +205,6 @@ export default function AdminPanel() {
   const [instagramCaption, setInstagramCaption] = useState("")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
-  const [isSavingBlog, setIsSavingBlog] = useState(false)
 
   // ── Category form state ───────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState("")
@@ -241,47 +228,23 @@ export default function AdminPanel() {
   // ── Draft autosave ────────────────────────────────────────────────────────
   const [savedDraft, setSavedDraft] = useState<{ savedAt: string } | null>(null)
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const draftSaveErrorShownRef = useRef(false)
 
   const hasDraftContent = useCallback(
-    () => !!(blogTitle || blogContent || blogKeywords || blogExcerpt || blogImage || blogCategories.length),
-    [blogTitle, blogContent, blogKeywords, blogExcerpt, blogImage, blogCategories]
+    () => !!(blogTitle || blogContent || blogKeywords || blogCategories.length),
+    [blogTitle, blogContent, blogKeywords, blogCategories]
   )
 
-  const applyDraft = useCallback((draft: Partial<BlogDraft>) => {
-    setBlogTitle(draft.blogTitle || "")
-    setBlogSlug(draft.blogSlug || "")
-    setBlogKeywords(draft.blogKeywords || "")
-    setBlogExcerpt(draft.blogExcerpt || "")
-    setBlogImage(draft.blogImage || "")
-    setBlogContent(draft.blogContent || "")
-    setBlogCategories(Array.isArray(draft.blogCategories) ? draft.blogCategories : [])
-    setBlogAuthorId(draft.blogAuthorId || "")
-    setBlogStatus(draft.blogStatus === "published" ? "published" : "draft")
-    setInstagramAutoPost(Boolean(draft.instagramAutoPost))
-    setInstagramCaption(draft.instagramCaption || "")
-    setEditingBlogId(draft.editingBlogId || null)
-  }, [])
-
   const saveDraft = useCallback(() => {
-    if (!hasDraftContent()) return
-    const draft: BlogDraft = {
+    if (!blogTitle && !blogContent && !blogKeywords && !blogCategories.length) return
+    const draft = {
       blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage,
       blogContent, blogCategories, blogAuthorId, blogStatus,
       instagramAutoPost, instagramCaption, editingBlogId,
       savedAt: new Date().toISOString(),
     }
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-      setSavedDraft({ savedAt: draft.savedAt })
-      draftSaveErrorShownRef.current = false
-    } catch {
-      if (!draftSaveErrorShownRef.current) {
-        toast.error("This draft is too large for browser autosave. Remove embedded images and try again.")
-        draftSaveErrorShownRef.current = true
-      }
-    }
-  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, editingBlogId, hasDraftContent])
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+    setSavedDraft({ savedAt: draft.savedAt })
+  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, editingBlogId])
 
   const clearDraft = useCallback(() => {
     localStorage.removeItem(DRAFT_KEY)
@@ -290,47 +253,50 @@ export default function AdminPanel() {
 
   useEffect(() => {
     const raw = localStorage.getItem(DRAFT_KEY)
-    if (!raw) return
-    try {
-      const draft = JSON.parse(raw) as Partial<BlogDraft>
-      if (!draft.savedAt || !(draft.blogTitle || draft.blogContent || draft.blogKeywords || draft.blogExcerpt || draft.blogImage || draft.blogCategories?.length)) return
-      applyDraft(draft)
-      setSavedDraft({ savedAt: draft.savedAt })
-      setActiveTab("blog")
-      toast.success("Your autosaved blog draft was restored.")
-    } catch {
-      localStorage.removeItem(DRAFT_KEY)
-      toast.error("The saved browser draft was damaged and could not be restored.")
+    if (raw) {
+      try {
+        const d = JSON.parse(raw)
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- existing localStorage draft hydration
+        if (d.savedAt) setSavedDraft({ savedAt: d.savedAt })
+      } catch { /* ignore */ }
     }
-  }, [applyDraft])
+  }, [])
 
   useEffect(() => {
-    if (activeTab !== "blog" || !hasDraftContent()) return
+    if (activeTab !== "blog" || editingBlogId) return
+    if (!hasDraftContent()) return
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current)
     autosaveTimerRef.current = setTimeout(saveDraft, 2000)
     return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current) }
-  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, activeTab, editingBlogId, hasDraftContent, saveDraft])
+  }, [blogTitle, blogSlug, blogKeywords, blogContent, blogCategories, blogStatus, activeTab, editingBlogId, hasDraftContent, saveDraft])
 
   useEffect(() => {
-    if (activeTab !== "blog" && hasDraftContent()) saveDraft()
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- existing autosave-on-tab-leave behavior
+    if (activeTab !== "blog" && !editingBlogId && hasDraftContent()) saveDraft()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
   useEffect(() => {
-    const handleUnload = () => { if (hasDraftContent()) saveDraft() }
+    const handleUnload = () => { if (!editingBlogId && hasDraftContent()) saveDraft() }
     window.addEventListener("beforeunload", handleUnload)
     return () => window.removeEventListener("beforeunload", handleUnload)
-  }, [hasDraftContent, saveDraft])
+  }, [editingBlogId, hasDraftContent, saveDraft])
 
   const restoreDraft = () => {
     const raw = localStorage.getItem(DRAFT_KEY)
     if (!raw) return
     try {
-      const draft = JSON.parse(raw) as Partial<BlogDraft>
-      applyDraft(draft)
-      setSavedDraft(draft.savedAt ? { savedAt: draft.savedAt } : null)
-      setActiveTab("blog")
-      toast.success("Draft restored.")
+      const d = JSON.parse(raw)
+      setBlogTitle(d.blogTitle || "")
+      setBlogSlug(d.blogSlug || "")
+      setBlogKeywords(d.blogKeywords || "")
+      setBlogContent(d.blogContent || "")
+      setBlogCategories(Array.isArray(d.blogCategories) ? d.blogCategories : d.blogCategory ? [d.blogCategory] : [])
+      setBlogStatus(d.blogStatus || "draft")
+      setInstagramAutoPost(Boolean(d.instagramAutoPost))
+      setInstagramCaption(d.instagramCaption || "")
+      setEditingBlogId(d.editingBlogId || null)
+      toast.success("Draft restored!")
     } catch {
       toast.error("Could not restore draft.")
     }
@@ -356,8 +322,10 @@ export default function AdminPanel() {
   const [blogSearchQuery, setBlogSearchQuery] = useState("")
   const filteredBlogsList = useMemo(() => {
     const query = blogSearchQuery.toLowerCase()
-    return blogs.filter((blog) => blog.title.toLowerCase().includes(query))
-  }, [blogSearchQuery, blogs])
+    return blogs
+      .filter((blog) => !isAuthor || !userId || blog.authorId === userId)
+      .filter((blog) => blog.title.toLowerCase().includes(query))
+  }, [blogSearchQuery, blogs, isAuthor, userId])
   const filteredUsers = useMemo(() => {
     const query = userSearchQuery.toLowerCase()
     return users.filter((profile) =>
@@ -390,31 +358,20 @@ export default function AdminPanel() {
       toast.error("Please fill in all required fields and select at least one category.")
       return
     }
-    if (/<img[^>]+src=["']data:image\//i.test(blogContent)) {
-      toast.error("This post contains an embedded image that is too large to save. Remove it and upload the image again.")
-      return
-    }
-    if (isSavingBlog) return
-    setIsSavingBlog(true)
     try {
       const selectedAuthor = authors.find(a => a.id === blogAuthorId)
+      const nextStatus = isAuthor && blogStatus === "published" ? "pending_review" : blogStatus
       const blogData = {
         title: blogTitle, slug: blogSlug, keywords: blogKeywords,
         excerpt: blogExcerpt, image: blogImage, content: blogContent,
         categoryId: blogCategories[0], categoryIds: blogCategories,
-        authorId: blogAuthorId,
-        authorName: selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
-        status: blogStatus as "published" | "draft",
+        authorId: isAuthor ? user?.uid : blogAuthorId,
+        authorName: isAuthor ? (user?.displayName || user?.email || "Author") : selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
+        status: nextStatus as Blog["status"],
         instagramAutoPost,
         instagramCaption: instagramCaption.trim(),
-        ...(instagramAutoPost && blogStatus === "published"
-          ? { instagramPostStatus: "pending" as const }
-          : {}),
-      }
-      const payloadSize = new TextEncoder().encode(JSON.stringify(blogData)).length
-      if (payloadSize > MAX_BLOG_PAYLOAD_BYTES) {
-        toast.error("This post is too large to save. Remove oversized images or shorten the content, then try again.")
-        return
+        ...(nextStatus === "pending_review" ? { reviewRequestedAt: new Date() } : {}),
+        ...(instagramAutoPost && nextStatus === "published" ? { instagramPostStatus: "pending" as const } : {}),
       }
       let persistedBlogId = editingBlogId
       if (editingBlogId) {
@@ -423,10 +380,10 @@ export default function AdminPanel() {
       } else {
         const created = await addBlog(blogData)
         persistedBlogId = created.id
-        toast.success(`"${blogTitle}" saved as ${blogStatus}.`)
+        toast.success(isAuthor && blogStatus === "published" ? `"${blogTitle}" sent to admin for publishing.` : `"${blogTitle}" saved as ${blogStatus}.`)
       }
 
-      if (persistedBlogId && blogStatus === "published" && instagramAutoPost) {
+      if (persistedBlogId && nextStatus === "published" && instagramAutoPost) {
         if (!blogImage) {
           toast.warning("Instagram sync skipped: featured image URL is required.")
         } else {
@@ -456,11 +413,8 @@ export default function AdminPanel() {
       resetBlogForm()
       clearDraft()
       handleTabChange("blog-list")
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Unknown error"
-      toast.error(`Failed to save blog post: ${message}`)
-    } finally {
-      setIsSavingBlog(false)
+    } catch {
+      toast.error("Failed to save blog post.")
     }
   }
 
@@ -488,18 +442,38 @@ export default function AdminPanel() {
     setBlogImage(blog.image || ""); setBlogContent(blog.content)
     setInstagramAutoPost(Boolean(blog.instagramAutoPost)); setInstagramCaption(blog.instagramCaption || "")
     setBlogCategories(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : [])
-    setBlogAuthorId(blog.authorId || ""); setBlogStatus(blog.status)
+    setBlogAuthorId(blog.authorId || ""); setBlogStatus(blog.status === "published" || blog.status === "pending_review" ? "published" : "draft")
     setEditingBlogId(blog.id)
     handleTabChange("blog")
   }
 
   const handleDeleteBlog = async (id: string) => {
     try {
+      if (isAuthor && user?.uid) {
+        await requestBlogDelete(id, user.uid)
+        toast.success("Delete request sent to admin.")
+        return
+      }
       await deleteBlog(id)
       toast.success("Blog post deleted.")
     } catch {
       toast.error("Failed to delete blog post.")
     }
+  }
+
+  const handleApproveBlog = async (id: string) => {
+    if (!user?.uid) return
+    try {
+      await approveBlog(id, user.uid)
+      toast.success("Blog approved and published.")
+    } catch { toast.error("Failed to approve blog.") }
+  }
+
+  const handleRejectDeleteRequest = async (id: string) => {
+    try {
+      await rejectBlogDeleteRequest(id)
+      toast.success("Delete request rejected.")
+    } catch { toast.error("Failed to reject delete request.") }
   }
 
   // ── Category handlers ─────────────────────────────────────────────────────
@@ -636,19 +610,19 @@ export default function AdminPanel() {
         <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
           {isFullAdmin
             ? "Plan content goals, manage articles, categories, and view platform analytics."
-            : "Create and manage blog posts, categories, and sub-categories."}
+            : "Create posts and categories. Publishing and deletion are sent to admin for approval."}
         </p>
       </div>
 
       {/* ── Mobile nav ── */}
       <div className="md:hidden mb-6">
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={role === "author" ? "author" : "admin"} />
+        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={isAuthor ? "author" : "admin"} />
       </div>
 
       {/* ── Body: sidebar + content ── */}
       <div className="flex gap-4 sm:gap-6 md:gap-8 items-start">
         {/* Sidebar (desktop only) */}
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={role === "author" ? "author" : "admin"} />
+        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={isAuthor ? "author" : "admin"} />
 
         {/* Tab content */}
         <div className="flex-1 min-w-0">
@@ -686,6 +660,9 @@ export default function AdminPanel() {
                 getCategoryName={getCategoryName}
                 handleEditBlog={handleEditBlog}
                 handleDeleteBlog={handleDeleteBlog}
+                handleApproveBlog={isFullAdmin ? handleApproveBlog : undefined}
+                handleRejectDeleteRequest={isFullAdmin ? handleRejectDeleteRequest : undefined}
+                isAuthor={isAuthor}
               />
             </div>
           )}
@@ -721,7 +698,6 @@ export default function AdminPanel() {
                 discardDraft={discardDraft}
                 formatDraftTime={formatDraftTime}
                 handleBlogSubmit={handleBlogSubmit}
-                isSavingBlog={isSavingBlog}
                 handleTitleChange={handleTitleChange}
                 onCancel={() => { resetBlogForm(); handleTabChange("blog-list") }}
               />

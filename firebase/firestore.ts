@@ -39,7 +39,13 @@ export interface Blog {
   dislikes?: number;
   views?: number;
   commentsCount?: number;
-  status: 'published' | 'draft';
+  status: 'published' | 'draft' | 'pending_review';
+  reviewRequestedAt?: any;
+  reviewedAt?: any;
+  reviewedBy?: string;
+  deleteRequested?: boolean;
+  deleteRequestedAt?: any;
+  deleteRequestedBy?: string;
   instagramAutoPost?: boolean;
   instagramCaption?: string;
   instagramPostId?: string;
@@ -401,6 +407,35 @@ export const updateBlog = async (id: string, blog: Partial<Blog>) => {
   const docRef = doc(db, "blogs", id);
   return await updateDoc(docRef, {
     ...withoutUndefined(blog),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const approveBlog = async (id: string, reviewerId: string) => {
+  const docRef = doc(db, "blogs", id);
+  return await updateDoc(docRef, {
+    status: "published",
+    reviewedAt: serverTimestamp(),
+    reviewedBy: reviewerId,
+    deleteRequested: false,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const requestBlogDelete = async (id: string, requesterId: string) => {
+  const docRef = doc(db, "blogs", id);
+  return await updateDoc(docRef, {
+    deleteRequested: true,
+    deleteRequestedAt: serverTimestamp(),
+    deleteRequestedBy: requesterId,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const rejectBlogDeleteRequest = async (id: string) => {
+  const docRef = doc(db, "blogs", id);
+  return await updateDoc(docRef, {
+    deleteRequested: false,
     updatedAt: serverTimestamp(),
   });
 };
