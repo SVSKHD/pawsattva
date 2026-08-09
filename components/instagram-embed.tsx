@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import { ShoppingBag } from "lucide-react";
 
 // Extend Window to include instgrm
 declare global {
@@ -29,6 +30,7 @@ export function InstagramEmbed({ url, className = "" }: InstagramEmbedProps) {
 
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset load state when the embed URL changes
     setError(false);
 
     // Ensure Instagram embed.js is loaded exactly once
@@ -187,20 +189,19 @@ interface BlogContentWithEmbedsProps {
 }
 
 export function BlogContentWithEmbeds({ htmlContent, className = "" }: BlogContentWithEmbedsProps) {
-  // Split content by Instagram markers [instagram:URL]
-  const instagramMarkerRegex = /\[instagram:(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/[^\]]+)\]/g;
+  // Split content by Instagram markers and product recommendation markers.
+  const embedMarkerRegex = /\[(instagram):(https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/[^\]]+)\]|\[(product):(\{[^\]]+\})\]/g;
   
-  const parts: { type: "html" | "instagram"; content: string }[] = [];
+  const parts: { type: "html" | "instagram" | "product"; content: string }[] = [];
   let lastIndex = 0;
   let match;
 
-  while ((match = instagramMarkerRegex.exec(htmlContent)) !== null) {
+  while ((match = embedMarkerRegex.exec(htmlContent)) !== null) {
     // Push preceding HTML
     if (match.index > lastIndex) {
       parts.push({ type: "html", content: htmlContent.slice(lastIndex, match.index) });
     }
-    // Push Instagram embed
-    parts.push({ type: "instagram", content: match[1] });
+    parts.push({ type: match[1] === "instagram" ? "instagram" : "product", content: match[2] || match[4] });
     lastIndex = match.index + match[0].length;
   }
 
@@ -224,6 +225,8 @@ export function BlogContentWithEmbeds({ htmlContent, className = "" }: BlogConte
       {parts.map((part, idx) =>
         part.type === "instagram" ? (
           <InstagramEmbed key={`ig-${idx}`} url={part.content} />
+        ) : part.type === "product" ? (
+          <ProductEmbed key={`product-${idx}`} raw={part.content} />
         ) : (
           <div
             key={`html-${idx}`}
@@ -232,5 +235,34 @@ export function BlogContentWithEmbeds({ htmlContent, className = "" }: BlogConte
         )
       )}
     </div>
+  );
+}
+
+function ProductEmbed({ raw }: { raw: string }) {
+  let product: { title?: string; url?: string; price?: string; note?: string } = {};
+  try {
+    product = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!product.title || !product.url) return null;
+
+  return (
+    <aside className="my-8 overflow-hidden rounded-[1.5rem] border border-emerald-900/10 bg-white/65 p-5 shadow-xl shadow-emerald-950/5 backdrop-blur-2xl dark:border-white/10 dark:bg-white/10">
+      <p className="mb-3 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">
+        <ShoppingBag className="h-3.5 w-3.5" />
+        Recommended Product
+      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-xl font-black text-foreground">{product.title}</h3>
+          {product.note && <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{product.note}</p>}
+          {product.price && <p className="mt-2 text-lg font-black text-emerald-700 dark:text-emerald-300">{product.price}</p>}
+        </div>
+        <a href={product.url} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex h-11 shrink-0 items-center justify-center rounded-full bg-emerald-700 px-5 text-sm font-black text-white transition hover:bg-emerald-800">
+          View Product
+        </a>
+      </div>
+    </aside>
   );
 }
