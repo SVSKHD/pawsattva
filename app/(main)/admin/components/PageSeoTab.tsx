@@ -20,6 +20,7 @@ const PAGE_OPTIONS: { key: PageSeoKey; label: string; pathname: string }[] = [
   { key: "home", label: "Home", pathname: "/" },
   { key: "blog", label: "Blogs", pathname: "/blog" },
   { key: "pet-feed", label: "Pet Care", pathname: "/pet-feed" },
+  { key: "consultation", label: "Consultation", pathname: "/consultation" },
 ]
 
 const EMPTY_CONFIG: Omit<PageSeoConfig, "key"> = {
