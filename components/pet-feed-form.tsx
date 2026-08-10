@@ -11,9 +11,10 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { deletePetFeedDraft, getPetFeedDraft, getUserProfile, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
 import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, User, UtensilsCrossed } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, Stethoscope, User, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
 import Image from "next/image"
+import Link from "next/link"
 
 const DRAFT_KEY = "pawsattva.pet-feed.wellness.v2"
 const STEP_KEY = `${DRAFT_KEY}.step`
@@ -391,6 +392,7 @@ function BcsMeter({ score, compact = false }: { score?: number; compact?: boolea
 
 function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void }) {
   const status = data.weightStatus ?? "ideal"; const assessed = data.assessedAt ? new Date(data.assessedAt) : new Date()
+  const dietPlan = getDietPlan(status)
   return <div className="space-y-6">
     <article className="wellness-report overflow-hidden rounded-[2rem] bg-[#faf6e9] text-stone-800 shadow-xl">
       <header className="bg-[#173f2c] p-7 text-white md:p-10"><div className="flex items-center gap-3"><PawPrint className="h-9 w-9" /><div><h2 className="text-3xl font-black">Paw Sattva</h2><p className="text-sm text-amber-100">Wellness · Balance · Harmony</p></div></div><p className="mt-6 text-xl font-bold capitalize">{data.lifeStage} wellness report</p><p className="text-sm text-white/75">Assessment date: {assessed.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p></header>
@@ -404,6 +406,35 @@ function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void 
       </div>
       <footer className="border-t border-emerald-900/10 p-6 text-center text-xs text-stone-600 md:px-10">This owner-provided report is an informational screening estimate, not a veterinary diagnosis. It does not provide medical treatment instructions.</footer>
     </article>
+    <Card className="overflow-hidden rounded-[2rem] border-orange-200 bg-gradient-to-br from-white via-orange-50 to-emerald-50 shadow-xl">
+      <CardContent className="grid gap-6 p-6 md:grid-cols-[1fr_auto] md:p-8">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-600">Diet next step</p>
+          <h2 className="mt-2 text-2xl font-black text-emerald-950">{dietPlan.title}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-stone-700">{dietPlan.description}</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {dietPlan.points.map((point) => (
+              <div key={point} className="rounded-2xl border border-white bg-white/80 p-4 text-sm font-semibold text-stone-700 shadow-sm">
+                {point}
+              </div>
+            ))}
+          </div>
+          <p className="mt-5 rounded-2xl bg-emerald-900/5 p-4 text-sm font-semibold text-emerald-950">
+            Initial pet diet guidance can be offered free for early users. Later, Paw Sattva can move detailed diet plans and follow-ups into subscription plans.
+          </p>
+        </div>
+        <div className="flex flex-col justify-center gap-3 md:min-w-64">
+          <Button asChild className="h-12 rounded-xl bg-[#173f2c]">
+            <Link href={`/consultation?pet=${encodeURIComponent(data.petName)}&status=${encodeURIComponent(status)}`}>
+              <Stethoscope /> Ask for diet consultation
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="h-12 rounded-xl bg-white/70">
+            <Link href="/pet-feed">Log food and track again</Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
     <div className="flex flex-col gap-3 sm:flex-row"><Button className="h-12 flex-1 rounded-xl bg-[#173f2c]" onClick={() => window.print()}><Printer /> Print or save report as PDF</Button><Button className="h-12 rounded-xl" variant="outline" onClick={onReset}><CheckCircle2 /> Assess another pet</Button></div>
     <SupervisionCard />
   </div>
@@ -411,4 +442,26 @@ function WellnessReport({ data, onReset }: { data: PetFeed; onReset: () => void 
 
 function ReportCard({ title, children }: { title: string; children: React.ReactNode }) { return <section className="rounded-2xl border border-emerald-900/10 bg-white p-5"><h3 className="mb-4 text-lg font-black text-emerald-950">{title}</h3>{children}</section> }
 function ReportGrid({ items }: { items: [string, unknown][] }) { return <dl className="grid grid-cols-2 gap-3">{items.map(([label, value]) => <div key={label}><dt className="text-[10px] font-bold uppercase tracking-wide text-stone-500">{label}</dt><dd className="mt-1 text-sm font-semibold capitalize">{String(value ?? "Not provided")}</dd></div>)}</dl> }
-function SupervisionCard() { return <Card className="rounded-[2rem] border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"><CardContent className="p-7 md:p-9"><p className="text-sm font-bold uppercase tracking-widest text-amber-700">Optional support</p><h2 className="mt-2 text-2xl font-black text-emerald-950">Need ongoing pet wellness supervision?</h2><p className="mt-3 max-w-2xl text-sm text-stone-700">Supervision can include progress check-ins, weight and BCS tracking, feeding-record reviews, and updated reports.</p><p className="mt-5 text-xl font-black text-emerald-900">Plans from ₹299 to ₹1,000/month</p><Button asChild className="mt-5 rounded-xl bg-[#173f2c]"><a href="https://instagram.com/pawsattva" target="_blank" rel="noreferrer">Enquire with Paw Sattva on Instagram</a></Button></CardContent></Card> }
+function getDietPlan(status: PetFeed["weightStatus"]) {
+  if (status === "underweight") {
+    return {
+      title: "Weight-gain diet review recommended",
+      description: "The report suggests your pet may need a carefully planned weight-gain diet. We can use the saved pet profile, food history, allergies, medical notes and feeding routine so you do not have to repeat the same history during consultation.",
+      points: ["Check appetite and health history", "Plan safe calories and protein", "Track weight-gain progress"],
+    }
+  }
+  if (status === "overweight" || status === "obese") {
+    return {
+      title: status === "obese" ? "Weight-loss diet support is important" : "Weight-management diet support is recommended",
+      description: "The report suggests extra body covering. Paw Sattva can guide a portion-aware diet discussion using your existing assessment details, then move into reminders and food logging for follow-up.",
+      points: ["Reduce excess calories safely", "Review treats and meal portions", "Monitor BCS over time"],
+    }
+  }
+  return {
+    title: "Maintenance diet support can keep progress steady",
+    description: "The report looks balanced today. A maintenance plan can keep meals consistent and use future food logs to spot changes early.",
+    points: ["Maintain routine", "Log food changes", "Review monthly progress"],
+  }
+}
+
+function SupervisionCard() { return <Card className="rounded-[2rem] border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50"><CardContent className="p-7 md:p-9"><p className="text-sm font-bold uppercase tracking-widest text-amber-700">Optional support</p><h2 className="mt-2 text-2xl font-black text-emerald-950">Need ongoing pet wellness supervision?</h2><p className="mt-3 max-w-2xl text-sm text-stone-700">Supervision can include diet consultation, progress check-ins, weight and BCS tracking, feeding-record reviews, and updated reports.</p><p className="mt-5 text-xl font-black text-emerald-900">Initial diet help can be free for early users; subscription plans can follow later.</p><div className="mt-5 flex flex-col gap-3 sm:flex-row"><Button asChild className="rounded-xl bg-[#173f2c]"><Link href="/consultation">Open consultation page</Link></Button><Button asChild variant="outline" className="rounded-xl bg-white/70"><a href="https://instagram.com/pawsattva" target="_blank" rel="noreferrer">Enquire on Instagram</a></Button></div></CardContent></Card> }
