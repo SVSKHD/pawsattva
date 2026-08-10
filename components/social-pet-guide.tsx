@@ -14,12 +14,30 @@ type Mascot = "dog" | "cat"
 
 export function SocialPetGuide() {
   const pathname = usePathname()
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [mascot, setMascot] = useState<Mascot>("dog")
   const [sharing, setSharing] = useState(false)
   const [greetingVisible, setGreetingVisible] = useState(true)
 
   useEffect(() => {
+    const showGuide = () => setMounted(true)
+    let cancelGuide = () => {}
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(showGuide, { timeout: 1200 })
+      cancelGuide = () => window.cancelIdleCallback(idleId)
+    } else {
+      const timer = setTimeout(showGuide, 650)
+      cancelGuide = () => clearTimeout(timer)
+    }
+
+    return cancelGuide
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     const savedMascot = sessionStorage.getItem("pawsattva.social-guide.mascot")
     const nextMascot: Mascot = savedMascot === "cat" ? "cat" : savedMascot === "dog" ? "dog" : Math.random() > 0.5 ? "cat" : "dog"
     setMascot(nextMascot)
@@ -27,7 +45,7 @@ export function SocialPetGuide() {
 
     const timer = window.setTimeout(() => setGreetingVisible(false), 9000)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [mounted])
 
   const isBlogPost = pathname.startsWith("/blog/")
   const switchMascot = () => {
@@ -65,10 +83,13 @@ export function SocialPetGuide() {
     }
   }
 
+  if (!mounted) return null
+
   return (
     <aside
       aria-label="Paw Sattva greeting guide"
-      className="fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-start md:bottom-6 md:left-6"
+      data-open={open}
+      className="pet-guide-shell fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-start md:bottom-6 md:left-6"
     >
       <style>{`
         @keyframes pet-guide-walk {
@@ -102,20 +123,80 @@ export function SocialPetGuide() {
           18%, 82% { opacity: 1; transform: translateY(0) scale(1); }
           100% { opacity: 0; transform: translateY(4px) scale(0.98); }
         }
-        .pet-guide-walk { animation: pet-guide-walk 4.8s ease-in-out infinite; }
-        .pet-guide-body { animation: pet-guide-body 1.8s ease-in-out infinite; transform-origin: center bottom; }
-        .pet-guide-paw { animation: pet-guide-paw 1.15s ease-in-out infinite; transform-origin: 16px 38px; }
-        .pet-guide-tail { animation: pet-guide-tail 0.95s ease-in-out infinite; transform-origin: 20px 50px; }
-        .pet-guide-leg-left { animation: pet-guide-leg-left 0.85s ease-in-out infinite; transform-origin: 38px 82px; }
-        .pet-guide-leg-right { animation: pet-guide-leg-right 0.85s ease-in-out infinite reverse; transform-origin: 70px 82px; }
-        .pet-guide-greeting { animation: pet-guide-bubble 9s ease-in-out both; }
+        .pet-guide-shell {
+          contain: layout paint style;
+          pointer-events: none;
+          transform: translateZ(0);
+        }
+        .pet-guide-shell button,
+        .pet-guide-shell a {
+          pointer-events: auto;
+        }
+        .pet-guide-panel {
+          contain: content;
+        }
+        .pet-guide-walk {
+          animation: pet-guide-walk 5.4s ease-in-out infinite;
+          will-change: transform;
+          transform: translateZ(0);
+        }
+        .pet-guide-body {
+          animation: pet-guide-body 2.1s ease-in-out infinite;
+          transform-origin: center bottom;
+          will-change: transform;
+        }
+        .pet-guide-paw {
+          animation: pet-guide-paw 1.35s ease-in-out infinite;
+          transform-origin: 16px 38px;
+          will-change: transform;
+        }
+        .pet-guide-tail {
+          animation: pet-guide-tail 1.2s ease-in-out infinite;
+          transform-origin: 20px 50px;
+          will-change: transform;
+        }
+        .pet-guide-leg-left {
+          animation: pet-guide-leg-left 1s ease-in-out infinite;
+          transform-origin: 38px 82px;
+        }
+        .pet-guide-leg-right {
+          animation: pet-guide-leg-right 1s ease-in-out infinite reverse;
+          transform-origin: 70px 82px;
+        }
+        .pet-guide-greeting {
+          animation: pet-guide-bubble 9s ease-in-out both;
+          will-change: opacity, transform;
+        }
+        .pet-guide-shadow {
+          filter: drop-shadow(0 16px 18px rgba(15,23,42,0.2));
+        }
+        .pet-guide-shell[data-open="true"] .pet-guide-walk {
+          animation-play-state: paused;
+        }
+        @media (max-width: 767px) {
+          .pet-guide-walk {
+            animation-duration: 7s;
+          }
+          .pet-guide-body,
+          .pet-guide-leg-left,
+          .pet-guide-leg-right {
+            animation: none;
+          }
+          .pet-guide-paw,
+          .pet-guide-tail {
+            animation-duration: 1.8s;
+          }
+          .pet-guide-shadow {
+            filter: drop-shadow(0 10px 12px rgba(15,23,42,0.18));
+          }
+        }
         @media (prefers-reduced-motion: reduce) {
           .pet-guide-walk, .pet-guide-body, .pet-guide-paw, .pet-guide-tail, .pet-guide-leg-left, .pet-guide-leg-right, .pet-guide-greeting { animation: none; }
         }
       `}</style>
 
       {open && (
-        <div className="mb-3 w-[min(22rem,calc(100vw-1.5rem))] rounded-[1.75rem] border border-orange-100/80 bg-background/95 p-4 shadow-2xl backdrop-blur-xl dark:border-white/10">
+        <div className="pet-guide-panel mb-3 w-[min(22rem,calc(100vw-1.5rem))] rounded-[1.75rem] border border-orange-100/80 bg-background/95 p-4 shadow-xl md:backdrop-blur-md dark:border-white/10">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-[family-name:var(--font-pacifico)] text-xl text-orange-600">
@@ -179,7 +260,7 @@ export function SocialPetGuide() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="pet-guide-greeting absolute bottom-20 left-14 z-10 rounded-[1.35rem] border border-orange-100 bg-white/95 px-4 py-3 text-left shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-zinc-950/95"
+            className="pet-guide-greeting absolute bottom-20 left-14 z-10 rounded-[1.35rem] border border-orange-100 bg-white/95 px-4 py-3 text-left shadow-lg md:backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/95"
           >
             <span className="block font-[family-name:var(--font-pacifico)] text-xl leading-none text-orange-600">
               Hi! I’m here.
@@ -195,7 +276,7 @@ export function SocialPetGuide() {
           onClick={() => { setOpen((current) => !current); setGreetingVisible(false) }}
           aria-expanded={open}
           aria-label={open ? "Close Paw Sattva greeting guide" : "Open Paw Sattva greeting guide"}
-          className="pet-guide-walk absolute bottom-0 left-0 rounded-[2rem] p-2 transition-transform hover:scale-105 active:scale-95"
+          className="pet-guide-walk absolute bottom-0 left-0 rounded-[2rem] p-2 transition-transform hover:scale-[1.03] active:scale-[0.98]"
         >
           <MascotCharacter mascot={mascot} />
           <span className="sr-only">Animated {mascot} saying hi</span>
@@ -215,7 +296,7 @@ function MascotCharacter({ mascot }: { mascot: Mascot }) {
       viewBox="0 0 118 118"
       role="img"
       aria-label={`Animated ${mascot} mascot`}
-      className="drop-shadow-[0_18px_24px_rgba(15,23,42,0.22)]"
+      className="pet-guide-shadow"
     >
       <ellipse cx="58" cy="101" rx="42" ry="9" fill="rgba(15,23,42,0.18)" />
       <g className="pet-guide-tail">
