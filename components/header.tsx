@@ -12,6 +12,7 @@ const navLinks = [
   { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
   { href: "/pet-feed", label: "Pet Feed" },
+  { href: "/consultation", label: "Consultation" },
 ];
 
 import { useAuth } from "@/components/auth-provider";

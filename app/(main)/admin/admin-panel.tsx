@@ -204,6 +204,7 @@ export default function AdminPanel() {
   const [instagramAutoPost, setInstagramAutoPost] = useState(false)
   const [instagramCaption, setInstagramCaption] = useState("")
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
+  const [isSavingBlog, setIsSavingBlog] = useState(false)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
 
   // ── Category form state ───────────────────────────────────────────────────
@@ -359,6 +360,7 @@ export default function AdminPanel() {
       return
     }
     try {
+      setIsSavingBlog(true)
       const selectedAuthor = authors.find(a => a.id === blogAuthorId)
       const nextStatus = isAuthor && blogStatus === "published" ? "pending_review" : blogStatus
       const blogData = {
@@ -415,6 +417,8 @@ export default function AdminPanel() {
       handleTabChange("blog-list")
     } catch {
       toast.error("Failed to save blog post.")
+    } finally {
+      setIsSavingBlog(false)
     }
   }
 
@@ -698,6 +702,7 @@ export default function AdminPanel() {
                 discardDraft={discardDraft}
                 formatDraftTime={formatDraftTime}
                 handleBlogSubmit={handleBlogSubmit}
+                isSavingBlog={isSavingBlog}
                 handleTitleChange={handleTitleChange}
                 onCancel={() => { resetBlogForm(); handleTabChange("blog-list") }}
               />

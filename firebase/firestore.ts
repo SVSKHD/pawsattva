@@ -193,7 +193,7 @@ export interface PetFeedDraft {
 export type ContentGoalType = "blog" | "instagram";
 export type ContentGoalStatus = "active" | "completed";
 
-export type PageSeoKey = "home" | "blog" | "pet-feed";
+export type PageSeoKey = "home" | "blog" | "pet-feed" | "consultation";
 
 export interface PageSeoConfig {
   key: PageSeoKey;
@@ -478,22 +478,35 @@ export const incrementBlogViews = async (blogId: string) => {
 
 export const addBlogComment = async (blogId: string, payload: Omit<BlogComment, "id" | "blogId" | "createdAt">) => {
   const commentRef = collection(db, "blogs", blogId, "comments");
-  await addDoc(commentRef, {
-    ...payload,
+  const savedComment = await addDoc(commentRef, {
+    ...withoutUndefined(payload),
     blogId,
     createdAt: serverTimestamp(),
   });
 
-  const blogRef = doc(db, "blogs", blogId);
-  await updateDoc(blogRef, {
-    commentsCount: increment(1),
-    updatedAt: serverTimestamp(),
-  });
+  // A reader may be allowed to create a comment without being allowed to edit
+  // the parent blog document. The comment is already saved at this point, so a
+  // denied counter update must not report the whole submission as failed (and
+  // tempt the reader to post the same comment again).
+  let countSynced = true;
+  try {
+    const blogRef = doc(db, "blogs", blogId);
+    await updateDoc(blogRef, {
+      commentsCount: increment(1),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    countSynced = false;
+    console.warn("Comment saved, but the blog comment count could not be updated.", error);
+  }
+
+  return { id: savedComment.id, countSynced };
 };
 
 export const onBlogCommentsSnapshot = (
   blogId: string,
-  callback: (comments: BlogComment[]) => void
+  callback: (comments: BlogComment[]) => void,
+  onError?: (error: Error) => void
 ) => {
   const commentsQuery = query(
     collection(db, "blogs", blogId, "comments"),
@@ -506,7 +519,7 @@ export const onBlogCommentsSnapshot = (
       ...entry.data(),
     } as BlogComment));
     callback(comments);
-  });
+  }, (error) => onError?.(error));
 };
 
 export const getBlogBySlug = async (slug: string): Promise<Blog | null> => {
