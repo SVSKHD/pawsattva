@@ -182,6 +182,9 @@ export default async function BlogPostPage({
 
   const authorName = blog.authorName || 'Paw Sattva Team';
   const authorInitial = authorName[0];
+  const tags = blog.keywords
+    ? blog.keywords.split(',').map((tag) => tag.trim()).filter(Boolean)
+    : [];
 
   return (
     <div className="blog-reading-page relative min-h-screen overflow-hidden bg-background">
@@ -315,7 +318,7 @@ export default async function BlogPostPage({
           <main className="lg:w-2/3 min-w-0 w-full">
             <Card className="blog-glass-card overflow-hidden border border-white/40 shadow-2xl shadow-black/10 rounded-[1.75rem] sm:rounded-[2rem]">
               <CardContent
-                className={`p-2 sm:p-8 md:p-12 overflow-hidden ${roboto.className}`}
+                className={`min-w-0 p-4 sm:p-8 md:p-12 ${roboto.className}`}
               >
                 <details className="mb-6 rounded-2xl border border-orange-100/60 bg-white/55 p-4 text-sm shadow-sm backdrop-blur-xl lg:hidden">
                   <summary className="cursor-pointer font-black text-orange-700">Contents</summary>
@@ -334,7 +337,7 @@ export default async function BlogPostPage({
                   </p>
                 )}
 
-                <div className="overflow-hidden break-words max-w-full w-full blog-rich-content">
+                <div className="blog-rich-content min-w-0 w-full max-w-full break-words">
                   <BlogContentWithEmbeds
                     htmlContent={contentWithIds}
                     className="prose prose-lg dark:prose-invert max-w-none
@@ -351,7 +354,7 @@ export default async function BlogPostPage({
                       prose-pre:max-w-full prose-pre:overflow-x-auto prose-pre:rounded-xl prose-pre:bg-zinc-900
                       prose-code:text-orange-600 prose-code:bg-orange-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:font-medium prose-code:before:content-none prose-code:after:content-none
                       prose-hr:border-orange-100
-                      overflow-hidden break-words"
+                      min-w-0 break-words"
                   />
                 </div>
 
@@ -380,22 +383,24 @@ export default async function BlogPostPage({
             {/* Tags + share */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="flex flex-wrap gap-2">
-                {blog.keywords?.split(',').map((tag: string) => (
+                {tags.map((tag) => (
                   <Badge
-                    key={tag.trim()}
+                    key={tag}
                     variant="secondary"
                     className="px-3 py-1 bg-muted hover:bg-orange-50 hover:text-orange-700 transition-colors cursor-pointer"
                   >
                     <Tag className="w-3 h-3 mr-1.5" />
-                    {tag.trim()}
+                    {tag}
                   </Badge>
                 ))}
               </div>
               <div className="flex items-center gap-3">
                 <SocialShare title={blog.title} />
-                <Button variant="outline" size="sm" className="rounded-full">
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Comment
+                <Button asChild variant="outline" size="sm" className="rounded-full">
+                  <a href="#comments">
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Comment
+                  </a>
                 </Button>
               </div>
             </div>
@@ -582,9 +587,30 @@ export default async function BlogPostPage({
         }
         .blog-rich-content .prose :is(table) {
           display: block;
+          width: 100%;
+          max-width: 100%;
           max-height: 360px;
           overflow: auto;
           border-radius: 1rem;
+        }
+        .blog-rich-content .prose :is(ol, ul) {
+          max-width: 100%;
+          margin-inline: 0;
+        }
+        .blog-rich-content .prose ol {
+          padding-inline-start: 3rem;
+          list-style-position: outside;
+        }
+        .blog-rich-content .prose ul {
+          padding-inline-start: 2rem;
+          list-style-position: outside;
+        }
+        .blog-rich-content .prose li {
+          padding-inline-start: 0.25rem;
+          overflow-wrap: anywhere;
+        }
+        .blog-rich-content .prose :is(p, a, blockquote) {
+          overflow-wrap: anywhere;
         }
         .blog-rich-content .prose > p:first-of-type::first-letter {
           float: left;
@@ -601,6 +627,17 @@ export default async function BlogPostPage({
           color: rgb(115 115 115);
           margin-top: 0.75rem;
           font-style: italic;
+        }
+        @media (max-width: 639px) {
+          .blog-rich-content .prose ol {
+            padding-inline-start: 3.25rem;
+          }
+          .blog-rich-content .prose ol ol {
+            padding-inline-start: 2.75rem;
+          }
+          .blog-rich-content .prose ul {
+            padding-inline-start: 2.25rem;
+          }
         }
       `}</style>
     </div>
