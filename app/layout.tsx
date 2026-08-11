@@ -4,6 +4,7 @@ import { Geist_Mono, Pacifico, Montserrat } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/components/auth-provider";
+import { AuthDialogProvider } from "@/components/auth-dialog-provider";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { FirebaseAnalytics } from "@/components/firebase-analytics";
 import PetCursorAura from "@/components/pet-cursor-aura";
@@ -47,12 +48,14 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          <TooltipProvider>
-            <PetCursorAura />
-            {children}
-            <SonnerToaster richColors position="top-center" />
-            <FirebaseAnalytics />
-          </TooltipProvider>
+          <AuthDialogProvider>
+            <TooltipProvider>
+              <PetCursorAura />
+              {children}
+              <SonnerToaster richColors position="top-center" />
+              <FirebaseAnalytics />
+            </TooltipProvider>
+          </AuthDialogProvider>
         </AuthProvider>
       </body>
     </html>

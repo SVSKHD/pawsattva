@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import {
   ArrowLeft,
   BookOpen,
@@ -22,6 +21,7 @@ import { FaInstagram } from "react-icons/fa"
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/auth-provider"
+import { useAuthDialog } from "@/components/auth-dialog-provider"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { ContentGoal, onContentGoalSnapshot } from "@/firebase/firestore"
@@ -106,15 +106,26 @@ function LoadingState({ message }: { message: string }) {
 
 export function GoalDetailClient({ goalId }: { goalId: string }) {
   const { user, loading: authLoading, isAdmin } = useAuth()
-  const router = useRouter()
+  const { requestSignIn } = useAuthDialog()
+  const requestedSignInRef = useRef(false)
   const [goal, setGoal] = useState<ContentGoal | null>(null)
   const [loadingGoal, setLoadingGoal] = useState(true)
   const [loadError, setLoadError] = useState("")
 
   useEffect(() => {
     if (authLoading) return
+    if (user) requestedSignInRef.current = false
     if (!user) {
-      router.replace(`/login?returnTo=${encodeURIComponent(`/goal/${goalId}`)}`)
+      if (!requestedSignInRef.current) {
+        requestedSignInRef.current = true
+        requestSignIn({
+          title: "Sign in to open this private goal",
+          description:
+            "Continue with Google and keep this goal link open. We’ll resume loading it here after sign-in.",
+          successMessage: "Signed in. Opening the private goal…",
+          dismissible: false,
+        })
+      }
       return
     }
     if (!isAdmin) {
@@ -132,7 +143,7 @@ export function GoalDetailClient({ goalId }: { goalId: string }) {
         setLoadingGoal(false)
       }
     )
-  }, [authLoading, goalId, isAdmin, router, user])
+  }, [authLoading, goalId, isAdmin, requestSignIn, user])
 
   const copyLink = async () => {
     try {
@@ -144,7 +155,7 @@ export function GoalDetailClient({ goalId }: { goalId: string }) {
   }
 
   if (authLoading) return <LoadingState message="Checking your login..." />
-  if (!user) return <LoadingState message="Taking you to secure login..." />
+  if (!user) return <LoadingState message="Sign in here to continue. This goal link will stay open." />
 
   if (!isAdmin) {
     return (
