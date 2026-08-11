@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
+import { AuthDialogTrigger } from "@/components/auth-dialog-trigger";
 import { Blog, getBlogs, getCategories } from "@/firebase/firestore";
 
 const DEFAULT_BLOG_IMAGE = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=1200&auto=format&fit=crop";
@@ -105,11 +106,15 @@ export default async function Home() {
                     <ArrowRight className="ml-2 w-5 h-5" />
                   </Button>
                 </Link>
-                <Link href="/login">
-                  <Button size="lg" variant="outline" className="h-14 px-8 rounded-2xl border-2 font-bold text-lg transition-all hover:bg-muted/50">
-                    Join the Pack
-                  </Button>
-                </Link>
+                <AuthDialogTrigger
+                  size="lg"
+                  variant="outline"
+                  signInTitle="Join the Paw Sattva pack"
+                  signInDescription="Continue with Google and stay right here. Your Paw Sattva profile will be ready for pet plans, comments, and saved progress."
+                  className="h-14 px-8 rounded-2xl border-2 font-bold text-lg transition-all hover:bg-muted/50"
+                >
+                  Join the Pack
+                </AuthDialogTrigger>
               </div>
             </div>
 

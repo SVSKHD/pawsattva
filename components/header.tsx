@@ -16,6 +16,7 @@ const navLinks = [
 ];
 
 import { useAuth } from "@/components/auth-provider";
+import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
 import { LogOut, LayoutDashboard, User, Loader2, Menu, Home, BookOpen, PawPrint } from "lucide-react";
@@ -41,6 +42,7 @@ function NavPendingHint() {
 export function Header() {
   const pathname = usePathname();
   const { user, isAdmin, loading } = useAuth();
+  const { requestSignIn } = useAuthDialog();
   const [isVisible, setIsVisible] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -183,14 +185,14 @@ export function Header() {
                   </Button>
                 </div>
               ) : (
-                <Link href="/login" className="hidden sm:block">
-                  <Button
-                    variant="ghost"
-                    className="rounded-full text-muted-foreground hover:text-foreground hover:bg-white/20 dark:hover:bg-white/10 transition-colors font-semibold"
-                  >
-                    Sign In
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => requestSignIn()}
+                  className="hidden rounded-full text-muted-foreground transition-colors hover:bg-white/20 hover:text-foreground dark:hover:bg-white/10 sm:inline-flex font-semibold"
+                >
+                  Sign In
+                </Button>
               )}
             </div>
           </div>

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import Link from "next/link";
+import type { User } from "firebase/auth";
 import { AlertCircle, Loader2, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { useAuth } from "@/components/auth-provider";
 import { addBlogComment, onBlogCommentsSnapshot } from "@/firebase/firestore";
 import type { BlogComment } from "@/firebase/firestore";
@@ -16,6 +17,7 @@ interface BlogCommentsProps {
 
 export function BlogComments({ blogId }: BlogCommentsProps) {
   const { user } = useAuth();
+  const { requestSignIn } = useAuthDialog();
   const [comments, setComments] = useState<BlogComment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [saving, setSaving] = useState(false);
@@ -45,43 +47,22 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
   }, [blogId]);
 
   const commentCount = comments.length;
-  const canSubmit = Boolean(user && newComment.trim().length >= 3 && !saving);
+  const canSubmit = newComment.trim().length >= 3 && !saving;
 
-  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!user) {
-      toast.error("Please login to comment.");
-      return;
-    }
-
+  const postComment = async (signedInUser: User, raw: string) => {
     if (savingRef.current) return;
-
-    const raw = newComment.trim();
-    if (raw.length < 3) {
-      const message = "Comment should be at least 3 characters.";
-      setSubmitError(message);
-      toast.error(message);
-      return;
-    }
-    if (hasProfanity(raw)) {
-      const message = "Please remove abusive language from your comment.";
-      setSubmitError(message);
-      toast.error(message);
-      return;
-    }
 
     try {
       savingRef.current = true;
       setSaving(true);
       setSubmitError(null);
       await addBlogComment(blogId, {
-        userId: user.uid,
-        userName: user.displayName || user.email?.split("@")[0] || "User",
-        userEmail: user.email || "",
+        userId: signedInUser.uid,
+        userName: signedInUser.displayName || signedInUser.email?.split("@")[0] || "User",
+        userEmail: signedInUser.email || "",
         content: sanitizeProfanity(raw),
       });
-      setNewComment("");
+      setNewComment((current) => current.trim() === raw ? "" : current);
       toast.success("Your comment is live.");
     } catch (error) {
       console.error("Unable to post blog comment.", error);
@@ -97,6 +78,37 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
       savingRef.current = false;
       setSaving(false);
     }
+  };
+
+  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const raw = newComment.trim();
+    if (raw.length < 3) {
+      const message = "Comment should be at least 3 characters.";
+      setSubmitError(message);
+      toast.error(message);
+      return;
+    }
+    if (hasProfanity(raw)) {
+      const message = "Please remove abusive language from your comment.";
+      setSubmitError(message);
+      toast.error(message);
+      return;
+    }
+
+    if (!user) {
+      requestSignIn({
+        title: "Sign in to post your comment",
+        description:
+          "Your comment is saved right here. Continue with Google and we’ll post it automatically when you return.",
+        successMessage: "Signed in. Posting your comment…",
+        onSuccess: (signedInUser) => postComment(signedInUser, raw),
+      });
+      return;
+    }
+
+    await postComment(user, raw);
   };
 
   return (
@@ -121,70 +133,59 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         </span>
       </div>
 
-      {!user ? (
-        <div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50/70 p-4 text-sm leading-relaxed dark:border-orange-900/50 dark:bg-orange-950/20">
-          <p className="font-semibold text-foreground">Join the conversation</p>
-          <p className="mt-1 text-muted-foreground">
-            Please{" "}
-            <Link href="/login" className="font-bold text-orange-600 underline underline-offset-4">
-              log in
-            </Link>{" "}
-            to share your thoughts.
-          </p>
+      <form onSubmit={submitComment} className="mt-5 rounded-2xl border border-border/80 bg-background/80 p-3 sm:p-4">
+        <label htmlFor="blog-comment" className="text-sm font-bold text-foreground">
+          Add a comment
+        </label>
+        <textarea
+          id="blog-comment"
+          name="comment"
+          value={newComment}
+          onChange={(event) => {
+            setNewComment(event.target.value);
+            if (submitError) setSubmitError(null);
+          }}
+          placeholder="Share something helpful about this article…"
+          className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-base leading-relaxed shadow-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:opacity-70"
+          maxLength={500}
+          minLength={3}
+          disabled={saving}
+          aria-invalid={Boolean(submitError)}
+          aria-describedby={submitError ? "comment-help comment-error" : "comment-help"}
+        />
+
+        <div id="comment-help" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+            {user
+              ? "Respectful comments only. Profanity is blocked."
+              : "Write first—we’ll ask you to sign in only when you post."}
+          </span>
+          <span className={newComment.length >= 450 ? "font-bold text-orange-600" : ""}>
+            {newComment.length}/500
+          </span>
         </div>
-      ) : (
-        <form onSubmit={submitComment} className="mt-5 rounded-2xl border border-border/80 bg-background/80 p-3 sm:p-4">
-          <label htmlFor="blog-comment" className="text-sm font-bold text-foreground">
-            Add a comment
-          </label>
-          <textarea
-            id="blog-comment"
-            name="comment"
-            value={newComment}
-            onChange={(event) => {
-              setNewComment(event.target.value);
-              if (submitError) setSubmitError(null);
-            }}
-            placeholder="Share something helpful about this article…"
-            className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-base leading-relaxed shadow-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:opacity-70"
-            maxLength={500}
-            minLength={3}
-            disabled={saving}
-            aria-invalid={Boolean(submitError)}
-            aria-describedby={submitError ? "comment-help comment-error" : "comment-help"}
-          />
 
-          <div id="comment-help" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-              Respectful comments only. Profanity is blocked.
-            </span>
-            <span className={newComment.length >= 450 ? "font-bold text-orange-600" : ""}>
-              {newComment.length}/500
-            </span>
-          </div>
-
-          {submitError && (
-            <div
-              id="comment-error"
-              role="alert"
-              className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span>{submitError}</span>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="mt-4 inline-flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        {submitError && (
+          <div
+            id="comment-error"
+            role="alert"
+            className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {saving ? "Posting..." : "Post Comment"}
-          </button>
-        </form>
-      )}
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{submitError}</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="mt-4 inline-flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {saving ? "Posting..." : user ? "Post Comment" : "Sign in & Post"}
+        </button>
+      </form>
 
       <div className="mt-6 space-y-3" aria-live="polite" aria-busy={loadingComments}>
         {loadingComments ? (

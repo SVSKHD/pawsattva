@@ -5,6 +5,7 @@ import Link from "next/link"
 import { LayoutDashboard, User } from "lucide-react"
 import Paw from "../app/pawsattva.png"
 import { Button } from "@/components/ui/button"
+import { useAuthDialog } from "@/components/auth-dialog-provider"
 import {
   Drawer,
   DrawerContent,
@@ -34,7 +35,13 @@ export function MobileMoreMenu({
   isAdmin,
   hasUser,
 }: MobileMoreMenuProps) {
+  const { requestSignIn } = useAuthDialog()
   const closeMenu = () => onOpenChange(false)
+
+  const handleSignIn = () => {
+    closeMenu()
+    window.setTimeout(() => requestSignIn(), 120)
+  }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -86,11 +93,13 @@ export function MobileMoreMenu({
               My Dashboard
             </Link>
           ) : (
-            <Link href="/login" onClick={closeMenu} className="col-span-2 mt-1">
-              <Button className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-orange-600 font-bold shadow-lg shadow-primary/20">
-                Sign In Now
-              </Button>
-            </Link>
+            <Button
+              type="button"
+              onClick={handleSignIn}
+              className="col-span-2 mt-1 h-12 w-full rounded-2xl bg-gradient-to-r from-primary to-orange-600 font-bold shadow-lg shadow-primary/20"
+            >
+              Sign In Now
+            </Button>
           )}
         </div>
       </DrawerContent>

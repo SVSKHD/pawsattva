@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
+import { useAuthDialog } from "@/components/auth-dialog-provider"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/firebase/db"
 import { signOut } from "firebase/auth"
@@ -32,15 +33,29 @@ import {
 
 export default function DashboardPage() {
   const { user, isAdmin, loading: authLoading } = useAuth()
+  const { requestSignIn } = useAuthDialog()
   const router = useRouter()
+  const requestedSignInRef = useRef(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loadingProfile, setLoadingProfile] = useState(true)
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/login")
+    if (authLoading) return
+    if (user) {
+      requestedSignInRef.current = false
+      return
     }
-  }, [authLoading, user, router])
+    if (requestedSignInRef.current) return
+
+    requestedSignInRef.current = true
+    requestSignIn({
+      title: "Sign in to open your dashboard",
+      description:
+        "Continue with Google without leaving this page. We’ll open your saved pet details and plans as soon as you return.",
+      successMessage: "Signed in. Loading your dashboard…",
+      dismissible: false,
+    })
+  }, [authLoading, requestSignIn, user])
 
   useEffect(() => {
     const fetchProfile = async () => {
