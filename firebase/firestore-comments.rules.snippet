@@ -1,0 +1,45 @@
+// Merge this block inside the existing
+// match /databases/{database}/documents { ... }
+// section of the Paw Sattva Firestore rules, then deploy the rules.
+//
+// It intentionally grants access only to blog comment documents. It does not
+// change permissions on the parent blog, users, analytics, or admin content.
+match /blogs/{blogId}/comments/{commentId} {
+  allow read: if exists(/databases/$(database)/documents/blogs/$(blogId))
+    && get(/databases/$(database)/documents/blogs/$(blogId)).data.status == "published";
+
+  allow create: if request.auth != null
+    && exists(/databases/$(database)/documents/blogs/$(blogId))
+    && get(/databases/$(database)/documents/blogs/$(blogId)).data.status == "published"
+    && request.resource.data.keys().hasOnly([
+      "blogId",
+      "userId",
+      "userName",
+      "userEmail",
+      "content",
+      "createdAt"
+    ])
+    && request.resource.data.keys().hasAll([
+      "blogId",
+      "userId",
+      "userName",
+      "content",
+      "createdAt"
+    ])
+    && request.resource.data.blogId == blogId
+    && request.resource.data.userId == request.auth.uid
+    && request.resource.data.userName is string
+    && request.resource.data.userName.size() >= 1
+    && request.resource.data.userName.size() <= 80
+    && (!request.resource.data.keys().hasAny(["userEmail"])
+      || (request.resource.data.userEmail is string
+        && request.resource.data.userEmail.size() <= 254))
+    && request.resource.data.content is string
+    && request.resource.data.content.size() >= 3
+    && request.resource.data.content.size() <= 500
+    && request.resource.data.createdAt == request.time;
+
+  // Comment editing/moderation can be added later with explicit owner/admin
+  // checks. Keeping these closed prevents readers altering stored comments.
+  allow update, delete: if false;
+}
