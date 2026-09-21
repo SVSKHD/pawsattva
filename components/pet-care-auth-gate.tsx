@@ -36,9 +36,18 @@ export function PetCareAuthGate({ children }: { children: ReactNode }) {
     )
   }
 
-  return (
-    <div aria-hidden={!user} className={!user ? "pointer-events-none select-none blur-[2px]" : undefined}>
-      {children}
-    </div>
-  )
+  if (!user) {
+    return (
+      <div className="flex min-h-[22rem] items-center justify-center rounded-[2rem] border border-orange-100/70 bg-white/60 p-8 text-center shadow-sm backdrop-blur-xl dark:border-orange-900/30 dark:bg-black/30">
+        <div className="max-w-sm space-y-2">
+          <p className="text-lg font-bold text-foreground">Google sign-in required</p>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Sign in to access PetFeed, prefill your contact details, and securely save your progress.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
 }
