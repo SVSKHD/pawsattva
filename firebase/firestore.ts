@@ -146,6 +146,7 @@ export interface PetFeed {
   id?: string;
   userId?: string;
   name: string;
+  email: string;
   phone: string;
   petType: string;
   petBreed: string;
@@ -676,6 +677,8 @@ export const savePetFeed = async (data: PetFeed) => {
   if (data.userId) {
     const userDocRef = doc(db, "users", data.userId);
     await updateDoc(userDocRef, {
+      displayName: data.name,
+      email: data.email,
       phone: data.phone,
       petFeeds: arrayUnion(withoutUndefined({
         petName: data.petName,
