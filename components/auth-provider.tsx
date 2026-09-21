@@ -55,6 +55,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           const data = userDoc.data();
           role = data.role === "author" ? "author" : data.admin === true ? "admin" : "user";
           isAdmin = role === "admin" || role === "author";
+
+          // Google/Firebase Auth is the source of truth for account identity.
+          // Keep the Firestore profile aligned without touching user-entered fields such as phone.
+          await setDoc(userDocRef, {
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+          }, { merge: true });
         } else {
           await setDoc(userDocRef, {
             email: user.email,
