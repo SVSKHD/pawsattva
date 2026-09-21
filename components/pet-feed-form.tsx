@@ -59,6 +59,7 @@ export function PetFeedForm() {
   const [formData, setFormData] = useState<FormData>(initialData)
   const [draftReady, setDraftReady] = useState(false)
   const [accountDraftReady, setAccountDraftReady] = useState(false)
+  const [profileReady, setProfileReady] = useState(false)
   const [draftStatus, setDraftStatus] = useState<"local" | "saving" | "saved">("local")
 
   useEffect(() => {
@@ -77,7 +78,12 @@ export function PetFeedForm() {
     setAccountDraftReady(false)
     getPetFeedDraft(user.uid).then((draft) => {
       if (!active || !draft) return
-      setFormData({ ...initialData, ...draft.data } as FormData)
+      setFormData({
+        ...initialData,
+        ...draft.data,
+        name: user.displayName || "",
+        email: user.email || "",
+      } as FormData)
       if (draft.step >= 0 && draft.step < steps.length) setStep(draft.step)
       setDraftStatus("saved")
       toast.info("Your saved Pet Feed assessment has been resumed.")
@@ -89,19 +95,19 @@ export function PetFeedForm() {
   useEffect(() => {
     if (!user?.uid || !accountDraftReady) return
     let active = true
+    setProfileReady(false)
 
     getUserProfile(user.uid)
       .then((profile) => {
         if (!active) return
-        const profileName = profile?.displayName || user.displayName || ""
-        const profileEmail = profile?.email || user.email || ""
-        const profilePhone = profile?.phone || user.phoneNumber || ""
 
+        // Auth identity must always match the account that is currently signed in.
+        // Phone is the only contact field sourced from the saved PawSattva profile.
         setFormData((current) => ({
           ...current,
-          name: current.name || profileName,
-          email: current.email || profileEmail,
-          phone: current.phone || profilePhone,
+          name: user.displayName || profile?.displayName || "",
+          email: user.email || profile?.email || "",
+          phone: profile?.phone || user.phoneNumber || current.phone || "",
         }))
       })
       .catch((error) => {
@@ -110,10 +116,13 @@ export function PetFeedForm() {
 
         setFormData((current) => ({
           ...current,
-          name: current.name || user.displayName || "",
-          email: current.email || user.email || "",
-          phone: current.phone || user.phoneNumber || "",
+          name: user.displayName || "",
+          email: user.email || "",
+          phone: user.phoneNumber || current.phone || "",
         }))
+      })
+      .finally(() => {
+        if (active) setProfileReady(true)
       })
 
     return () => { active = false }
@@ -124,7 +133,7 @@ export function PetFeedForm() {
   }, [formData, step, submitted])
 
   useEffect(() => {
-    if (!draftReady || !accountDraftReady || submitted || !user?.uid) return
+    if (!draftReady || !accountDraftReady || !profileReady || submitted || !user?.uid) return
     setDraftStatus("saving")
     const timer = window.setTimeout(() => {
       savePetFeedDraft(user.uid, { data: formData, step })
@@ -132,7 +141,7 @@ export function PetFeedForm() {
         .catch((error) => { setDraftStatus("local"); console.error("Unable to save Pet Feed draft:", error) })
     }, 900)
     return () => window.clearTimeout(timer)
-  }, [accountDraftReady, draftReady, formData, step, submitted, user?.uid])
+  }, [accountDraftReady, draftReady, formData, profileReady, step, submitted, user?.uid])
 
   const selectedBreed = useMemo(() => formData.petBreed ? getBreed(formData.petType, formData.petBreed) : null, [formData.petBreed, formData.petType])
   const ageMonths = formData.ageValue && Number(formData.ageValue) > 0
@@ -204,15 +213,15 @@ export function PetFeedForm() {
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
         {step === 0 && <div className="grid items-end gap-5 md:grid-cols-3">
-          <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" />
-          <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" hint="Prefilled from your signed-in Google account." />
+          <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" readOnly={Boolean(user?.displayName)} hint="Matched to your signed-in Google account." />
+          <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" readOnly={Boolean(user?.email)} hint="Matched to your signed-in Google account." />
           <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" hint="Prefilled when a phone number is already saved on your PawSattva profile." />
         </div>}
         {step === 1 && <div className="space-y-5">
           <div className="grid items-end gap-5 sm:grid-cols-2">
             <InputField label="Pet name" value={formData.petName} onChange={(value) => set("petName", value)} />
             <SelectField label="Pet type" value={formData.petType} onChange={(value) => { set("petType", value as PetType); set("petBreed", "") }} options={[["Dog", "Dog"], ["Cat", "Cat"]]} />
-            <SelectField label="Breed" value={formData.petBreed} onChange={(value) => set("petBreed", value)} placeholder="Select breed" options={BREEDS[formData.petType].map((breed) => [breed.name, breed.name])} />
+            <BreedSelectField label="Breed" value={formData.petBreed} onChange={(value) => set("petBreed", value)} placeholder="Select breed" breeds={BREEDS[formData.petType]} />
             <InputField label="Age" type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(value) => set("ageValue", value)} />
             <SelectField label="Age unit" value={formData.ageUnit} onChange={(value) => set("ageUnit", value as FormData["ageUnit"])} options={[["months", "Months"], ["years", "Years"]]} />
             <SelectField label="Sex" value={formData.sex} onChange={(value) => set("sex", value as FormData["sex"])} options={[["male", "Male"], ["female", "Female"], ["unknown", "Unknown"]]} />
@@ -350,6 +359,71 @@ const SelectField = ({
     </Select>
   </Field>
 )
+
+const BreedSelectField = ({
+  label,
+  value,
+  onChange,
+  breeds,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  breeds: Array<{ name: string; imageUrl: string }>
+  placeholder?: string
+}) => {
+  const selected = breeds.find((breed) => breed.name === value)
+
+  return (
+    <Field label={label}>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className={`${controlClass} overflow-hidden pr-2`}>
+          {selected ? (
+            <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
+              <span className="truncate">{selected.name}</span>
+              <span className="relative -mr-1 h-10 w-16 shrink-0 overflow-hidden rounded-lg border border-white/70 bg-muted/40 shadow-sm dark:border-white/10">
+                <Image
+                  src={selected.imageUrl}
+                  alt=""
+                  fill
+                  sizes="64px"
+                  className="object-cover opacity-95"
+                />
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background/20" />
+              </span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground">{placeholder ?? "Select breed"}</span>
+          )}
+        </SelectTrigger>
+        <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+          {breeds.map((breed) => (
+            <SelectItem
+              key={breed.name}
+              value={breed.name}
+              className="min-h-16 overflow-hidden py-2 pr-12 pl-3"
+            >
+              <span className="flex w-full min-w-0 items-center">
+                <span className="truncate pr-24 font-medium">{breed.name}</span>
+                <span className="absolute inset-y-1 right-7 w-20 overflow-hidden rounded-lg border border-white/70 bg-muted/30 shadow-sm dark:border-white/10">
+                  <Image
+                    src={breed.imageUrl}
+                    alt={`${breed.name} reference`}
+                    fill
+                    sizes="80px"
+                    className="object-cover opacity-95"
+                  />
+                  <span className="pointer-events-none absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-popover/25" />
+                </span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  )
+}
 
 const TextField = ({
   label,
