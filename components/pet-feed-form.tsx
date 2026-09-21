@@ -20,7 +20,7 @@ const DRAFT_KEY = "pawsattva.pet-feed.wellness.v2"
 const STEP_KEY = `${DRAFT_KEY}.step`
 
 const initialData = {
-  name: "", phone: "", petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
+  name: "", email: "", phone: "", petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
   sex: "unknown" as "male" | "female" | "unknown", neutered: false, weightKg: "", heightCm: "", activityLevel: "moderate" as "low" | "moderate" | "high",
   ribsScore: 0, waistScore: 0, tuckScore: 0, bcsAssessmentStarted: false, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
   foodBrand: "", dailyMeals: "2", dailyQuantity: "", treatsPerDay: "0", allergies: "", medicalConditions: "", foodDislikes: "",
@@ -87,30 +87,37 @@ export function PetFeedForm() {
   }, [user?.uid])
 
   useEffect(() => {
-    if (!user?.uid) return
+    if (!user?.uid || !accountDraftReady) return
     let active = true
 
     getUserProfile(user.uid)
       .then((profile) => {
         if (!active) return
         const profileName = profile?.displayName || user.displayName || ""
+        const profileEmail = profile?.email || user.email || ""
         const profilePhone = profile?.phone || user.phoneNumber || ""
 
         setFormData((current) => ({
           ...current,
           name: current.name || profileName,
+          email: current.email || profileEmail,
           phone: current.phone || profilePhone,
         }))
       })
       .catch((error) => {
         console.error("Unable to prefill Pet Care profile:", error)
-        if (active && user.displayName) {
-          setFormData((current) => current.name ? current : { ...current, name: user.displayName ?? "" })
-        }
+        if (!active) return
+
+        setFormData((current) => ({
+          ...current,
+          name: current.name || user.displayName || "",
+          email: current.email || user.email || "",
+          phone: current.phone || user.phoneNumber || "",
+        }))
       })
 
     return () => { active = false }
-  }, [user?.displayName, user?.phoneNumber, user?.uid])
+  }, [accountDraftReady, user?.displayName, user?.email, user?.phoneNumber, user?.uid])
 
   useEffect(() => {
     if (!submitted) { localStorage.setItem(DRAFT_KEY, JSON.stringify(formData)); localStorage.setItem(STEP_KEY, String(step)) }
@@ -141,7 +148,7 @@ export function PetFeedForm() {
     setFormData((current) => ({ ...current, [key]: value, bcsAssessmentStarted: true }))
 
   const validateStep = () => {
-    if (step === 0 && (!formData.name.trim() || !/^\+?[0-9 ()-]{7,20}$/.test(formData.phone))) return "Enter a full name and valid phone number."
+    if (step === 0 && (!formData.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) || !/^\+?[0-9 ()-]{7,20}$/.test(formData.phone))) return "Enter a full name, valid email address, and valid phone number."
     if (step === 1 && (!formData.petName.trim() || !formData.petBreed || Number(formData.ageValue) <= 0 || Number(formData.weightKg) <= 0 || (formData.heightCm !== "" && Number(formData.heightCm) <= 0))) return "Complete the pet profile with valid positive age and weight values. Height must be positive when provided."
     if (step === 2 && !bcsAnswered) return "Answer all three body-condition questions to calculate the BCS."
     if (step === 3 && (Number(formData.dailyMeals) <= 0 || Number(formData.treatsPerDay) < 0 || Number(formData.mealDays) <= 0 || !formData.dailyQuantity.trim())) return "Enter valid feeding values; negative or empty numeric values are not allowed."
@@ -159,7 +166,7 @@ export function PetFeedForm() {
       const assessedAt = new Date().toISOString()
       const dietaryConcerns = [formData.allergies && `Allergies: ${formData.allergies}`, formData.medicalConditions && `Medical: ${formData.medicalConditions}`, formData.foodDislikes && `Dislikes: ${formData.foodDislikes}`, formData.feedingConcerns].filter(Boolean).join(" · ")
       const payload: PetFeed = {
-        userId: user?.uid, name: formData.name.trim(), phone: formData.phone.trim(), petName: formData.petName.trim(), petType: formData.petType,
+        userId: user?.uid, name: formData.name.trim(), email: formData.email.trim(), phone: formData.phone.trim(), petName: formData.petName.trim(), petType: formData.petType,
         petBreed: formData.petBreed, ageValue, ageUnit: formData.ageUnit, ageMonths, lifeStage: getLifeStage(formData.petType, ageMonths), sex: formData.sex,
         neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed?.imageUrl,
         breedReferenceRange: selectedBreed?.adultWeightRange, breedHeightReferenceRange: selectedBreed?.adultHeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
@@ -175,7 +182,7 @@ export function PetFeedForm() {
     } catch (cause) { console.error(cause); toast.error("Unable to save the assessment. Please try again.") } finally { setLoading(false) }
   }
 
-  if (submitted) return <WellnessReport data={submitted} onReset={() => { setSubmitted(null); setStep(0); setFormData({ ...initialData, name: user?.displayName ?? "" }) }} />
+  if (submitted) return <WellnessReport data={submitted} onReset={() => { setSubmitted(null); setStep(0); setFormData({ ...initialData, name: formData.name, email: formData.email, phone: formData.phone }) }} />
 
   return <div className="space-y-6">
     <Card className="overflow-hidden rounded-[2.5rem] border-white/40 bg-white/60 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-black/40">
@@ -196,9 +203,10 @@ export function PetFeedForm() {
         <p className="mt-2 text-xs font-medium text-muted-foreground" aria-live="polite">{user ? (draftStatus === "saving" ? "Saving your progress…" : draftStatus === "saved" ? "Progress saved to your account" : "Progress saved on this device") : "Progress saved on this device · Sign in to resume on another device"}</p>
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
-        {step === 0 && <div className="grid items-end gap-5 sm:grid-cols-2">
+        {step === 0 && <div className="grid items-end gap-5 md:grid-cols-3">
           <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" />
-          <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" />
+          <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" hint="Prefilled from your signed-in Google account." />
+          <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" hint="Prefilled when a phone number is already saved on your PawSattva profile." />
         </div>}
         {step === 1 && <div className="space-y-5">
           <div className="grid items-end gap-5 sm:grid-cols-2">
