@@ -397,7 +397,12 @@ const BreedSelectField = ({
             <span className="text-muted-foreground">{placeholder ?? "Select breed"}</span>
           )}
         </SelectTrigger>
-        <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+        <SelectContent
+          position="popper"
+          align="start"
+          sideOffset={6}
+          className="max-h-80 w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)]"
+        >
           {breeds.map((breed) => (
             <SelectItem
               key={breed.name}
