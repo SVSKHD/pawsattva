@@ -212,7 +212,7 @@ export function PetFeedForm() {
         <p className="mt-2 text-xs font-medium text-muted-foreground" aria-live="polite">{user ? (draftStatus === "saving" ? "Saving your progress…" : draftStatus === "saved" ? "Progress saved to your account" : "Progress saved on this device") : "Progress saved on this device · Sign in to resume on another device"}</p>
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
-        {step === 0 && <div className="grid items-end gap-5 md:grid-cols-3">
+        {step === 0 && <div className="grid items-start gap-5 md:grid-cols-3">
           <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" readOnly={Boolean(user?.displayName)} hint="Matched to your signed-in Google account." />
           <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" readOnly={Boolean(user?.email)} hint="Matched to your signed-in Google account." />
           <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" hint="Prefilled when a phone number is already saved on your PawSattva profile." />
