@@ -2,6 +2,7 @@
 
 import { getDownloadURL, ref, uploadBytesResumable } from "firebase/storage";
 import { storage } from "@/firebase/storage";
+import { isSupabaseConfigured, uploadSupabaseObject } from "@/lib/supabase/http";
 
 interface UploadOptions {
   folder?: string;
@@ -108,8 +109,27 @@ export const uploadBlogImage = async (file: File, options: UploadOptions = {}) =
 
   const extension = (uploadFile.name.split(".").pop() || "jpg").toLowerCase();
   const path = `${folder}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const storageRef = ref(storage, path);
 
+  if (isSupabaseConfigured()) {
+    options.onProgress?.(30);
+    const uploaded = await uploadSupabaseObject(
+      "media",
+      path,
+      uploadFile,
+      uploadFile.type || file.type || "image/webp"
+    );
+    options.onProgress?.(100);
+
+    return {
+      url: uploaded.publicUrl,
+      originalKB: Math.round(originalBytes / 1024),
+      compressedKB: Math.round(uploadFile.size / 1024),
+      wasCompressed: uploadFile.size < originalBytes,
+    };
+  }
+
+  // Temporary fallback while Supabase env/config is being rolled out.
+  const storageRef = ref(storage, path);
   const uploadTask = uploadBytesResumable(storageRef, uploadFile, {
     contentType: uploadFile.type || file.type,
   });
