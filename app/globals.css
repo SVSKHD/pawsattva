@@ -525,3 +525,38 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* PetFeed step fields: subtle staggered entrance while preserving layout. */
+@keyframes pet-feed-field-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pet-feed-field {
+  animation: pet-feed-field-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.pet-feed-field:nth-child(2) { animation-delay: 45ms; }
+.pet-feed-field:nth-child(3) { animation-delay: 90ms; }
+.pet-feed-field:nth-child(4) { animation-delay: 135ms; }
+.pet-feed-field:nth-child(5) { animation-delay: 180ms; }
+.pet-feed-field:nth-child(6) { animation-delay: 225ms; }
+.pet-feed-field:nth-child(7) { animation-delay: 270ms; }
+.pet-feed-field:nth-child(8) { animation-delay: 315ms; }
+.pet-feed-field:nth-child(9) { animation-delay: 360ms; }
+.pet-feed-field:nth-child(10) { animation-delay: 405ms; }
+.pet-feed-field:nth-child(11) { animation-delay: 450ms; }
+.pet-feed-field:nth-child(12) { animation-delay: 495ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-feed-field {
+    animation: none;
+  }
+}
