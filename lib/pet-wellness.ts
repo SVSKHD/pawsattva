@@ -122,7 +122,7 @@ export const BREEDS: Record<PetType, BreedReference[]> = {
     { name: "Maine Coon", group: "Large cat breeds", adultWeightRange: "4–9 kg" },
     { name: "Bengal", group: "Popular cat breeds", adultWeightRange: "4–7 kg" },
     { name: "Ragdoll", group: "Popular cat breeds", adultWeightRange: "4–9 kg" },
-    { name: "Mixed/Other", group: "Other", imageUrl: catFallback },
+    { name: "Mixed/Other", group: "Other" },
   ],
 }
 
