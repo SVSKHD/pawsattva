@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/firebase/firebase";
-import { getUserProfile, upsertUserIdentity } from "@/firebase/firestore";
+import { getUserProfile, migrateLegacyUserProfile, upsertUserIdentity } from "@/firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -46,6 +46,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         let profile = await getUserProfile(user.uid);
 
         if (!profile) {
+          // Copy the user's existing Firestore profile the first time they log in
+          // after Supabase is enabled. This preserves phone, PetFeed history and drafts.
+          await migrateLegacyUserProfile(user.uid);
           await upsertUserIdentity(user.uid, {
             email: user.email ?? "",
             displayName: user.displayName ?? undefined,
