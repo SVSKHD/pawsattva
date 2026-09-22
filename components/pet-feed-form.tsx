@@ -465,6 +465,8 @@ const BreedPhoto = ({
   return (
     <span className={`relative block shrink-0 overflow-hidden bg-orange-50/70 ${className}`}>
       {source && !failed ? (
+        // Native img keeps the 100-row searchable list lightweight and supports lazy loading.
+        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={source}
           alt=""
