@@ -280,8 +280,6 @@ const profilePatch = (data: Partial<UserProfile>) => withoutUndefined({
   whatsapp_phone: data.whatsappPhone,
   whatsapp_same_as_phone: data.whatsappSameAsPhone,
   receive_updates: data.receiveUpdates,
-  admin: data.admin,
-  role: data.role,
   pet_feeds: data.petFeeds,
   updated_at: new Date().toISOString(),
 });
@@ -391,14 +389,12 @@ export const updateUserRole = async (userId: string, role: NonNullable<UserProfi
   }
 
   await supabaseRest(
-    `profiles?id=eq.${encodeURIComponent(userId)}`,
+    "rpc/set_profile_role",
     {
-      method: "PATCH",
-      headers: { Prefer: "return=minimal" },
+      method: "POST",
       body: JSON.stringify({
-        role,
-        admin: role === "admin" || role === "author",
-        updated_at: new Date().toISOString(),
+        target_id: userId,
+        new_role: role,
       }),
     }
   );
