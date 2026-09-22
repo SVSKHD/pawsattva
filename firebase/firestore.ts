@@ -72,6 +72,9 @@ export interface UserProfile {
   displayName?: string;
   photoURL?: string;
   phone?: string;
+  whatsappPhone?: string;
+  whatsappSameAsPhone?: boolean;
+  receiveUpdates?: boolean;
   admin: boolean;
   role?: "user" | "author" | "admin";
   petFeeds?: PetFeedEntry[];
@@ -148,6 +151,9 @@ export interface PetFeed {
   name: string;
   email: string;
   phone: string;
+  whatsappPhone: string;
+  whatsappSameAsPhone: boolean;
+  receiveUpdates: boolean;
   petType: string;
   petBreed: string;
   petName: string;
@@ -678,6 +684,9 @@ export const savePetFeed = async (data: PetFeed) => {
     const userDocRef = doc(db, "users", data.userId);
     await updateDoc(userDocRef, {
       phone: data.phone,
+      whatsappPhone: data.whatsappPhone,
+      whatsappSameAsPhone: data.whatsappSameAsPhone,
+      receiveUpdates: data.receiveUpdates,
       petFeeds: arrayUnion(withoutUndefined({
         petName: data.petName,
         petType: data.petType,
