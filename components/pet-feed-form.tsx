@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -20,16 +21,16 @@ const DRAFT_KEY = "pawsattva.pet-feed.wellness.v2"
 const STEP_KEY = `${DRAFT_KEY}.step`
 
 const initialData = {
-  name: "", email: "", phone: "", petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
+  name: "", email: "", phone: "", whatsappSameAsPhone: true, whatsappPhone: "", receiveUpdates: false, petName: "", petType: "Dog" as PetType, petBreed: "", ageValue: "", ageUnit: "years" as "months" | "years",
   sex: "unknown" as "male" | "female" | "unknown", neutered: false, weightKg: "", heightCm: "", activityLevel: "moderate" as "low" | "moderate" | "high",
   ribsScore: 0, waistScore: 0, tuckScore: 0, bcsAssessmentStarted: false, foodType: "commercial" as "commercial" | "home-cooked" | "mixed" | "raw" | "other",
   foodBrand: "", dailyMeals: "2", dailyQuantity: "", treatsPerDay: "0", allergies: "", medicalConditions: "", foodDislikes: "",
-  feedingConcerns: "", mealDays: "30", reminders: false, subscribe: true,
+  feedingConcerns: "", mealDays: "30", reminders: false,
 }
 
 type FormData = typeof initialData
-const controlClass = "!h-14 w-full rounded-xl border border-orange-100/80 bg-white/85 px-4 text-base shadow-sm transition-colors placeholder:text-muted-foreground/55 focus-visible:border-orange-300 focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
-const textareaClass = "min-h-28 w-full resize-y rounded-xl border border-orange-100/80 bg-white/85 p-4 text-base shadow-sm transition-colors placeholder:text-muted-foreground/55 focus-visible:border-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
+const controlClass = "!h-14 w-full rounded-xl border border-orange-100/80 bg-white/85 px-4 text-base shadow-sm transition-all duration-300 placeholder:text-muted-foreground/55 hover:border-orange-200 hover:shadow-md focus-visible:border-orange-300 focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
+const textareaClass = "min-h-28 w-full resize-y rounded-xl border border-orange-100/80 bg-white/85 p-4 text-base shadow-sm transition-all duration-300 placeholder:text-muted-foreground/55 hover:border-orange-200 hover:shadow-md focus-visible:border-orange-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/20 dark:border-orange-900/35 dark:bg-black/25"
 const steps = [
   { title: "Pet Parent", description: "About you", icon: User },
   { title: "Pet Profile", description: "Your companion", icon: Dog },
@@ -38,7 +39,7 @@ const steps = [
 ]
 
 const Observation = ({ id, label, value, onChange, options }: { id: string; label: string; value: number; onChange: (value: number) => void; options: string[] }) => (
-  <fieldset className="space-y-3 rounded-2xl border border-orange-100/70 bg-white/70 p-4 shadow-sm dark:border-orange-900/20 dark:bg-black/20">
+  <fieldset className="pet-feed-field space-y-3 rounded-2xl border border-orange-100/70 bg-white/70 p-4 shadow-sm transition-all duration-300 hover:shadow-md dark:border-orange-900/20 dark:bg-black/20">
     <legend className="px-1 font-semibold text-foreground">{label}</legend>
     <div className="grid gap-2 sm:grid-cols-3">
       {options.map((option, index) => {
@@ -108,6 +109,9 @@ export function PetFeedForm() {
           name: user.displayName || profile?.displayName || "",
           email: user.email || profile?.email || "",
           phone: profile?.phone || user.phoneNumber || current.phone || "",
+          whatsappSameAsPhone: profile?.whatsappSameAsPhone ?? current.whatsappSameAsPhone,
+          whatsappPhone: profile?.whatsappPhone || current.whatsappPhone || "",
+          receiveUpdates: profile?.receiveUpdates ?? current.receiveUpdates,
         }))
       })
       .catch((error) => {
@@ -155,15 +159,28 @@ export function PetFeedForm() {
   const set = <K extends keyof FormData>(key: K, value: FormData[K]) => setFormData((current) => ({ ...current, [key]: value }))
   const setObservation = (key: "ribsScore" | "waistScore" | "tuckScore", value: number) =>
     setFormData((current) => ({ ...current, [key]: value, bcsAssessmentStarted: true }))
+  const setWhatsappSameAsPhone = (checked: boolean) =>
+    setFormData((current) => ({
+      ...current,
+      whatsappSameAsPhone: checked,
+      whatsappPhone: checked ? current.phone : (current.whatsappPhone || current.phone),
+    }))
 
   const validateStep = () => {
-    if (step === 0 && (!formData.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim()) || !/^\+?[0-9 ()-]{7,20}$/.test(formData.phone))) return "Enter a full name, valid email address, and valid phone number."
+    const phonePattern = /^\+?[0-9 ()-]{7,20}$/
+    if (step === 0 && (
+      !formData.name.trim()
+      || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())
+      || !phonePattern.test(formData.phone)
+      || (!formData.whatsappSameAsPhone && !phonePattern.test(formData.whatsappPhone))
+    )) return "Enter valid contact details, including a WhatsApp number when it differs from your phone number."
     if (step === 1 && (!formData.petName.trim() || !formData.petBreed || Number(formData.ageValue) <= 0 || Number(formData.weightKg) <= 0 || (formData.heightCm !== "" && Number(formData.heightCm) <= 0))) return "Complete the pet profile with valid positive age and weight values. Height must be positive when provided."
     if (step === 2 && !bcsAnswered) return "Answer all three body-condition questions to calculate the BCS."
     if (step === 3 && (Number(formData.dailyMeals) <= 0 || Number(formData.treatsPerDay) < 0 || Number(formData.mealDays) <= 0 || !formData.dailyQuantity.trim())) return "Enter valid feeding values; negative or empty numeric values are not allowed."
     return null
   }
 
+  const previous = () => setStep((current) => Math.max(0, current - 1))
   const next = () => { const error = validateStep(); if (error) return toast.error(error); setStep((current) => Math.min(3, current + 1)) }
 
   const submit = async () => {
@@ -175,13 +192,21 @@ export function PetFeedForm() {
       const assessedAt = new Date().toISOString()
       const dietaryConcerns = [formData.allergies && `Allergies: ${formData.allergies}`, formData.medicalConditions && `Medical: ${formData.medicalConditions}`, formData.foodDislikes && `Dislikes: ${formData.foodDislikes}`, formData.feedingConcerns].filter(Boolean).join(" · ")
       const payload: PetFeed = {
-        userId: user?.uid, name: formData.name.trim(), email: formData.email.trim(), phone: formData.phone.trim(), petName: formData.petName.trim(), petType: formData.petType,
+        userId: user?.uid,
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        whatsappSameAsPhone: formData.whatsappSameAsPhone,
+        whatsappPhone: (formData.whatsappSameAsPhone ? formData.phone : formData.whatsappPhone).trim(),
+        receiveUpdates: formData.receiveUpdates,
+        petName: formData.petName.trim(),
+        petType: formData.petType,
         petBreed: formData.petBreed, ageValue, ageUnit: formData.ageUnit, ageMonths, lifeStage: getLifeStage(formData.petType, ageMonths), sex: formData.sex,
         neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed?.imageUrl,
         breedReferenceRange: selectedBreed?.adultWeightRange, breedHeightReferenceRange: selectedBreed?.adultHeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
         bodyConditionScore: bcs, weightStatus: status, foodType: formData.foodType, foodBrand: formData.foodBrand.trim(), dailyMeals: Number(formData.dailyMeals),
         dailyQuantity: formData.dailyQuantity.trim(), treatsPerDay: Number(formData.treatsPerDay), allergies: formData.allergies.trim(), medicalConditions: formData.medicalConditions.trim(),
-        foodDislikes: formData.foodDislikes.trim(), dietaryConcerns, mealDays: Number(formData.mealDays), reminders: formData.reminders, subscribe: formData.subscribe,
+        foodDislikes: formData.foodDislikes.trim(), dietaryConcerns, mealDays: Number(formData.mealDays), reminders: formData.reminders, subscribe: formData.receiveUpdates,
         assessmentVersion: "bcs-owner-v1", assessedAt,
       }
       await savePetFeed(payload)
@@ -196,26 +221,82 @@ export function PetFeedForm() {
   return <div className="space-y-6">
     <Card className="overflow-hidden rounded-[2.5rem] border-white/40 bg-white/60 shadow-2xl backdrop-blur-2xl dark:border-white/10 dark:bg-black/40">
       <CardHeader className="p-7 pb-2 text-center md:p-10 md:pb-2">
-        <div className="relative mb-8 flex items-start justify-between" aria-label={`Step ${step + 1} of 4`}>
-          <div className="absolute left-[10%] right-[10%] top-5 h-0.5 bg-muted" />
-          {steps.map((item, index) => {
-            const Icon = item.icon
-            const active = index <= step
-            return <button type="button" key={item.title} onClick={() => index < step && setStep(index)} disabled={index > step} className="relative z-10 flex w-1/4 flex-col items-center gap-2 disabled:cursor-default">
-              <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all ${active ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25" : "border-muted bg-background text-muted-foreground"} ${index === step ? "scale-110 ring-4 ring-orange-500/15" : ""}`}><Icon className="h-5 w-5" /></span>
-              <span className={`hidden text-[10px] font-bold uppercase tracking-wider sm:block ${active ? "text-orange-600" : "text-muted-foreground"}`}>{item.title}</span>
-            </button>
-          })}
+        <div className="relative mb-8" aria-label={`Step ${step + 1} of 4`}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Previous step"
+            onClick={previous}
+            disabled={step === 0}
+            className="absolute left-0 top-0 z-20 h-10 w-10 rounded-full border-orange-100 bg-white/90 shadow-sm transition-all duration-300 hover:-translate-x-0.5 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-30 dark:bg-black/50"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="relative mx-12 flex items-start justify-between">
+            <div className="absolute left-[10%] right-[10%] top-5 h-0.5 bg-muted" />
+            {steps.map((item, index) => {
+              const Icon = item.icon
+              const active = index <= step
+              return <button type="button" key={item.title} onClick={() => index < step && setStep(index)} disabled={index > step} className="relative z-10 flex w-1/4 flex-col items-center gap-2 disabled:cursor-default">
+                <span className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all duration-300 ${active ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-500/25" : "border-muted bg-background text-muted-foreground"} ${index === step ? "scale-110 ring-4 ring-orange-500/15" : ""}`}><Icon className="h-5 w-5" /></span>
+                <span className={`hidden text-[10px] font-bold uppercase tracking-wider sm:block ${active ? "text-orange-600" : "text-muted-foreground"}`}>{item.title}</span>
+              </button>
+            })}
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Next step"
+            onClick={next}
+            disabled={step === steps.length - 1}
+            className="absolute right-0 top-0 z-20 h-10 w-10 rounded-full border-orange-100 bg-white/90 shadow-sm transition-all duration-300 hover:translate-x-0.5 hover:border-orange-300 hover:bg-orange-50 disabled:opacity-30 dark:bg-black/50"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
         <CardTitle className="text-3xl font-black tracking-tight">{steps[step].title}</CardTitle>
         <p className="text-sm text-muted-foreground">{steps[step].description}</p>
         <p className="mt-2 text-xs font-medium text-muted-foreground" aria-live="polite">{user ? (draftStatus === "saving" ? "Saving your progress…" : draftStatus === "saved" ? "Progress saved to your account" : "Progress saved on this device") : "Progress saved on this device · Sign in to resume on another device"}</p>
       </CardHeader>
       <CardContent className="space-y-5 p-7 md:p-10">
-        {step === 0 && <div className="grid items-start gap-5 md:grid-cols-3">
-          <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" readOnly={Boolean(user?.displayName)} hint="Matched to your signed-in Google account." />
-          <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" readOnly={Boolean(user?.email)} hint="Matched to your signed-in Google account." />
-          <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" hint="Prefilled when a phone number is already saved on your PawSattva profile." />
+        {step === 0 && <div className="space-y-5">
+          <div className="grid items-start gap-5 md:grid-cols-3">
+            <InputField label="Pet parent’s full name" value={formData.name} onChange={(value) => set("name", value)} autoComplete="name" readOnly={Boolean(user?.displayName)} hint="Matched to your signed-in Google account." />
+            <InputField label="Email address" type="email" value={formData.email} onChange={(value) => set("email", value)} autoComplete="email" readOnly={Boolean(user?.email)} hint="Matched to your signed-in Google account." />
+            <InputField label="Phone number" type="tel" value={formData.phone} onChange={(value) => set("phone", value)} autoComplete="tel" hint="Prefilled when a phone number is already saved on your PawSattva profile." />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <ConsentCheckbox
+              checked={formData.whatsappSameAsPhone}
+              onCheckedChange={setWhatsappSameAsPhone}
+              label="WhatsApp number is the same as phone number"
+              description={formData.phone ? `We'll use ${formData.phone} for WhatsApp.` : "We'll use the phone number above for WhatsApp."}
+            />
+            <ConsentCheckbox
+              checked={formData.receiveUpdates}
+              onCheckedChange={(checked) => set("receiveUpdates", checked)}
+              label="Would you like to receive updates from PawSattva?"
+              description="Receive useful wellness updates, feeding reminders, and PawSattva news. You can change this preference later."
+            />
+          </div>
+
+          {!formData.whatsappSameAsPhone && (
+            <div className="grid gap-5 md:grid-cols-2">
+              <InputField
+                label="WhatsApp number"
+                type="tel"
+                value={formData.whatsappPhone}
+                onChange={(value) => set("whatsappPhone", value)}
+                autoComplete="tel"
+                hint="Enter the number you want PawSattva to use for WhatsApp."
+              />
+            </div>
+          )}
         </div>}
         {step === 1 && <div className="space-y-5">
           <div className="grid items-end gap-5 sm:grid-cols-2">
@@ -268,7 +349,6 @@ export function PetFeedForm() {
           <TextField label="Food dislikes" placeholder="Foods your pet refuses or avoids." value={formData.foodDislikes} onChange={(value) => set("foodDislikes", value)} />
           <TextField label="Other feeding concerns" placeholder="Vomiting, loose stools, picky eating, appetite changes, etc." value={formData.feedingConcerns} onChange={(value) => set("feedingConcerns", value)} />
           <Toggle label="Feeding reminders" hint="Remind me to review and log feeding regularly." checked={formData.reminders} onChange={(value) => set("reminders", value)} />
-          <Toggle label="Pet-care tips/subscription" hint="Receive helpful Paw Sattva care updates." checked={formData.subscribe} onChange={(value) => set("subscribe", value)} />
         </div>}
       </CardContent>
       <CardFooter className="flex gap-3 border-t border-border/40 p-7 md:p-10">
@@ -291,7 +371,7 @@ const Field = ({
   optional?: boolean
   hint?: string
 }) => (
-  <div className="min-w-0 space-y-2">
+  <div className="pet-feed-field min-w-0 space-y-2">
     <div className="flex min-h-5 items-center justify-between gap-2">
       <Label className="text-sm font-semibold leading-none text-foreground">{label}</Label>
       {optional && (
@@ -453,6 +533,30 @@ const TextField = ({
   </Field>
 )
 
+const ConsentCheckbox = ({
+  checked,
+  onCheckedChange,
+  label,
+  description,
+}: {
+  checked: boolean
+  onCheckedChange: (checked: boolean) => void
+  label: string
+  description: string
+}) => (
+  <label className="pet-feed-field group flex cursor-pointer items-start gap-3 rounded-2xl border border-orange-100/80 bg-white/75 p-4 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md dark:border-orange-900/30 dark:bg-black/25">
+    <Checkbox
+      checked={checked}
+      onCheckedChange={(value) => onCheckedChange(value === true)}
+      className="mt-0.5 size-5 rounded-md border-orange-200 data-checked:border-orange-500 data-checked:bg-orange-500"
+    />
+    <span className="min-w-0">
+      <span className="block text-sm font-semibold leading-snug text-foreground">{label}</span>
+      <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{description}</span>
+    </span>
+  </label>
+)
+
 const Toggle = ({
   label,
   checked,
@@ -464,7 +568,7 @@ const Toggle = ({
   onChange: (value: boolean) => void
   hint?: string
 }) => (
-  <div className="flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-orange-100/80 bg-white/85 px-4 py-3 shadow-sm dark:border-orange-900/35 dark:bg-black/25">
+  <div className="pet-feed-field flex min-h-14 w-full items-center justify-between gap-4 rounded-xl border border-orange-100/80 bg-white/85 px-4 py-3 shadow-sm transition-all duration-300 hover:border-orange-200 hover:shadow-md dark:border-orange-900/35 dark:bg-black/25">
     <div className="min-w-0">
       <Label className="text-sm font-semibold leading-none text-foreground">{label}</Label>
       {hint && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{hint}</p>}
