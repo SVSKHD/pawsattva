@@ -4,17 +4,25 @@ import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { deletePetFeedDraft, getPetFeedDraft, getUserProfile, PetFeed, savePetFeed, savePetFeedDraft } from "@/firebase/firestore"
-import { BREEDS, PetType, STATUS_COPY, calculateBcs, getBreed, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Dog, Loader2, PawPrint, Printer, Stethoscope, User, UtensilsCrossed } from "lucide-react"
+import { BREEDS, BreedReference, PetType, STATUS_COPY, calculateBcs, getBreed, getBreedImageSource, getLifeStage, getWeightContext, getWeightStatus } from "@/lib/pet-wellness"
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, ChevronsUpDown, Dog, Loader2, PawPrint, Printer, Stethoscope, User, UtensilsCrossed } from "lucide-react"
 import { toast } from "sonner"
-import Image from "next/image"
 import Link from "next/link"
 
 const DRAFT_KEY = "pawsattva.pet-feed.wellness.v2"
@@ -202,7 +210,7 @@ export function PetFeedForm() {
         petName: formData.petName.trim(),
         petType: formData.petType,
         petBreed: formData.petBreed, ageValue, ageUnit: formData.ageUnit, ageMonths, lifeStage: getLifeStage(formData.petType, ageMonths), sex: formData.sex,
-        neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed?.imageUrl,
+        neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed ? getBreedImageSource(selectedBreed) ?? undefined : undefined,
         breedReferenceRange: selectedBreed?.adultWeightRange, breedHeightReferenceRange: selectedBreed?.adultHeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
         bodyConditionScore: bcs, weightStatus: status, foodType: formData.foodType, foodBrand: formData.foodBrand.trim(), dailyMeals: Number(formData.dailyMeals),
         dailyQuantity: formData.dailyQuantity.trim(), treatsPerDay: Number(formData.treatsPerDay), allergies: formData.allergies.trim(), medicalConditions: formData.medicalConditions.trim(),
@@ -312,8 +320,8 @@ export function PetFeedForm() {
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
           {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm sm:grid-cols-[180px_1fr] dark:border-orange-900/20 dark:bg-black/20">
-            <Image src={selectedBreed.imageUrl} alt={`${selectedBreed.name} breed reference`} width={360} height={176} className="h-44 w-full object-cover" />
-            <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">References filled automatically</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p></div>
+            <BreedPhoto breed={selectedBreed} className="h-44 w-full rounded-none" />
+            <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">{selectedBreed.adultWeightRange ? "Breed references loaded" : "Breed selected"}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p></div>
           </div>}
           {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
             <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -440,6 +448,41 @@ const SelectField = ({
   </Field>
 )
 
+const BreedPhoto = ({
+  breed,
+  className,
+}: {
+  breed: BreedReference
+  className: string
+}) => {
+  const [failed, setFailed] = useState(false)
+  const source = getBreedImageSource(breed)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [source, breed.name])
+
+  return (
+    <span className={`relative block shrink-0 overflow-hidden bg-orange-50/70 ${className}`}>
+      {source && !failed ? (
+        // Native img keeps the 100-row searchable list lightweight and supports lazy loading.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={source}
+          alt=""
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 text-orange-400 dark:from-orange-950/30 dark:to-amber-950/20">
+          <PawPrint className="h-5 w-5" />
+        </span>
+      )}
+    </span>
+  )
+}
+
 const BreedSelectField = ({
   label,
   value,
@@ -450,62 +493,81 @@ const BreedSelectField = ({
   label: string
   value: string
   onChange: (value: string) => void
-  breeds: Array<{ name: string; imageUrl: string }>
+  breeds: BreedReference[]
   placeholder?: string
 }) => {
+  const [open, setOpen] = useState(false)
   const selected = breeds.find((breed) => breed.name === value)
+  const groups = Array.from(new Set(breeds.map((breed) => breed.group)))
 
   return (
     <Field label={label}>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className={`${controlClass} overflow-hidden pr-2`}>
-          {selected ? (
-            <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-              <span className="truncate">{selected.name}</span>
-              <span className="relative -mr-1 h-10 w-16 shrink-0 overflow-hidden rounded-lg border border-white/70 bg-muted/40 shadow-sm dark:border-white/10">
-                <Image
-                  src={selected.imageUrl}
-                  alt=""
-                  fill
-                  sizes="64px"
-                  className="object-cover opacity-95"
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={`${controlClass} justify-between overflow-hidden pr-3 font-normal`}
+          >
+            {selected ? (
+              <span className="flex min-w-0 items-center gap-3">
+                <BreedPhoto
+                  breed={selected}
+                  className="h-9 w-12 rounded-lg border border-white/70 shadow-sm dark:border-white/10"
                 />
-                <span className="pointer-events-none absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-background/20" />
+                <span className="truncate">{selected.name}</span>
               </span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">{placeholder ?? "Select breed"}</span>
-          )}
-        </SelectTrigger>
-        <SelectContent
-          position="popper"
+            ) : (
+              <span className="truncate text-muted-foreground">{placeholder ?? "Select breed"}</span>
+            )}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent
           align="start"
           sideOffset={6}
-          className="max-h-80 w-[var(--radix-select-trigger-width)] min-w-[var(--radix-select-trigger-width)]"
+          className="w-[var(--radix-popover-trigger-width)] gap-0 p-0"
         >
-          {breeds.map((breed) => (
-            <SelectItem
-              key={breed.name}
-              value={breed.name}
-              className="min-h-16 overflow-hidden py-2 pr-32 pl-3 font-medium"
-              endAdornment={
-                <span className="pointer-events-none absolute inset-y-1 right-7 w-20 overflow-hidden rounded-lg border border-white/70 bg-muted/30 shadow-sm dark:border-white/10">
-                  <Image
-                    src={breed.imageUrl}
-                    alt={`${breed.name} reference`}
-                    fill
-                    sizes="80px"
-                    className="object-cover opacity-95"
-                  />
-                  <span className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-popover/25" />
-                </span>
-              }
-            >
-              {breed.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <Command>
+            <CommandInput placeholder={`Search ${breeds.length} breeds...`} />
+            <CommandList className="max-h-80">
+              <CommandEmpty>No matching breed found.</CommandEmpty>
+              {groups.map((group) => (
+                <CommandGroup key={group} heading={group}>
+                  {breeds
+                    .filter((breed) => breed.group === group)
+                    .map((breed) => (
+                      <CommandItem
+                        key={breed.name}
+                        value={breed.name}
+                        data-checked={value === breed.name}
+                        onSelect={() => {
+                          onChange(breed.name)
+                          setOpen(false)
+                        }}
+                        className="min-h-14 py-2"
+                      >
+                        <BreedPhoto
+                          breed={breed}
+                          className="h-11 w-14 rounded-lg border border-border/60 shadow-sm"
+                        />
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold">{breed.name}</span>
+                          <span className="mt-0.5 block truncate text-[10px] uppercase tracking-wide text-muted-foreground">
+                            {breed.group}
+                          </span>
+                        </span>
+                      </CommandItem>
+                    ))}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </Field>
   )
 }

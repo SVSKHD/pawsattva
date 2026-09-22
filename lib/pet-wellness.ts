@@ -3,36 +3,136 @@ export type WeightStatus = "underweight" | "ideal" | "overweight" | "obese"
 
 export interface BreedReference {
   name: string
+  group: string
   adultWeightRange?: string
   adultHeightRange?: string
-  imageUrl: string
+  imageUrl?: string
+  imageSearchName?: string | null
 }
 
-const dogFallback = "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80"
 const catFallback = "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80"
 
 export const BREEDS: Record<PetType, BreedReference[]> = {
   Dog: [
-    { name: "Labrador", adultWeightRange: "25–36 kg", adultHeightRange: "55–62 cm", imageUrl: "https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=900&q=80" },
-    { name: "German Shepherd", adultWeightRange: "22–40 kg", adultHeightRange: "55–65 cm", imageUrl: "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?auto=format&fit=crop&w=900&q=80" },
-    { name: "Golden Retriever", adultWeightRange: "25–34 kg", adultHeightRange: "51–61 cm", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
-    { name: "Poodle", adultWeightRange: "Varies by size: 3–32 kg", adultHeightRange: "Varies by size: 24–62 cm", imageUrl: "https://images.unsplash.com/photo-1616149562385-39db17dc445c?auto=format&fit=crop&w=900&q=80" },
-    { name: "Beagle", adultWeightRange: "9–14 kg", adultHeightRange: "33–41 cm", imageUrl: "https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=80" },
-    { name: "Indian Pariah", adultWeightRange: "15–30 kg", adultHeightRange: "46–64 cm", imageUrl: "https://images.unsplash.com/photo-1558788353-f76d92427f16?auto=format&fit=crop&w=900&q=80" },
-    { name: "Mixed/Other", imageUrl: dogFallback },
+    { name: "Chihuahua", group: "Small home & companion breeds" },
+    { name: "Pomeranian", group: "Small home & companion breeds" },
+    { name: "Pug", group: "Small home & companion breeds" },
+    { name: "Shih Tzu", group: "Small home & companion breeds" },
+    { name: "Maltese", group: "Small home & companion breeds" },
+    { name: "Havanese", group: "Small home & companion breeds" },
+    { name: "Bichon Frise", group: "Small home & companion breeds" },
+    { name: "Yorkshire Terrier", group: "Small home & companion breeds" },
+    { name: "Cavalier King Charles Spaniel", group: "Small home & companion breeds" },
+    { name: "Papillon", group: "Small home & companion breeds" },
+    { name: "Miniature Pinscher", group: "Small home & companion breeds" },
+    { name: "French Bulldog", group: "Small home & companion breeds" },
+    { name: "Boston Terrier", group: "Small home & companion breeds" },
+    { name: "Dachshund", group: "Small home & companion breeds" },
+    { name: "Jack Russell Terrier", group: "Small home & companion breeds" },
+    { name: "Pekingese", group: "Small home & companion breeds" },
+    { name: "Lhasa Apso", group: "Small home & companion breeds" },
+    { name: "Miniature Schnauzer", group: "Small home & companion breeds" },
+    { name: "Toy Poodle", group: "Small home & companion breeds" },
+    { name: "Pembroke Welsh Corgi", group: "Small home & companion breeds" },
+    { name: "Beagle", group: "Medium home & family breeds", adultWeightRange: "9–14 kg", adultHeightRange: "33–41 cm" },
+    { name: "Cocker Spaniel", group: "Medium home & family breeds" },
+    { name: "English Springer Spaniel", group: "Medium home & family breeds" },
+    { name: "Border Collie", group: "Medium home & family breeds" },
+    { name: "Australian Shepherd", group: "Medium home & family breeds" },
+    { name: "Brittany", group: "Medium home & family breeds" },
+    { name: "Bulldog", group: "Medium home & family breeds" },
+    { name: "Staffordshire Bull Terrier", group: "Medium home & family breeds" },
+    { name: "American Staffordshire Terrier", group: "Medium home & family breeds" },
+    { name: "Basenji", group: "Medium home & family breeds" },
+    { name: "Whippet", group: "Medium home & family breeds" },
+    { name: "Shiba Inu", group: "Medium home & family breeds" },
+    { name: "Shetland Sheepdog", group: "Medium home & family breeds" },
+    { name: "Standard Schnauzer", group: "Medium home & family breeds" },
+    { name: "Finnish Spitz", group: "Medium home & family breeds" },
+    { name: "Keeshond", group: "Medium home & family breeds" },
+    { name: "Samoyed", group: "Medium home & family breeds" },
+    { name: "Dalmatian", group: "Medium home & family breeds" },
+    { name: "Vizsla", group: "Medium home & family breeds" },
+    { name: "English Setter", group: "Medium home & family breeds" },
+    { name: "Labrador", group: "Large home & family breeds", adultWeightRange: "25–36 kg", adultHeightRange: "55–62 cm" },
+    { name: "Golden Retriever", group: "Large home & family breeds", adultWeightRange: "25–34 kg", adultHeightRange: "51–61 cm" },
+    { name: "German Shepherd", group: "Large home & family breeds", adultWeightRange: "22–40 kg", adultHeightRange: "55–65 cm" },
+    { name: "Poodle", group: "Large home & family breeds", adultWeightRange: "Varies by size: 3–32 kg", adultHeightRange: "Varies by size: 24–62 cm" },
+    { name: "Boxer", group: "Large home & family breeds" },
+    { name: "Doberman Pinscher", group: "Large home & family breeds" },
+    { name: "Rottweiler", group: "Large home & family breeds" },
+    { name: "Great Pyrenees", group: "Large home & family breeds" },
+    { name: "Bernese Mountain Dog", group: "Large home & family breeds" },
+    { name: "Siberian Husky", group: "Large home & family breeds" },
+    { name: "Alaskan Malamute", group: "Large home & family breeds" },
+    { name: "Weimaraner", group: "Large home & family breeds" },
+    { name: "Rhodesian Ridgeback", group: "Large home & family breeds" },
+    { name: "German Shorthaired Pointer", group: "Large home & family breeds" },
+    { name: "Belgian Malinois", group: "Large home & family breeds" },
+    { name: "Collie", group: "Large home & family breeds" },
+    { name: "Old English Sheepdog", group: "Large home & family breeds" },
+    { name: "Akita", group: "Large home & family breeds" },
+    { name: "Chow Chow", group: "Large home & family breeds" },
+    { name: "Giant Schnauzer", group: "Large home & family breeds" },
+    { name: "Great Dane", group: "Giant breeds" },
+    { name: "Saint Bernard", group: "Giant breeds" },
+    { name: "Newfoundland", group: "Giant breeds" },
+    { name: "Mastiff", group: "Giant breeds" },
+    { name: "Bullmastiff", group: "Giant breeds" },
+    { name: "Irish Wolfhound", group: "Giant breeds" },
+    { name: "Leonberger", group: "Giant breeds" },
+    { name: "Cane Corso", group: "Giant breeds" },
+    { name: "Dogue de Bordeaux", group: "Giant breeds" },
+    { name: "Anatolian Shepherd", group: "Giant breeds" },
+    { name: "Indian Pariah", group: "Indian & native breeds", adultWeightRange: "15–30 kg", adultHeightRange: "46–64 cm" },
+    { name: "Rajapalayam", group: "Indian & native breeds" },
+    { name: "Mudhol Hound", group: "Indian & native breeds" },
+    { name: "Chippiparai", group: "Indian & native breeds" },
+    { name: "Kombai", group: "Indian & native breeds" },
+    { name: "Kanni", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Rampur Greyhound", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Himalayan Sheepdog", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Bakharwal Dog", group: "Indian & native breeds" },
+    { name: "Gaddi Kutta", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Bully Kutta", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Pandikona", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Jonangi", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Kaikadi", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Tangkhul Hui", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Australian Cattle Dog", group: "Working, herding & sporting breeds" },
+    { name: "Belgian Tervuren", group: "Working, herding & sporting breeds" },
+    { name: "Belgian Sheepdog", group: "Working, herding & sporting breeds" },
+    { name: "Beauceron", group: "Working, herding & sporting breeds" },
+    { name: "Briard", group: "Working, herding & sporting breeds" },
+    { name: "Chesapeake Bay Retriever", group: "Working, herding & sporting breeds" },
+    { name: "Flat-Coated Retriever", group: "Working, herding & sporting breeds" },
+    { name: "Nova Scotia Duck Tolling Retriever", group: "Working, herding & sporting breeds" },
+    { name: "Bloodhound", group: "Working, herding & sporting breeds" },
+    { name: "Basset Hound", group: "Working, herding & sporting breeds" },
+    { name: "Greyhound", group: "Working, herding & sporting breeds" },
+    { name: "Afghan Hound", group: "Working, herding & sporting breeds" },
+    { name: "Saluki", group: "Working, herding & sporting breeds" },
+    { name: "Borzoi", group: "Working, herding & sporting breeds" },
+    { name: "Mixed/Other", group: "Other", imageSearchName: null },
   ],
   Cat: [
-    { name: "Persian", adultWeightRange: "3–6 kg", imageUrl: "https://images.unsplash.com/photo-1577023311546-cdc07a8454d9?auto=format&fit=crop&w=900&q=80" },
-    { name: "Siamese", adultWeightRange: "3–6 kg", imageUrl: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=900&q=80" },
-    { name: "Maine Coon", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1606214174585-fe31582dc6ee?auto=format&fit=crop&w=900&q=80" },
-    { name: "Bengal", adultWeightRange: "4–7 kg", imageUrl: "https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=900&q=80" },
-    { name: "Ragdoll", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80" },
-    { name: "Mixed/Other", imageUrl: catFallback },
+    { name: "Persian", group: "Popular cat breeds", adultWeightRange: "3–6 kg", imageUrl: "https://images.unsplash.com/photo-1577023311546-cdc07a8454d9?auto=format&fit=crop&w=900&q=80" },
+    { name: "Siamese", group: "Popular cat breeds", adultWeightRange: "3–6 kg", imageSearchName: null },
+    { name: "Maine Coon", group: "Large cat breeds", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1606214174585-fe31582dc6ee?auto=format&fit=crop&w=900&q=80" },
+    { name: "Bengal", group: "Popular cat breeds", adultWeightRange: "4–7 kg", imageSearchName: null },
+    { name: "Ragdoll", group: "Popular cat breeds", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80" },
+    { name: "Mixed/Other", group: "Other", imageUrl: catFallback },
   ],
 }
 
 export const getBreed = (type: PetType, name: string) =>
   BREEDS[type].find((breed) => breed.name === name) ?? BREEDS[type].at(-1)!
+
+export const getBreedImageSource = (breed: BreedReference) => {
+  if (breed.imageUrl) return breed.imageUrl
+  if (breed.imageSearchName === null) return null
+  return `/api/breed-image?breed=${encodeURIComponent(breed.imageSearchName ?? breed.name)}`
+}
 
 export const getLifeStage = (type: PetType, ageMonths: number) => {
   if (ageMonths < 12) return type === "Dog" ? "puppy" : "kitten"
