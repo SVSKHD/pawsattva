@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth } from "@/firebase/firebase";
+import { getUserProfile, upsertUserIdentity } from "@/firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
@@ -40,39 +41,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       try {
-        // Firestore is intentionally loaded only for signed-in users. Public visitors
-        // should not pay the download and initialization cost during first paint.
-        const [{ doc, getDoc, setDoc }, { db }] = await Promise.all([
-          import("firebase/firestore"),
-          import("@/firebase/db"),
-        ]);
-        const userDocRef = doc(db, "users", user.uid);
-        const userDoc = await getDoc(userDocRef);
-        let isAdmin = false;
-        let role: AuthContextType["role"] = "user";
+        // Firebase remains the identity provider. The profile/data backend can now
+        // be Supabase (with a Firestore fallback until the cutover is complete).
+        let profile = await getUserProfile(user.uid);
 
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          role = data.role === "author" ? "author" : data.admin === true ? "admin" : "user";
-          isAdmin = role === "admin" || role === "author";
-
-          // Google/Firebase Auth is the source of truth for account identity.
-          // Keep the Firestore profile aligned without touching user-entered fields such as phone.
-          await setDoc(userDocRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-          }, { merge: true });
+        if (!profile) {
+          await upsertUserIdentity(user.uid, {
+            email: user.email ?? "",
+            displayName: user.displayName ?? undefined,
+            photoURL: user.photoURL ?? undefined,
+          });
+          profile = await getUserProfile(user.uid);
         } else {
-          await setDoc(userDocRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            admin: false,
-            role: "user",
-            createdAt: new Date(),
+          await upsertUserIdentity(user.uid, {
+            email: user.email ?? profile.email,
+            displayName: user.displayName ?? profile.displayName,
+            photoURL: user.photoURL ?? profile.photoURL,
           });
         }
+
+        const role: AuthContextType["role"] =
+          profile?.role === "author"
+            ? "author"
+            : profile?.role === "admin" || profile?.admin === true
+              ? "admin"
+              : "user";
+        const isAdmin = role === "admin" || role === "author";
 
         if (active && sequence === authSequence) {
           setAuthState({ user, loading: false, isAdmin, role });
