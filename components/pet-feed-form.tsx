@@ -156,6 +156,7 @@ export function PetFeedForm() {
   }, [accountDraftReady, draftReady, formData, profileReady, step, submitted, user?.uid])
 
   const selectedBreed = useMemo(() => formData.petBreed ? getBreed(formData.petType, formData.petBreed) : null, [formData.petBreed, formData.petType])
+  const selectedBreedImage = selectedBreed ? getBreedImageSource(selectedBreed) : null
   const ageMonths = formData.ageValue && Number(formData.ageValue) > 0
     ? (formData.ageUnit === "years" ? Number(formData.ageValue) * 12 : Number(formData.ageValue))
     : null
@@ -319,8 +320,8 @@ export function PetFeedForm() {
             <SelectField label="Activity level" value={formData.activityLevel} onChange={(value) => set("activityLevel", value as FormData["activityLevel"])} options={[["low", "Low"], ["moderate", "Moderate"], ["high", "High"]]} />
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
-          {selectedBreed && <div className="grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm sm:grid-cols-[180px_1fr] dark:border-orange-900/20 dark:bg-black/20">
-            <BreedPhoto breed={selectedBreed} className="h-44 w-full rounded-none" />
+          {selectedBreed && <div className={`grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm dark:border-orange-900/20 dark:bg-black/20 ${selectedBreedImage ? "sm:grid-cols-[180px_1fr]" : ""}`}>
+            {selectedBreedImage && <BreedPhoto breed={selectedBreed} className="h-44 w-full rounded-none" />}
             <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">{selectedBreed.adultWeightRange ? "Breed references loaded" : "Breed selected"}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p></div>
           </div>}
           {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
@@ -457,26 +458,38 @@ const BreedPhoto = ({
 }) => {
   const [failed, setFailed] = useState(false)
   const source = getBreedImageSource(breed)
+  const initials = breed.name
+    .split(/[\s/-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
 
   useEffect(() => {
     setFailed(false)
   }, [source, breed.name])
 
   return (
-    <span className={`relative block shrink-0 overflow-hidden bg-orange-50/70 ${className}`}>
+    <span className={`relative block shrink-0 overflow-hidden ${className}`}>
       {source && !failed ? (
-        // Native img keeps the 100-row searchable list lightweight and supports lazy loading.
+        // Verified local assets only; lazy loading keeps the 100-row picker light.
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={source}
-          alt=""
+          alt={`${breed.name} breed`}
           loading="lazy"
           className="h-full w-full object-cover"
           onError={() => setFailed(true)}
         />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 text-orange-400 dark:from-orange-950/30 dark:to-amber-950/20">
-          <PawPrint className="h-5 w-5" />
+        <span
+          aria-label={`${breed.name} breed placeholder`}
+          className="flex h-full w-full items-center justify-center bg-gradient-to-br from-orange-50 via-amber-50 to-emerald-50 text-orange-700 dark:from-orange-950/35 dark:via-amber-950/25 dark:to-emerald-950/20 dark:text-orange-300"
+        >
+          <span className="flex flex-col items-center justify-center leading-none">
+            <span className="text-[11px] font-black tracking-tight">{initials || "PET"}</span>
+            <PawPrint className="mt-1 h-3.5 w-3.5 opacity-70" />
+          </span>
         </span>
       )}
     </span>
