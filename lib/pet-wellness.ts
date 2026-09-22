@@ -129,9 +129,12 @@ export const BREEDS: Record<PetType, BreedReference[]> = {
 export const getBreed = (type: PetType, name: string) =>
   BREEDS[type].find((breed) => breed.name === name) ?? BREEDS[type].at(-1)!
 
-export const getBreedImageSource = (breed: BreedReference) => {
+export const getBreedImageSource = (type: PetType, breed: BreedReference) => {
   const thumbnail = breed.thumbnail?.trim()
-  return thumbnail?.startsWith("/breeds/") ? thumbnail : null
+  if (thumbnail?.startsWith("/breeds/")) return thumbnail
+  if (breed.name === "Mixed/Other") return null
+
+  return `/api/breed-photo?type=${encodeURIComponent(type)}&breed=${encodeURIComponent(breed.name)}`
 }
 
 export const getLifeStage = (type: PetType, ageMonths: number) => {
