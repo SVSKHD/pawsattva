@@ -6,11 +6,12 @@ export interface BreedReference {
   group: string
   adultWeightRange?: string
   adultHeightRange?: string
-  imageUrl?: string
-  imageSearchName?: string | null
+  /**
+   * Verified local asset only, e.g. /breeds/labrador.webp.
+   * Leave undefined until the image has been manually checked against the breed.
+   */
+  thumbnail?: string | null
 }
-
-const catFallback = "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80"
 
 export const BREEDS: Record<PetType, BreedReference[]> = {
   Dog: [
@@ -89,16 +90,16 @@ export const BREEDS: Record<PetType, BreedReference[]> = {
     { name: "Mudhol Hound", group: "Indian & native breeds" },
     { name: "Chippiparai", group: "Indian & native breeds" },
     { name: "Kombai", group: "Indian & native breeds" },
-    { name: "Kanni", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Rampur Greyhound", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Himalayan Sheepdog", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Kanni", group: "Indian & native breeds" },
+    { name: "Rampur Greyhound", group: "Indian & native breeds" },
+    { name: "Himalayan Sheepdog", group: "Indian & native breeds" },
     { name: "Bakharwal Dog", group: "Indian & native breeds" },
-    { name: "Gaddi Kutta", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Bully Kutta", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Pandikona", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Jonangi", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Kaikadi", group: "Indian & native breeds", imageSearchName: null },
-    { name: "Tangkhul Hui", group: "Indian & native breeds", imageSearchName: null },
+    { name: "Gaddi Kutta", group: "Indian & native breeds" },
+    { name: "Bully Kutta", group: "Indian & native breeds" },
+    { name: "Pandikona", group: "Indian & native breeds" },
+    { name: "Jonangi", group: "Indian & native breeds" },
+    { name: "Kaikadi", group: "Indian & native breeds" },
+    { name: "Tangkhul Hui", group: "Indian & native breeds" },
     { name: "Australian Cattle Dog", group: "Working, herding & sporting breeds" },
     { name: "Belgian Tervuren", group: "Working, herding & sporting breeds" },
     { name: "Belgian Sheepdog", group: "Working, herding & sporting breeds" },
@@ -113,14 +114,14 @@ export const BREEDS: Record<PetType, BreedReference[]> = {
     { name: "Afghan Hound", group: "Working, herding & sporting breeds" },
     { name: "Saluki", group: "Working, herding & sporting breeds" },
     { name: "Borzoi", group: "Working, herding & sporting breeds" },
-    { name: "Mixed/Other", group: "Other", imageSearchName: null },
+    { name: "Mixed/Other", group: "Other" },
   ],
   Cat: [
-    { name: "Persian", group: "Popular cat breeds", adultWeightRange: "3–6 kg", imageUrl: "https://images.unsplash.com/photo-1577023311546-cdc07a8454d9?auto=format&fit=crop&w=900&q=80" },
-    { name: "Siamese", group: "Popular cat breeds", adultWeightRange: "3–6 kg", imageSearchName: null },
-    { name: "Maine Coon", group: "Large cat breeds", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1606214174585-fe31582dc6ee?auto=format&fit=crop&w=900&q=80" },
-    { name: "Bengal", group: "Popular cat breeds", adultWeightRange: "4–7 kg", imageSearchName: null },
-    { name: "Ragdoll", group: "Popular cat breeds", adultWeightRange: "4–9 kg", imageUrl: "https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=80" },
+    { name: "Persian", group: "Popular cat breeds", adultWeightRange: "3–6 kg" },
+    { name: "Siamese", group: "Popular cat breeds", adultWeightRange: "3–6 kg" },
+    { name: "Maine Coon", group: "Large cat breeds", adultWeightRange: "4–9 kg" },
+    { name: "Bengal", group: "Popular cat breeds", adultWeightRange: "4–7 kg" },
+    { name: "Ragdoll", group: "Popular cat breeds", adultWeightRange: "4–9 kg" },
     { name: "Mixed/Other", group: "Other", imageUrl: catFallback },
   ],
 }
@@ -129,9 +130,8 @@ export const getBreed = (type: PetType, name: string) =>
   BREEDS[type].find((breed) => breed.name === name) ?? BREEDS[type].at(-1)!
 
 export const getBreedImageSource = (breed: BreedReference) => {
-  if (breed.imageUrl) return breed.imageUrl
-  if (breed.imageSearchName === null) return null
-  return `/api/breed-image?breed=${encodeURIComponent(breed.imageSearchName ?? breed.name)}`
+  const thumbnail = breed.thumbnail?.trim()
+  return thumbnail?.startsWith("/breeds/") ? thumbnail : null
 }
 
 export const getLifeStage = (type: PetType, ageMonths: number) => {
