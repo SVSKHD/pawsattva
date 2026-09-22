@@ -20,6 +20,7 @@ import {
   deleteField
 } from "firebase/firestore";
 import { db } from "./db";
+import { isSupabaseConfigured, supabaseRest } from "@/lib/supabase/http";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -232,56 +233,201 @@ const withoutUndefined = <T extends object>(data: T) =>
     Object.entries(data).filter(([, value]) => value !== undefined)
   ) as Partial<T>;
 
-// ── USER OPERATIONS ──────────────────────────────────────────────────────────
-
-export const getAdminUsers = async () => {
-  const usersQuery = query(collection(db, "users"), where("admin", "==", true));
-  const snapshot = await getDocs(usersQuery);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  } as UserProfile));
+type SupabaseProfileRow = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  photo_url: string | null;
+  phone: string | null;
+  whatsapp_phone: string | null;
+  whatsapp_same_as_phone: boolean | null;
+  receive_updates: boolean | null;
+  admin: boolean | null;
+  role: "user" | "author" | "admin" | null;
+  pet_feeds: PetFeedEntry[] | null;
+  pet_feed_draft: PetFeedDraft | null;
+  created_at: string | null;
+  updated_at: string | null;
 };
 
-export const getAppUsers = async () => {
-  const snapshot = await getDocs(collection(db, "users"));
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-  } as UserProfile));
+type SupabasePetFeedRow = {
+  id: string;
+  user_id: string | null;
+  data: PetFeed;
+  created_at: string;
 };
 
-export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
-  const snapshot = await getDoc(doc(db, "users", userId));
-  return snapshot.exists()
-    ? { id: snapshot.id, ...snapshot.data() } as UserProfile
-    : null;
-};
+const mapSupabaseProfile = (row: SupabaseProfileRow): UserProfile => ({
+  id: row.id,
+  email: row.email ?? "",
+  displayName: row.display_name ?? undefined,
+  photoURL: row.photo_url ?? undefined,
+  phone: row.phone ?? undefined,
+  whatsappPhone: row.whatsapp_phone ?? undefined,
+  whatsappSameAsPhone: row.whatsapp_same_as_phone ?? undefined,
+  receiveUpdates: row.receive_updates ?? undefined,
+  admin: row.admin ?? false,
+  role: row.role ?? "user",
+  petFeeds: row.pet_feeds ?? undefined,
+  createdAt: row.created_at ?? undefined,
+});
 
-// Real-time listener for users
-export const onUsersSnapshot = (callback: (users: UserProfile[]) => void) => {
-  return onSnapshot(collection(db, "users"), (snapshot) => {
-    const users = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-    } as UserProfile));
-    callback(users);
+const profilePatch = (data: Partial<UserProfile>) => withoutUndefined({
+  email: data.email,
+  display_name: data.displayName,
+  photo_url: data.photoURL,
+  phone: data.phone,
+  whatsapp_phone: data.whatsappPhone,
+  whatsapp_same_as_phone: data.whatsappSameAsPhone,
+  receive_updates: data.receiveUpdates,
+  admin: data.admin,
+  role: data.role,
+  pet_feeds: data.petFeeds,
+  updated_at: new Date().toISOString(),
+});
+
+export const upsertUserIdentity = async (
+  userId: string,
+  identity: Pick<UserProfile, "email" | "displayName" | "photoURL">
+) => {
+  if (!isSupabaseConfigured()) {
+    await setDoc(doc(db, "users", userId), {
+      email: identity.email,
+      displayName: identity.displayName,
+      photoURL: identity.photoURL,
+    }, { merge: true });
+    return;
+  }
+
+  const payload = {
+    id: userId,
+    email: identity.email,
+    display_name: identity.displayName ?? null,
+    photo_url: identity.photoURL ?? null,
+    updated_at: new Date().toISOString(),
+  };
+
+  await supabaseRest<SupabaseProfileRow[]>("profiles?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload),
   });
 };
 
+// ── USER OPERATIONS ──────────────────────────────────────────────────────────
+
+export const getAdminUsers = async () => {
+  if (!isSupabaseConfigured()) {
+    const usersQuery = query(collection(db, "users"), where("admin", "==", true));
+    const snapshot = await getDocs(usersQuery);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+  }
+
+  const rows = await supabaseRest<SupabaseProfileRow[]>(
+    "profiles?admin=eq.true&select=*&order=created_at.desc.nullslast"
+  );
+  return rows.map(mapSupabaseProfile);
+};
+
+export const getAppUsers = async () => {
+  if (!isSupabaseConfigured()) {
+    const snapshot = await getDocs(collection(db, "users"));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+  }
+
+  const rows = await supabaseRest<SupabaseProfileRow[]>(
+    "profiles?select=*&order=created_at.desc.nullslast"
+  );
+  return rows.map(mapSupabaseProfile);
+};
+
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  if (!isSupabaseConfigured()) {
+    const snapshot = await getDoc(doc(db, "users", userId));
+    return snapshot.exists()
+      ? { id: snapshot.id, ...snapshot.data() } as UserProfile
+      : null;
+  }
+
+  const rows = await supabaseRest<SupabaseProfileRow[]>(
+    `profiles?id=eq.${encodeURIComponent(userId)}&select=*&limit=1`
+  );
+  return rows[0] ? mapSupabaseProfile(rows[0]) : null;
+};
+
+// Compatibility listener during migration. Supabase Realtime can replace this
+// once @supabase/supabase-js is adopted; polling keeps existing admin UI stable.
+export const onUsersSnapshot = (callback: (users: UserProfile[]) => void) => {
+  if (!isSupabaseConfigured()) {
+    return onSnapshot(collection(db, "users"), (snapshot) => {
+      callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile)));
+    });
+  }
+
+  let active = true;
+  const sync = async () => {
+    try {
+      const users = await getAppUsers();
+      if (active) callback(users);
+    } catch (error) {
+      console.error("Unable to refresh Supabase users:", error);
+    }
+  };
+
+  void sync();
+  const timer = window.setInterval(sync, 10000);
+  return () => {
+    active = false;
+    window.clearInterval(timer);
+  };
+};
+
 export const updateUserRole = async (userId: string, role: NonNullable<UserProfile["role"]>) => {
-  const docRef = doc(db, "users", userId);
-  return await updateDoc(docRef, { role, admin: role === "admin" || role === "author" });
+  if (!isSupabaseConfigured()) {
+    return await updateDoc(doc(db, "users", userId), {
+      role,
+      admin: role === "admin" || role === "author",
+    });
+  }
+
+  await supabaseRest(
+    `profiles?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        role,
+        admin: role === "admin" || role === "author",
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
 };
 
 export const updateUser = async (userId: string, data: Partial<UserProfile>) => {
-  const docRef = doc(db, "users", userId);
-  return await updateDoc(docRef, data);
+  if (!isSupabaseConfigured()) {
+    return await updateDoc(doc(db, "users", userId), data);
+  }
+
+  await supabaseRest(
+    `profiles?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(profilePatch(data)),
+    }
+  );
 };
 
 export const deleteUser = async (userId: string) => {
-  const docRef = doc(db, "users", userId);
-  return await deleteDoc(docRef);
+  if (!isSupabaseConfigured()) {
+    return await deleteDoc(doc(db, "users", userId));
+  }
+
+  await supabaseRest(
+    `profiles?id=eq.${encodeURIComponent(userId)}`,
+    { method: "DELETE", headers: { Prefer: "return=minimal" } }
+  );
 };
 
 // ── PAGE SEO OPERATIONS ──────────────────────────────────────────────────────
@@ -645,84 +791,199 @@ export const addSubscription = async (sub: Omit<Subscription, "id" | "subscribed
 // ── PET FEED OPERATIONS ─────────────────────────────────────────────────────
 
 export const getPetFeedDraft = async (userId: string): Promise<PetFeedDraft | null> => {
-  const snapshot = await getDoc(doc(db, "users", userId));
-  return snapshot.exists() && snapshot.data().petFeedDraft
-    ? snapshot.data().petFeedDraft as PetFeedDraft
-    : null;
+  if (!isSupabaseConfigured()) {
+    const snapshot = await getDoc(doc(db, "users", userId));
+    return snapshot.exists() && snapshot.data().petFeedDraft
+      ? snapshot.data().petFeedDraft as PetFeedDraft
+      : null;
+  }
+
+  const rows = await supabaseRest<Pick<SupabaseProfileRow, "pet_feed_draft">[]>(
+    `profiles?id=eq.${encodeURIComponent(userId)}&select=pet_feed_draft&limit=1`
+  );
+  return rows[0]?.pet_feed_draft ?? null;
 };
 
 export const savePetFeedDraft = async (userId: string, draft: Omit<PetFeedDraft, "updatedAt">) => {
-  await setDoc(doc(db, "users", userId), {
-    petFeedDraft: { ...draft, updatedAt: serverTimestamp() },
-  }, { merge: true });
+  if (!isSupabaseConfigured()) {
+    await setDoc(doc(db, "users", userId), {
+      petFeedDraft: { ...draft, updatedAt: serverTimestamp() },
+    }, { merge: true });
+    return;
+  }
+
+  await supabaseRest(
+    "profiles?on_conflict=id",
+    {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        id: userId,
+        pet_feed_draft: { ...draft, updatedAt: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
 };
 
 export const deletePetFeedDraft = async (userId: string) => {
-  await updateDoc(doc(db, "users", userId), { petFeedDraft: deleteField() });
+  if (!isSupabaseConfigured()) {
+    await updateDoc(doc(db, "users", userId), { petFeedDraft: deleteField() });
+    return;
+  }
+
+  await supabaseRest(
+    `profiles?id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({
+        pet_feed_draft: null,
+        updated_at: new Date().toISOString(),
+      }),
+    }
+  );
 };
 
 export const getPetFeeds = async () => {
-  const q = query(collection(db, "petFeeds"), orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data(),
-    createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : doc.data().createdAt
+  if (!isSupabaseConfigured()) {
+    const q = query(collection(db, "petFeeds"), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate ? doc.data().createdAt.toDate().toISOString() : doc.data().createdAt
+    } as PetFeed));
+  }
+
+  const rows = await supabaseRest<SupabasePetFeedRow[]>(
+    "pet_feeds?select=*&order=created_at.desc"
+  );
+  return rows.map(row => ({
+    ...row.data,
+    id: row.id,
+    userId: row.user_id ?? row.data.userId,
+    createdAt: row.created_at,
   } as PetFeed));
 };
 
 export const savePetFeed = async (data: PetFeed) => {
-  const cleanData = withoutUndefined(data);
-  // Save to petFeeds collection
-  const feedDoc = await addDoc(collection(db, "petFeeds"), {
-    ...cleanData,
-    createdAt: serverTimestamp(),
+  if (!isSupabaseConfigured()) {
+    const cleanData = withoutUndefined(data);
+    const feedDoc = await addDoc(collection(db, "petFeeds"), {
+      ...cleanData,
+      createdAt: serverTimestamp(),
+    });
+
+    if (data.userId) {
+      await updateDoc(doc(db, "users", data.userId), {
+        phone: data.phone,
+        whatsappPhone: data.whatsappPhone,
+        whatsappSameAsPhone: data.whatsappSameAsPhone,
+        receiveUpdates: data.receiveUpdates,
+        petFeeds: arrayUnion(withoutUndefined({
+          petName: data.petName,
+          petType: data.petType,
+          petBreed: data.petBreed,
+          mealDays: data.mealDays,
+          reminders: data.reminders,
+          subscribe: data.subscribe,
+          createdAt: new Date().toISOString(),
+          ageValue: data.ageValue,
+          ageUnit: data.ageUnit,
+          ageMonths: data.ageMonths,
+          lifeStage: data.lifeStage,
+          sex: data.sex,
+          neutered: data.neutered,
+          weightKg: data.weightKg,
+          heightCm: data.heightCm,
+          activityLevel: data.activityLevel,
+          breedImageUrl: data.breedImageUrl,
+          breedReferenceRange: data.breedReferenceRange,
+          breedHeightReferenceRange: data.breedHeightReferenceRange,
+          ribsScore: data.ribsScore,
+          waistScore: data.waistScore,
+          tuckScore: data.tuckScore,
+          bodyConditionScore: data.bodyConditionScore,
+          weightStatus: data.weightStatus,
+          foodType: data.foodType,
+          foodBrand: data.foodBrand,
+          dailyMeals: data.dailyMeals,
+          dailyQuantity: data.dailyQuantity,
+          treatsPerDay: data.treatsPerDay,
+          dietaryConcerns: data.dietaryConcerns,
+          assessmentVersion: data.assessmentVersion,
+          assessedAt: data.assessedAt,
+        })),
+      });
+    }
+
+    return feedDoc;
+  }
+
+  const cleanData = withoutUndefined(data) as PetFeed;
+  const rows = await supabaseRest<SupabasePetFeedRow[]>("pet_feeds", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({
+      user_id: data.userId ?? null,
+      data: cleanData,
+    }),
   });
 
-  // Also save pet feed entry under user's document if userId is provided
   if (data.userId) {
-    const userDocRef = doc(db, "users", data.userId);
-    await updateDoc(userDocRef, {
-      phone: data.phone,
-      whatsappPhone: data.whatsappPhone,
-      whatsappSameAsPhone: data.whatsappSameAsPhone,
-      receiveUpdates: data.receiveUpdates,
-      petFeeds: arrayUnion(withoutUndefined({
-        petName: data.petName,
-        petType: data.petType,
-        petBreed: data.petBreed,
-        mealDays: data.mealDays,
-        reminders: data.reminders,
-        subscribe: data.subscribe,
-        createdAt: new Date().toISOString(),
-        ageValue: data.ageValue,
-        ageUnit: data.ageUnit,
-        ageMonths: data.ageMonths,
-        lifeStage: data.lifeStage,
-        sex: data.sex,
-        neutered: data.neutered,
-        weightKg: data.weightKg,
-        heightCm: data.heightCm,
-        activityLevel: data.activityLevel,
-        breedImageUrl: data.breedImageUrl,
-        breedReferenceRange: data.breedReferenceRange,
-        breedHeightReferenceRange: data.breedHeightReferenceRange,
-        ribsScore: data.ribsScore,
-        waistScore: data.waistScore,
-        tuckScore: data.tuckScore,
-        bodyConditionScore: data.bodyConditionScore,
-        weightStatus: data.weightStatus,
-        foodType: data.foodType,
-        foodBrand: data.foodBrand,
-        dailyMeals: data.dailyMeals,
-        dailyQuantity: data.dailyQuantity,
-        treatsPerDay: data.treatsPerDay,
-        dietaryConcerns: data.dietaryConcerns,
-        assessmentVersion: data.assessmentVersion,
-        assessedAt: data.assessedAt,
-      })),
+    const currentProfile = await getUserProfile(data.userId);
+    const nextEntry = withoutUndefined({
+      petName: data.petName,
+      petType: data.petType,
+      petBreed: data.petBreed,
+      mealDays: data.mealDays,
+      reminders: data.reminders,
+      subscribe: data.subscribe,
+      createdAt: new Date().toISOString(),
+      ageValue: data.ageValue,
+      ageUnit: data.ageUnit,
+      ageMonths: data.ageMonths,
+      lifeStage: data.lifeStage,
+      sex: data.sex,
+      neutered: data.neutered,
+      weightKg: data.weightKg,
+      heightCm: data.heightCm,
+      activityLevel: data.activityLevel,
+      breedImageUrl: data.breedImageUrl,
+      breedReferenceRange: data.breedReferenceRange,
+      breedHeightReferenceRange: data.breedHeightReferenceRange,
+      ribsScore: data.ribsScore,
+      waistScore: data.waistScore,
+      tuckScore: data.tuckScore,
+      bodyConditionScore: data.bodyConditionScore,
+      weightStatus: data.weightStatus,
+      foodType: data.foodType,
+      foodBrand: data.foodBrand,
+      dailyMeals: data.dailyMeals,
+      dailyQuantity: data.dailyQuantity,
+      treatsPerDay: data.treatsPerDay,
+      dietaryConcerns: data.dietaryConcerns,
+      assessmentVersion: data.assessmentVersion,
+      assessedAt: data.assessedAt,
+    }) as PetFeedEntry;
+
+    await supabaseRest("profiles?on_conflict=id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        id: data.userId,
+        email: currentProfile?.email ?? data.email,
+        phone: data.phone,
+        whatsapp_phone: data.whatsappPhone,
+        whatsapp_same_as_phone: data.whatsappSameAsPhone,
+        receive_updates: data.receiveUpdates,
+        pet_feeds: [...(currentProfile?.petFeeds ?? []), nextEntry],
+        pet_feed_draft: null,
+        updated_at: new Date().toISOString(),
+      }),
     });
   }
 
-  return feedDoc;
+  return rows[0] ?? null;
 };
