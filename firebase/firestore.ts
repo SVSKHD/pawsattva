@@ -284,6 +284,37 @@ const profilePatch = (data: Partial<UserProfile>) => withoutUndefined({
   updated_at: new Date().toISOString(),
 });
 
+export const migrateLegacyUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  if (!isSupabaseConfigured()) return getUserProfile(userId);
+
+  const snapshot = await getDoc(doc(db, "users", userId));
+  if (!snapshot.exists()) return null;
+
+  const legacy = { id: snapshot.id, ...snapshot.data() } as UserProfile & {
+    petFeedDraft?: PetFeedDraft;
+  };
+
+  await supabaseRest<SupabaseProfileRow[]>("profiles?on_conflict=id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify({
+      id: userId,
+      email: legacy.email || null,
+      display_name: legacy.displayName ?? null,
+      photo_url: legacy.photoURL ?? null,
+      phone: legacy.phone ?? null,
+      whatsapp_phone: legacy.whatsappPhone ?? null,
+      whatsapp_same_as_phone: legacy.whatsappSameAsPhone ?? true,
+      receive_updates: legacy.receiveUpdates ?? false,
+      pet_feeds: legacy.petFeeds ?? [],
+      pet_feed_draft: legacy.petFeedDraft ?? null,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+
+  return legacy;
+};
+
 export const upsertUserIdentity = async (
   userId: string,
   identity: Pick<UserProfile, "email" | "displayName" | "photoURL">
