@@ -156,7 +156,7 @@ export function PetFeedForm() {
   }, [accountDraftReady, draftReady, formData, profileReady, step, submitted, user?.uid])
 
   const selectedBreed = useMemo(() => formData.petBreed ? getBreed(formData.petType, formData.petBreed) : null, [formData.petBreed, formData.petType])
-  const selectedBreedImage = selectedBreed ? getBreedImageSource(selectedBreed) : null
+  const selectedBreedImage = selectedBreed ? getBreedImageSource(formData.petType, selectedBreed) : null
   const ageMonths = formData.ageValue && Number(formData.ageValue) > 0
     ? (formData.ageUnit === "years" ? Number(formData.ageValue) * 12 : Number(formData.ageValue))
     : null
@@ -211,7 +211,7 @@ export function PetFeedForm() {
         petName: formData.petName.trim(),
         petType: formData.petType,
         petBreed: formData.petBreed, ageValue, ageUnit: formData.ageUnit, ageMonths, lifeStage: getLifeStage(formData.petType, ageMonths), sex: formData.sex,
-        neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed ? getBreedImageSource(selectedBreed) ?? undefined : undefined,
+        neutered: formData.neutered, weightKg: Number(formData.weightKg), heightCm: formData.heightCm ? Number(formData.heightCm) : undefined, activityLevel: formData.activityLevel, breedImageUrl: selectedBreed ? getBreedImageSource(formData.petType, selectedBreed) ?? undefined : undefined,
         breedReferenceRange: selectedBreed?.adultWeightRange, breedHeightReferenceRange: selectedBreed?.adultHeightRange, ribsScore: formData.ribsScore, waistScore: formData.waistScore, tuckScore: formData.tuckScore,
         bodyConditionScore: bcs, weightStatus: status, foodType: formData.foodType, foodBrand: formData.foodBrand.trim(), dailyMeals: Number(formData.dailyMeals),
         dailyQuantity: formData.dailyQuantity.trim(), treatsPerDay: Number(formData.treatsPerDay), allergies: formData.allergies.trim(), medicalConditions: formData.medicalConditions.trim(),
@@ -311,7 +311,7 @@ export function PetFeedForm() {
           <div className="grid items-end gap-5 sm:grid-cols-2">
             <InputField label="Pet name" value={formData.petName} onChange={(value) => set("petName", value)} />
             <SelectField label="Pet type" value={formData.petType} onChange={(value) => { set("petType", value as PetType); set("petBreed", "") }} options={[["Dog", "Dog"], ["Cat", "Cat"]]} />
-            <BreedSelectField label="Breed" value={formData.petBreed} onChange={(value) => set("petBreed", value)} placeholder="Select breed" breeds={BREEDS[formData.petType]} />
+            <BreedSelectField label="Breed" value={formData.petBreed} onChange={(value) => set("petBreed", value)} placeholder="Select breed" breeds={BREEDS[formData.petType]} petType={formData.petType} />
             <InputField label="Age" type="number" min="0.1" step="0.1" value={formData.ageValue} onChange={(value) => set("ageValue", value)} />
             <SelectField label="Age unit" value={formData.ageUnit} onChange={(value) => set("ageUnit", value as FormData["ageUnit"])} options={[["months", "Months"], ["years", "Years"]]} />
             <SelectField label="Sex" value={formData.sex} onChange={(value) => set("sex", value as FormData["sex"])} options={[["male", "Male"], ["female", "Female"], ["unknown", "Unknown"]]} />
@@ -321,8 +321,8 @@ export function PetFeedForm() {
             <Toggle label="Spayed/neutered" checked={formData.neutered} onChange={(value) => set("neutered", value)} />
           </div>
           {selectedBreed && <div className={`grid overflow-hidden rounded-2xl border border-orange-100/70 bg-white/75 shadow-sm dark:border-orange-900/20 dark:bg-black/20 ${selectedBreedImage ? "sm:grid-cols-[180px_1fr]" : ""}`}>
-            {selectedBreedImage && <BreedPhoto breed={selectedBreed} className="h-44 w-full rounded-none" />}
-            <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">{selectedBreed.adultWeightRange ? "Breed references loaded" : "Breed selected"}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p></div>
+            {selectedBreedImage && <BreedPhoto breed={selectedBreed} petType={formData.petType} className="h-44 w-full rounded-none" />}
+            <div className="p-5"><div className="flex flex-wrap items-center gap-2"><p className="text-xl font-black text-foreground">{selectedBreed.name}</p><span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-800">{selectedBreed.adultWeightRange ? "Breed references loaded" : "Breed selected"}</span></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult weight</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultWeightRange ?? "Not available"}</p></div><div className="rounded-xl bg-muted/60 p-3"><p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">General adult shoulder height</p><p className="mt-1 text-sm font-bold">{selectedBreed.adultHeightRange ?? "Not available"}</p></div></div><p className="mt-3 text-xs text-muted-foreground">These are general adult references—not your pet’s current measurements, diagnostic targets, or guaranteed ideal values. Enter measured weight and optional height above.</p>{selectedBreedImage && !selectedBreed.thumbnail && <p className="mt-2 text-[10px] text-muted-foreground">Breed photo: Wikipedia / Wikimedia Commons. A verified local PawSattva image will take priority when available.</p>}</div>
           </div>}
           {selectedBreed && <div className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-lg dark:border-orange-900/40 dark:bg-black/30">
             <div className="mb-3 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
@@ -451,13 +451,15 @@ const SelectField = ({
 
 const BreedPhoto = ({
   breed,
+  petType,
   className,
 }: {
   breed: BreedReference
+  petType: PetType
   className: string
 }) => {
   const [failed, setFailed] = useState(false)
-  const source = getBreedImageSource(breed)
+  const source = getBreedImageSource(petType, breed)
   const initials = breed.name
     .split(/[\s/-]+/)
     .filter(Boolean)
@@ -501,12 +503,14 @@ const BreedSelectField = ({
   value,
   onChange,
   breeds,
+  petType,
   placeholder,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   breeds: BreedReference[]
+  petType: PetType
   placeholder?: string
 }) => {
   const [open, setOpen] = useState(false)
@@ -528,6 +532,7 @@ const BreedSelectField = ({
               <span className="flex min-w-0 items-center gap-3">
                 <BreedPhoto
                   breed={selected}
+                  petType={petType}
                   className="h-9 w-12 rounded-lg border border-white/70 shadow-sm dark:border-white/10"
                 />
                 <span className="truncate">{selected.name}</span>
@@ -565,6 +570,7 @@ const BreedSelectField = ({
                       >
                         <BreedPhoto
                           breed={breed}
+                          petType={petType}
                           className="h-11 w-14 rounded-lg border border-border/60 shadow-sm"
                         />
                         <span className="min-w-0">
@@ -578,6 +584,9 @@ const BreedSelectField = ({
                 </CommandGroup>
               ))}
             </CommandList>
+            <div className="border-t border-border/60 px-3 py-2 text-[10px] leading-relaxed text-muted-foreground">
+              Breed-matched photos use verified local PawSattva assets first, then validated Wikipedia/Wikimedia thumbnails.
+            </div>
           </Command>
         </PopoverContent>
       </Popover>
