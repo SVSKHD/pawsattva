@@ -50,6 +50,7 @@ export default function RootLayout({
         <AuthProvider>
           <AuthDialogProvider>
             <TooltipProvider>
+              <ProfileOnboardingGate />
               <PetCursorAura />
               {children}
               <SonnerToaster richColors position="top-center" />
