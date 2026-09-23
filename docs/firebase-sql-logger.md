@@ -16,13 +16,27 @@ The SQL Connect service and the Cloud SQL PostgreSQL instance must be in the sam
 
 ## First-time Firebase setup
 
-From the repository root, authenticate the Firebase CLI and initialize/provision SQL Connect for the PawSattva Firebase project. Keep the resource names above, or update `dataconnect/dataconnect.yaml` to the resource names you choose.
+The production project must have the Firebase SQL Connect API enabled before any web query or mutation can succeed.
 
-Then deploy the schema and connector:
+Enable the API for the PawSattva Google Cloud project:
 
 ```bash
-npx -y firebase-tools@latest deploy --only dataconnect
+gcloud services enable firebasedataconnect.googleapis.com --project=pawsattva
 ```
+
+After the API reports enabled, deploy the checked-in Data Connect schema and connector:
+
+```bash
+npm run firebase:logger:deploy
+```
+
+Equivalent direct command:
+
+```bash
+npx -y firebase-tools@latest deploy --only dataconnect --project pawsattva
+```
+
+If the API was just enabled, allow a few minutes for Google Cloud service activation to propagate before retrying the web logger.
 
 The Firebase console/CLI provisioning flow creates or links the Cloud SQL for PostgreSQL instance. The repository cannot provision a Cloud SQL instance without credentials for the target Firebase/Google Cloud project.
 
@@ -70,3 +84,16 @@ Ownership is enforced inside the deployed connector:
 - delete requires both the requested entry id and `userId == auth.uid`
 
 The client never supplies an owner UID to the PostgreSQL mutation.
+
+## Production 403: SERVICE_DISABLED
+
+If the browser reports `403 PERMISSION_DENIED` with `reason: SERVICE_DISABLED` for `firebasedataconnect.googleapis.com`, the application code is reaching the correct Google API endpoint but the API is disabled for the project.
+
+The fix is infrastructure activation, not a Netlify change:
+
+1. Enable `firebasedataconnect.googleapis.com` for project `pawsattva`.
+2. Deploy Data Connect with `npm run firebase:logger:deploy`.
+3. Wait for activation/deployment propagation.
+4. Reload `/logger` and use **Retry database** if the unavailable banner is still visible.
+
+The web client now detects this specific condition and opens a local circuit breaker so it does not keep repeating failing SQL requests while the service is disabled.
