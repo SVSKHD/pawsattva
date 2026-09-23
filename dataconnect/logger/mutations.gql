@@ -13,10 +13,6 @@ mutation SaveMyLoggerProfile(
     }
   ) {
     userId
-    phone
-    whatsappPhone
-    whatsappSameAsPhone
-    updatedAt
   }
 }
 
@@ -46,17 +42,6 @@ mutation AddPetLoggerEntry(
     }
   ) {
     id
-    userId
-    loggedOn
-    petName
-    mealType
-    loggedAt
-    foodName
-    quantity
-    waterMl
-    treats
-    notes
-    createdAt
   }
 }
 
