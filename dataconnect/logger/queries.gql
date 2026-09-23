@@ -1,0 +1,32 @@
+query GetMyLoggerProfile @auth(level: USER) {
+  loggerProfile(key: { userId_expr: "auth.uid" }) {
+    userId
+    phone
+    whatsappPhone
+    whatsappSameAsPhone
+    updatedAt
+  }
+}
+
+query GetMyPetLoggerEntries($start: Date!, $end: Date!) @auth(level: USER) {
+  petLoggerEntries(
+    where: {
+      userId: { eq_expr: "auth.uid" }
+      loggedOn: { ge: $start, le: $end }
+    }
+    orderBy: { loggedOn: DESC }
+  ) {
+    id
+    userId
+    loggedOn
+    petName
+    mealType
+    loggedAt
+    foodName
+    quantity
+    waterMl
+    treats
+    notes
+    createdAt
+  }
+}
