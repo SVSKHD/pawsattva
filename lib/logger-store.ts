@@ -51,7 +51,7 @@ type ListLoggerEntriesData = {
 }
 
 type CreateLoggerEntryData = {
-  petLoggerEntry_insert: LoggerRow
+  petLoggerEntry_insert: { id: string }
 }
 
 const assertCurrentUser = (userId: string) => {
@@ -124,7 +124,20 @@ export async function savePetLoggerEntry(
     notes: entry.notes?.trim() || null,
   })
 
-  return mapRow(data.petLoggerEntry_insert)
+  return {
+    id: data.petLoggerEntry_insert.id,
+    userId: entry.userId,
+    loggedOn: entry.loggedOn,
+    petName: entry.petName.trim(),
+    mealType: entry.mealType,
+    loggedAt: entry.loggedAt || undefined,
+    foodName: entry.foodName.trim(),
+    quantity: entry.quantity?.trim() || undefined,
+    waterMl: entry.waterMl,
+    treats: entry.treats?.trim() || undefined,
+    notes: entry.notes?.trim() || undefined,
+    createdAt: new Date().toISOString(),
+  }
 }
 
 export async function deletePetLoggerEntry(
