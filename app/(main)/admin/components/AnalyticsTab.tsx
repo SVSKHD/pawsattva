@@ -42,6 +42,22 @@ interface AnalyticsTabProps {
 }
 
 export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: AnalyticsTabProps) {
+  void totalPetFeeds
+
+  const nonAdminUsers = useMemo(
+    () => users.filter((profile) => !(profile.admin || profile.role === "admin")),
+    [users]
+  )
+
+  const userPetFeeds = useMemo(
+    () =>
+      nonAdminUsers.reduce(
+        (sum, profile) => sum + (profile.petFeeds?.length ?? 0),
+        0
+      ),
+    [nonAdminUsers]
+  )
+
   const totalViews = blogs.reduce((sum, b) => sum + (b.views ?? 0), 0)
   const totalLikes = blogs.reduce((sum, b) => sum + (b.likes ?? 0), 0)
   const totalDislikes = blogs.reduce((sum, b) => sum + (b.dislikes ?? 0), 0)
@@ -56,7 +72,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
 
   // Recent user signups (sorted by creation date)
   const recentUsers = useMemo(() =>
-    [...users]
+    [...nonAdminUsers]
       .filter(u => u.createdAt)
       .sort((a, b) => {
         const da = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime()
@@ -64,14 +80,14 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
         return db - da
       })
       .slice(0, 8),
-    [users]
+    [nonAdminUsers]
   )
 
   const stats = [
-    { label: "Total Users", value: users.length, icon: Users, color: "bg-blue-500/10 text-blue-600" },
+    { label: "Total Users", value: nonAdminUsers.length, icon: Users, color: "bg-blue-500/10 text-blue-600" },
     { label: "Subscribers", value: subscribers.length, icon: Mail, color: "bg-violet-500/10 text-violet-600" },
     { label: "Blog Posts", value: blogs.length, icon: FileText, color: "bg-rose-500/10 text-rose-600" },
-    { label: "Pet Feeds", value: totalPetFeeds, icon: Dog, color: "bg-orange-500/10 text-orange-600" },
+    { label: "Pet Feeds", value: userPetFeeds, icon: Dog, color: "bg-orange-500/10 text-orange-600" },
     { label: "Total Views", value: totalViews, icon: Eye, color: "bg-sky-500/10 text-sky-600" },
     { label: "Total Likes", value: totalLikes, icon: Heart, color: "bg-emerald-500/10 text-emerald-600" },
     { label: "Total Dislikes", value: totalDislikes, icon: ThumbsDown, color: "bg-rose-500/10 text-rose-500" },
@@ -277,7 +293,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
         </CardHeader>
         <CardContent className="p-4 sm:p-8 pt-2">
           <div className="space-y-3">
-            {users.filter(u => u.petFeeds && u.petFeeds.length > 0).map((u, rank) => (
+            {nonAdminUsers.filter(u => u.petFeeds && u.petFeeds.length > 0).map((u, rank) => (
               <div
                 key={u.id}
                 className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all"
@@ -308,7 +324,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
                 </span>
               </div>
             ))}
-            {users.filter(u => u.petFeeds && u.petFeeds.length > 0).length === 0 && (
+            {nonAdminUsers.filter(u => u.petFeeds && u.petFeeds.length > 0).length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Dog className="w-10 h-10 mx-auto mb-3 opacity-20" />
                 <p className="font-medium">No pet feed submissions yet.</p>

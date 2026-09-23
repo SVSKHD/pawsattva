@@ -16,6 +16,7 @@ import {
   Phone,
   Save,
   Search,
+  ShieldCheck,
   Trash2,
   UserRound,
   Users,
@@ -185,26 +186,59 @@ export function UsersTab({
   handleChangeUserRole,
   handleDeleteUserAccount,
 }: UsersTabProps) {
+  void totalPetFeeds
+
   const [ageFilter, setAgeFilter] = useState<UserAgeFilter>("all")
   const [breedFilter, setBreedFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
+
+  const admins = useMemo(
+    () =>
+      users
+        .filter((profile) => getRole(profile) === "admin")
+        .sort((a, b) => {
+          const aDate = toDate(a.createdAt)?.getTime() ?? 0
+          const bDate = toDate(b.createdAt)?.getTime() ?? 0
+          return bDate - aDate
+        }),
+    [users]
+  )
+
+  const nonAdminUsers = useMemo(
+    () => users.filter((profile) => getRole(profile) !== "admin"),
+    [users]
+  )
+
+  const nonAdminFilteredUsers = useMemo(
+    () => filteredUsers.filter((profile) => getRole(profile) !== "admin"),
+    [filteredUsers]
+  )
+
+  const userPetCount = useMemo(
+    () =>
+      nonAdminUsers.reduce(
+        (sum, profile) => sum + (profile.petFeeds?.length ?? 0),
+        0
+      ),
+    [nonAdminUsers]
+  )
 
   const breeds = useMemo(
     () =>
       Array.from(
         new Set(
-          users.flatMap((profile) =>
+          nonAdminUsers.flatMap((profile) =>
             (profile.petFeeds ?? [])
               .map((feed) => feed.petBreed?.trim())
               .filter((breed): breed is string => Boolean(breed))
           )
         )
       ).sort((a, b) => a.localeCompare(b)),
-    [users]
+    [nonAdminUsers]
   )
 
   const visibleUsers = useMemo(() => {
-    return [...filteredUsers]
+    return [...nonAdminFilteredUsers]
       .filter((profile) => {
         if (ageFilter === "new") return isNewUser(profile)
         if (ageFilter === "old") {
@@ -225,7 +259,7 @@ export function UsersTab({
         const bDate = toDate(b.createdAt)?.getTime() ?? 0
         return bDate - aDate
       })
-  }, [ageFilter, breedFilter, filteredUsers])
+  }, [ageFilter, breedFilter, nonAdminFilteredUsers])
 
   const totalPages = Math.max(1, Math.ceil(visibleUsers.length / PAGE_SIZE))
   const pageUsers = useMemo(
@@ -278,10 +312,10 @@ export function UsersTab({
             <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
               <div>
                 <CardTitle className="text-xl font-bold sm:text-2xl">
-                  All Users
+                  Users
                 </CardTitle>
                 <CardDescription className="mt-1 text-xs sm:text-base">
-                  Search users, filter by join age or breed, and click any row to
+                  Search non-admin users, filter by join age or breed, and click any row to
                   see the full profile and registered pets.
                 </CardDescription>
               </div>
@@ -289,11 +323,15 @@ export function UsersTab({
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600">
                   <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  {users.length} users
+                  {nonAdminUsers.length} users
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 text-xs font-bold text-violet-600">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {admins.length} {admins.length === 1 ? "admin" : "admins"}
                 </span>
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-600">
                   <PawPrint className="h-3.5 w-3.5" />
-                  {totalPetFeeds} pets
+                  {userPetCount} user pets
                 </span>
               </div>
             </div>
@@ -345,8 +383,63 @@ export function UsersTab({
           </div>
         </CardHeader>
 
+        {admins.length > 0 && (
+          <div className="border-y border-border/40 bg-violet-500/[0.035] px-4 py-4 sm:px-8">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-violet-600">
+                  <ShieldCheck className="h-4 w-4" />
+                  Administrators
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Admin accounts are separated and are not included in the user count or pagination.
+                </p>
+              </div>
+              <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-black text-violet-600">
+                {admins.length}
+              </span>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {admins.map((admin) => (
+                <button
+                  key={admin.id}
+                  type="button"
+                  onClick={() => setExpandedUserId(admin.id)}
+                  className="flex min-h-[74px] items-center gap-3 rounded-2xl border border-violet-500/15 bg-background/70 p-3 text-left transition-colors hover:border-violet-500/30 hover:bg-violet-500/[0.05]"
+                >
+                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-violet-500/20 bg-violet-500/10 font-bold text-violet-600">
+                    {admin.photoURL ? (
+                      <NextImage
+                        src={admin.photoURL}
+                        alt={admin.displayName || "Admin"}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <ShieldCheck className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black">
+                      {admin.displayName || "Administrator"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {admin.email}
+                    </p>
+                    <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
+                      Joined {formatDate(admin.createdAt, "Unknown")}
+                    </p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <CardContent className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
+          <div className="min-h-[430px] overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead>
                 <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
@@ -377,7 +470,7 @@ export function UsersTab({
                     <tr
                       key={profile.id}
                       onClick={(event) => openUser(event, profile)}
-                      className="group cursor-pointer transition-colors hover:bg-orange-500/[0.04] dark:hover:bg-orange-500/[0.06]"
+                      className="group h-[82px] cursor-pointer transition-colors hover:bg-orange-500/[0.04] dark:hover:bg-orange-500/[0.06]"
                     >
                       <td className="px-6 py-4">
                         {editingUserId === profile.id ? (
@@ -662,7 +755,7 @@ export function UsersTab({
               matching users
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              5 users per page · {totalPetFeeds} total pet profiles
+              5 users per page · {userPetCount} pet profiles from users
             </p>
           </div>
 
