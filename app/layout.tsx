@@ -8,6 +8,7 @@ import { AuthDialogProvider } from "@/components/auth-dialog-provider";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { FirebaseAnalytics } from "@/components/firebase-analytics";
 import PetCursorAura from "@/components/pet-cursor-aura";
+import { ProfileOnboardingGate } from "@/components/profile-onboarding-gate";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -50,6 +51,7 @@ export default function RootLayout({
         <AuthProvider>
           <AuthDialogProvider>
             <TooltipProvider>
+              <ProfileOnboardingGate />
               <PetCursorAura />
               {children}
               <SonnerToaster richColors position="top-center" />

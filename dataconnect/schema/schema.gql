@@ -1,0 +1,22 @@
+type LoggerProfile @table(key: "userId") {
+  userId: String! @default(expr: "auth.uid")
+  phone: String!
+  whatsappPhone: String!
+  whatsappSameAsPhone: Boolean! @default(value: true)
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+}
+
+type PetLoggerEntry @table @index(fields: ["userId", "loggedOn"], order: [ASC, DESC]) {
+  userId: String! @default(expr: "auth.uid")
+  loggedOn: Date!
+  petName: String!
+  mealType: String!
+  loggedAt: String
+  foodName: String!
+  quantity: String
+  waterMl: Int
+  treats: String
+  notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}

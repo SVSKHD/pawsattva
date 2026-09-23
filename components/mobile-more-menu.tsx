@@ -17,6 +17,7 @@ const menuLinks = [
   { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
   { href: "/pet-feed", label: "Pet Feed" },
+  { href: "/logger", label: "Food Logger" },
   { href: "/consultation", label: "Consultation" },
 ]
 
