@@ -241,6 +241,11 @@ export function LoggerClient() {
     [petName, petProfiles]
   )
 
+  const trendPet = useMemo(
+    () => petProfiles.find((pet) => pet.petName === trendPetName) ?? null,
+    [petProfiles, trendPetName]
+  )
+
   const selectedKey = toDateKey(selectedDate)
   const selectedEntries = useMemo(
     () =>
@@ -415,7 +420,8 @@ export function LoggerClient() {
       const amount = entry.quantity ? ` — ${entry.quantity}` : ""
       const water = entry.waterMl !== undefined ? ` | Water: ${entry.waterMl} ml` : ""
       const treat = entry.treats ? ` | Treats: ${entry.treats}` : ""
-      return `• ${entry.petName}: ${mealLabels[entry.mealType]}${time} — ${entry.foodName}${amount}${water}${treat}`
+      const quality = entry.feedQuality ? ` | Quality: ${qualityLabels[entry.feedQuality]}` : ""
+      return `• ${entry.petName}: ${mealLabels[entry.mealType]}${time} — ${entry.foodName}${amount}${water}${treat}${quality}`
     })
 
     const text = [
@@ -710,7 +716,13 @@ export function LoggerClient() {
                 type="button"
                 className="rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600"
                 onClick={() => {
-                  setWeightKg(lastWeight?.weightKg ? String(lastWeight.weightKg) : "")
+                  setWeightKg(
+                    lastWeight?.weightKg
+                      ? String(lastWeight.weightKg)
+                      : trendPet?.weightKg
+                        ? String(trendPet.weightKg)
+                        : ""
+                  )
                   setWeightOpen(true)
                 }}
               >
@@ -795,7 +807,13 @@ export function LoggerClient() {
                   variant="outline"
                   className="rounded-xl"
                   onClick={() => {
-                    setWeightKg(lastWeight?.weightKg ? String(lastWeight.weightKg) : "")
+                    setWeightKg(
+                    lastWeight?.weightKg
+                      ? String(lastWeight.weightKg)
+                      : trendPet?.weightKg
+                        ? String(trendPet.weightKg)
+                        : ""
+                  )
                     setWeightOpen(true)
                   }}
                 >
@@ -842,7 +860,10 @@ export function LoggerClient() {
                       type="button"
                       size="sm"
                       className="mt-4 rounded-xl"
-                      onClick={() => setWeightOpen(true)}
+                      onClick={() => {
+                        setWeightKg(trendPet?.weightKg ? String(trendPet.weightKg) : "")
+                        setWeightOpen(true)
+                      }}
                     >
                       Log first weight
                     </Button>
