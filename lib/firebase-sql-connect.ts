@@ -28,7 +28,7 @@ export async function runSqlQuery<Data, Variables>(
 ): Promise<Data> {
   const result = await executeQuery(
     queryRef<Data, Variables>(firebaseSql, name, variables),
-    QueryFetchPolicy.SERVER_ONLY
+    { fetchPolicy: QueryFetchPolicy.SERVER_ONLY }
   )
   return result.data
 }
@@ -37,8 +37,8 @@ export async function runSqlQueryWithoutVariables<Data>(
   name: string
 ): Promise<Data> {
   const result = await executeQuery(
-    queryRef<Data, undefined>(firebaseSql, name, undefined),
-    QueryFetchPolicy.SERVER_ONLY
+    queryRef<Data>(firebaseSql, name),
+    { fetchPolicy: QueryFetchPolicy.SERVER_ONLY }
   )
   return result.data
 }
