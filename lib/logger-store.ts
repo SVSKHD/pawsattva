@@ -94,16 +94,24 @@ export async function getPetLoggerEntries(
 
   const entries = snapshot.docs
     .map((entry) => {
-      const data = entry.data() as Omit<PetLoggerEntry, "id">
+      const data = entry.data() as Omit<PetLoggerEntry, "id" | "createdAt"> & {
+        createdAt?: unknown
+      }
+      const rawCreatedAt = data.createdAt
+      const createdAt =
+        typeof rawCreatedAt === "object" &&
+        rawCreatedAt !== null &&
+        "toDate" in rawCreatedAt &&
+        typeof (rawCreatedAt as { toDate?: unknown }).toDate === "function"
+          ? (rawCreatedAt as { toDate: () => Date }).toDate().toISOString()
+          : typeof rawCreatedAt === "string"
+            ? rawCreatedAt
+            : undefined
+
       return {
         id: entry.id,
         ...data,
-        createdAt:
-          typeof data.createdAt === "object" &&
-          data.createdAt &&
-          "toDate" in data.createdAt
-            ? (data.createdAt as { toDate: () => Date }).toDate().toISOString()
-            : data.createdAt,
+        createdAt,
       } as PetLoggerEntry
     })
     .filter((entry) => entry.loggedOn >= startDate && entry.loggedOn <= endDate)
