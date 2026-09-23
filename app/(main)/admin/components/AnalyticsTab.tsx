@@ -46,7 +46,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
 
   const nonAdminUsers = useMemo(
     () => users.filter((profile) => !(profile.admin || profile.role === "admin")),
-    [nonAdminUsers]
+    [users]
   )
 
   const userPetFeeds = useMemo(
@@ -80,7 +80,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
         return db - da
       })
       .slice(0, 8),
-    [users]
+    [nonAdminUsers]
   )
 
   const stats = [
