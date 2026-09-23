@@ -40,7 +40,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { getUserProfile } from "@/firebase/firestore"
 import {
   deletePetLoggerEntry,
   getPetLoggerEntries,
@@ -96,36 +95,6 @@ export function LoggerClient() {
     }
   }, [authLoading, router, user])
 
-  useEffect(() => {
-    if (!user) return
-
-    let active = true
-    const loadProfile = async () => {
-      try {
-        const profile = await getUserProfile(user.uid)
-        if (!active) return
-
-        const names = Array.from(
-          new Set(
-            (profile?.petFeeds ?? [])
-              .map((pet) => pet.petName?.trim())
-              .filter((name): name is string => Boolean(name))
-          )
-        )
-
-        setPetNames(names)
-        if (!petName && names[0]) setPetName(names[0])
-      } catch (error) {
-        console.error("Unable to load pet names:", error)
-      }
-    }
-
-    void loadProfile()
-    return () => {
-      active = false
-    }
-  }, [petName, user])
-
   const loadMonth = useCallback(async () => {
     if (!user) return
 
@@ -135,6 +104,19 @@ export function LoggerClient() {
       const end = toDateKey(endOfMonth(visibleMonth))
       const monthEntries = await getPetLoggerEntries(user.uid, start, end)
       setEntries(monthEntries)
+
+      const names = Array.from(
+        new Set(
+          monthEntries
+            .map((entry) => entry.petName.trim())
+            .filter(Boolean)
+        )
+      ).sort()
+
+      setPetNames((current) =>
+        Array.from(new Set([...current, ...names])).sort()
+      )
+      setPetName((current) => current || names[0] || "")
     } catch (error) {
       console.error("Unable to load pet logger entries:", error)
       toast.error("Could not load this month’s pet logs.")
