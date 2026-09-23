@@ -7,7 +7,7 @@ type LoggerProfile @table(key: "userId") {
   updatedAt: Timestamp! @default(expr: "request.time")
 }
 
-type PetLoggerEntry @table {
+type PetLoggerEntry @table @index(fields: ["userId", "loggedOn"], order: [ASC, DESC]) {
   userId: String! @default(expr: "auth.uid")
   loggedOn: Date!
   petName: String!
