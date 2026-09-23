@@ -139,7 +139,7 @@ export function LoggerClient() {
   )
 
   const loggedDates = useMemo(
-    () => Array.from(new Set(entries.map((entry) => entry.loggedOn))).map(parseISO),
+    () => Array.from(new Set(entries.map((entry) => entry.loggedOn))).map((value) => parseISO(value)),
     [entries]
   )
 
