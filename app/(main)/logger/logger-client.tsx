@@ -487,11 +487,7 @@ export function LoggerClient() {
 
   const retryDatabase = () => {
     resetFirebaseSqlUnavailableState()
-    setDatabaseUnavailable(false)
-    setTimeout(() => {
-      void loadMonth()
-      void loadWeights()
-    }, 0)
+    window.location.reload()
   }
 
   if (authLoading || (!user && !authLoading)) {
