@@ -1,0 +1,74 @@
+mutation SaveMyLoggerProfile(
+  $phone: String!
+  $whatsappPhone: String!
+  $whatsappSameAsPhone: Boolean!
+) @auth(level: USER) {
+  loggerProfile_upsert(
+    data: {
+      userId_expr: "auth.uid"
+      phone: $phone
+      whatsappPhone: $whatsappPhone
+      whatsappSameAsPhone: $whatsappSameAsPhone
+      updatedAt_expr: "request.time"
+    }
+  ) {
+    userId
+    phone
+    whatsappPhone
+    whatsappSameAsPhone
+    updatedAt
+  }
+}
+
+mutation AddPetLoggerEntry(
+  $loggedOn: Date!
+  $petName: String!
+  $mealType: String!
+  $loggedAt: String
+  $foodName: String!
+  $quantity: String
+  $waterMl: Int
+  $treats: String
+  $notes: String
+) @auth(level: USER) {
+  petLoggerEntry_insert(
+    data: {
+      userId_expr: "auth.uid"
+      loggedOn: $loggedOn
+      petName: $petName
+      mealType: $mealType
+      loggedAt: $loggedAt
+      foodName: $foodName
+      quantity: $quantity
+      waterMl: $waterMl
+      treats: $treats
+      notes: $notes
+    }
+  ) {
+    id
+    userId
+    loggedOn
+    petName
+    mealType
+    loggedAt
+    foodName
+    quantity
+    waterMl
+    treats
+    notes
+    createdAt
+  }
+}
+
+mutation DeleteMyPetLoggerEntry($id: UUID!) @auth(level: USER) {
+  petLoggerEntry_delete(
+    first: {
+      where: {
+        id: { eq: $id }
+        userId: { eq_expr: "auth.uid" }
+      }
+    }
+  ) {
+    id
+  }
+}
