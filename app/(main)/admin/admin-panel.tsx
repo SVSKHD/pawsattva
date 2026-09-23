@@ -328,11 +328,28 @@ export default function AdminPanel() {
       .filter((blog) => blog.title.toLowerCase().includes(query))
   }, [blogSearchQuery, blogs, isAuthor, userId])
   const filteredUsers = useMemo(() => {
-    const query = userSearchQuery.toLowerCase()
-    return users.filter((profile) =>
-      (profile.displayName || "").toLowerCase().includes(query) ||
-      profile.email.toLowerCase().includes(query)
-    )
+    const query = userSearchQuery.trim().toLowerCase()
+    if (!query) return users
+
+    return users.filter((profile) => {
+      const userFields = [
+        profile.displayName,
+        profile.email,
+        profile.phone,
+        profile.whatsappPhone,
+      ]
+
+      const userMatch = userFields.some((value) =>
+        (value || "").toLowerCase().includes(query)
+      )
+
+      const petMatch = (profile.petFeeds ?? []).some((feed) =>
+        [feed.petName, feed.petType, feed.petBreed]
+          .some((value) => (value || "").toLowerCase().includes(query))
+      )
+
+      return userMatch || petMatch
+    })
   }, [userSearchQuery, users])
   const totalPetFeeds = useMemo(
     () => users.reduce((sum, profile) => sum + (profile.petFeeds?.length || 0), 0),
