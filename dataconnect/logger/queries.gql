@@ -23,10 +23,29 @@ query GetMyPetLoggerEntries($start: Date!, $end: Date!) @auth(level: USER) {
     mealType
     loggedAt
     foodName
+    feedQuality
     quantity
     waterMl
     treats
     notes
+    createdAt
+  }
+}
+
+query GetMyPetWeightEntries($petName: String!, $start: Date!, $end: Date!) @auth(level: USER) {
+  petWeightEntries(
+    where: {
+      userId: { eq_expr: "auth.uid" }
+      petName: { eq: $petName }
+      loggedOn: { ge: $start, le: $end }
+    }
+    orderBy: { loggedOn: ASC }
+  ) {
+    id
+    userId
+    petName
+    loggedOn
+    weightGrams
     createdAt
   }
 }
