@@ -14,9 +14,18 @@ type PetLoggerEntry @table @index(fields: ["userId", "loggedOn"], order: [ASC, D
   mealType: String!
   loggedAt: String
   foodName: String!
+  feedQuality: String
   quantity: String
   waterMl: Int
   treats: String
   notes: String
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type PetWeightEntry @table @index(fields: ["userId", "petName", "loggedOn"], order: [ASC, ASC, DESC]) {
+  userId: String! @default(expr: "auth.uid")
+  petName: String!
+  loggedOn: Date!
+  weightGrams: Int!
   createdAt: Timestamp! @default(expr: "request.time")
 }

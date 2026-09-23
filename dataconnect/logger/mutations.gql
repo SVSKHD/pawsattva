@@ -22,6 +22,7 @@ mutation AddPetLoggerEntry(
   $mealType: String!
   $loggedAt: String
   $foodName: String!
+  $feedQuality: String!
   $quantity: String
   $waterMl: Int
   $treats: String
@@ -35,10 +36,28 @@ mutation AddPetLoggerEntry(
       mealType: $mealType
       loggedAt: $loggedAt
       foodName: $foodName
+      feedQuality: $feedQuality
       quantity: $quantity
       waterMl: $waterMl
       treats: $treats
       notes: $notes
+    }
+  ) {
+    id
+  }
+}
+
+mutation AddPetWeightEntry(
+  $petName: String!
+  $loggedOn: Date!
+  $weightGrams: Int!
+) @auth(level: USER) {
+  petWeightEntry_insert(
+    data: {
+      userId_expr: "auth.uid"
+      petName: $petName
+      loggedOn: $loggedOn
+      weightGrams: $weightGrams
     }
   ) {
     id
