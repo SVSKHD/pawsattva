@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
+  differenceInCalendarDays,
   endOfMonth,
   format,
   parseISO,
   startOfMonth,
+  subDays,
 } from "date-fns"
 import {
   CalendarDays,
@@ -19,12 +21,23 @@ import {
   Loader2,
   PawPrint,
   Plus,
+  Scale,
   Share2,
   Sparkles,
+  TrendingUp,
   Trash2,
   Utensils,
 } from "lucide-react"
 import { toast } from "sonner"
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts"
 
 import { getUserProfile, type PetFeedEntry } from "@/firebase/firestore"
 import { useAuth } from "@/components/auth-provider"
@@ -50,9 +63,13 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   deletePetLoggerEntry,
   getPetLoggerEntries,
+  getPetWeightEntries,
+  type FeedQuality,
   type LoggerMealType,
   type PetLoggerEntry,
+  type PetWeightEntry,
   savePetLoggerEntry,
+  savePetWeightEntry,
 } from "@/lib/logger-store"
 
 const mealLabels: Record<LoggerMealType, string> = {
@@ -65,6 +82,18 @@ const mealLabels: Record<LoggerMealType, string> = {
 }
 
 const mealOptions = Object.entries(mealLabels) as [LoggerMealType, string][]
+
+const qualityLabels: Record<FeedQuality, string> = {
+  healthy: "Healthy",
+  okay: "Okay",
+  poor: "Poor",
+}
+
+const qualityScores: Record<FeedQuality, number> = {
+  healthy: 3,
+  okay: 2,
+  poor: 1,
+}
 
 const toDateKey = (date: Date) => format(date, "yyyy-MM-dd")
 
@@ -86,12 +115,19 @@ export function LoggerClient() {
   const [loadingPets, setLoadingPets] = useState(true)
   const [petPickerOpen, setPetPickerOpen] = useState(false)
   const [moreDetailsOpen, setMoreDetailsOpen] = useState(false)
+  const [trendPetName, setTrendPetName] = useState("")
+  const [weightEntries, setWeightEntries] = useState<PetWeightEntry[]>([])
+  const [loadingWeights, setLoadingWeights] = useState(false)
+  const [weightOpen, setWeightOpen] = useState(false)
+  const [weightKg, setWeightKg] = useState("")
+  const [savingWeight, setSavingWeight] = useState(false)
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const [petName, setPetName] = useState("")
+  const [feedQuality, setFeedQuality] = useState<FeedQuality>("okay")
   const [mealType, setMealType] = useState<LoggerMealType>("breakfast")
   const [loggedAt, setLoggedAt] = useState(currentTime)
   const [foodName, setFoodName] = useState("")
@@ -122,6 +158,7 @@ export function LoggerClient() {
         const pets = profile?.petFeeds ?? []
         setPetProfiles(pets)
         setPetName((current) => current || pets[0]?.petName || "")
+        setTrendPetName((current) => current || pets[0]?.petName || "")
       })
       .catch((error) => {
         console.error("Unable to load saved pet profiles:", error)
@@ -170,6 +207,35 @@ export function LoggerClient() {
     void loadMonth()
   }, [loadMonth])
 
+  const loadWeights = useCallback(async () => {
+    if (!user || !trendPetName) {
+      setWeightEntries([])
+      return
+    }
+
+    setLoadingWeights(true)
+    try {
+      const end = new Date()
+      const start = subDays(end, 90)
+      const weights = await getPetWeightEntries(
+        user.uid,
+        trendPetName,
+        toDateKey(start),
+        toDateKey(end)
+      )
+      setWeightEntries(weights)
+    } catch (error) {
+      console.error("Unable to load pet weight history:", error)
+      toast.error("Could not load weight history.")
+    } finally {
+      setLoadingWeights(false)
+    }
+  }, [trendPetName, user])
+
+  useEffect(() => {
+    void loadWeights()
+  }, [loadWeights])
+
   const selectedPet = useMemo(
     () => petProfiles.find((pet) => pet.petName === petName) ?? null,
     [petName, petProfiles]
@@ -194,7 +260,45 @@ export function LoggerClient() {
     [selectedEntries]
   )
 
+  const qualityTrend = useMemo(() => {
+    const byDay = new Map<string, { total: number; count: number }>()
+
+    entries
+      .filter((entry) => entry.petName === trendPetName && entry.feedQuality)
+      .forEach((entry) => {
+        const score = qualityScores[entry.feedQuality as FeedQuality]
+        const current = byDay.get(entry.loggedOn) || { total: 0, count: 0 }
+        current.total += score
+        current.count += 1
+        byDay.set(entry.loggedOn, current)
+      })
+
+    return Array.from(byDay.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, value]) => ({
+        date: format(parseISO(date), "dd MMM"),
+        score: Number((value.total / value.count).toFixed(2)),
+      }))
+  }, [entries, trendPetName])
+
+  const weightTrend = useMemo(
+    () =>
+      weightEntries.map((entry) => ({
+        date: format(parseISO(entry.loggedOn), "dd MMM"),
+        weight: entry.weightKg,
+      })),
+    [weightEntries]
+  )
+
+  const lastWeight = weightEntries.at(-1)
+  const needsWeightCheckIn = useMemo(() => {
+    if (!trendPetName) return false
+    if (!lastWeight) return true
+    return differenceInCalendarDays(new Date(), parseISO(lastWeight.loggedOn)) >= 7
+  }, [lastWeight, trendPetName])
+
   const resetForm = () => {
+    setFeedQuality("okay")
     setMealType("breakfast")
     setLoggedAt(currentTime())
     setFoodName("")
@@ -233,6 +337,7 @@ export function LoggerClient() {
         mealType,
         loggedAt: loggedAt || undefined,
         foodName: foodName.trim(),
+        feedQuality,
         quantity: quantity.trim() || undefined,
         waterMl: parsedWater,
         treats: treats.trim() || undefined,
@@ -245,12 +350,44 @@ export function LoggerClient() {
       }
       setAddOpen(false)
       resetForm()
-      toast.success("Pet food log saved.")
+      toast.success("Meal logged and nutrition trend updated.")
     } catch (error) {
       console.error("Unable to save pet logger entry:", error)
       toast.error("Could not save this food log.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleWeightSave = async () => {
+    if (!user || !trendPetName) return
+
+    const parsedWeight = Number(weightKg)
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0 || parsedWeight > 250) {
+      toast.error("Enter a valid weight in kg.")
+      return
+    }
+
+    setSavingWeight(true)
+    try {
+      const saved = await savePetWeightEntry({
+        userId: user.uid,
+        petName: trendPetName,
+        loggedOn: toDateKey(new Date()),
+        weightKg: parsedWeight,
+      })
+      setWeightEntries((current) =>
+        [...current.filter((entry) => entry.loggedOn !== saved.loggedOn), saved]
+          .sort((a, b) => a.loggedOn.localeCompare(b.loggedOn))
+      )
+      setWeightKg("")
+      setWeightOpen(false)
+      toast.success(`${trendPetName}'s weekly weight was logged.`)
+    } catch (error) {
+      console.error("Unable to save pet weight:", error)
+      toast.error("Could not save this weight.")
+    } finally {
+      setSavingWeight(false)
     }
   }
 
@@ -450,7 +587,20 @@ export function LoggerClient() {
                               {entry.petName} · {mealLabels[entry.mealType]}
                               {entry.loggedAt ? ` · ${entry.loggedAt}` : ""}
                             </p>
-                            <h3 className="mt-1 text-lg font-bold">{entry.foodName}</h3>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              <h3 className="text-lg font-bold">{entry.foodName}</h3>
+                              {entry.feedQuality && (
+                                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
+                                  entry.feedQuality === "healthy"
+                                    ? "bg-emerald-500/10 text-emerald-600"
+                                    : entry.feedQuality === "poor"
+                                      ? "bg-rose-500/10 text-rose-600"
+                                      : "bg-amber-500/10 text-amber-600"
+                                }`}>
+                                  {qualityLabels[entry.feedQuality]}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           <Button
@@ -503,6 +653,248 @@ export function LoggerClient() {
           )}
         </div>
       </div>
+
+      <section className="mt-7 space-y-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">
+              <TrendingUp className="h-3.5 w-3.5" />
+              Pet progress
+            </div>
+            <h2 className="text-2xl font-black">Nutrition & weight trends</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Day-to-day meal quality and a weekly weight check-in for each pet.
+            </p>
+          </div>
+
+          {petProfiles.length > 0 && (
+            <div className="flex max-w-full gap-2 overflow-x-auto pb-1">
+              {petProfiles.map((pet, index) => (
+                <button
+                  key={`trend-${pet.petName}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setTrendPetName(pet.petName)
+                    setPetName(pet.petName)
+                  }}
+                  className={`shrink-0 rounded-full border px-3 py-2 text-xs font-black transition-all duration-300 ${
+                    trendPetName === pet.petName
+                      ? "border-orange-500 bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                      : "bg-background hover:-translate-y-0.5 hover:border-orange-300"
+                  }`}
+                >
+                  {pet.petName}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {trendPetName && needsWeightCheckIn && (
+          <Card className="overflow-hidden rounded-[1.6rem] border-amber-300/60 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm dark:border-amber-900/60 dark:from-amber-950/20 dark:to-orange-950/10">
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/20">
+                  <Scale className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-black">Weekly weight check for {trendPetName}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {lastWeight
+                      ? `Last logged ${differenceInCalendarDays(new Date(), parseISO(lastWeight.loggedOn))} days ago · ${lastWeight.weightKg.toFixed(2)} kg`
+                      : "No logger weight yet. Add the first weekly baseline."}
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                className="rounded-xl bg-amber-500 font-black text-white hover:bg-amber-600"
+                onClick={() => {
+                  setWeightKg(lastWeight?.weightKg ? String(lastWeight.weightKg) : "")
+                  setWeightOpen(true)
+                }}
+              >
+                <Scale className="mr-2 h-4 w-4" />
+                Log weight
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="grid gap-5 xl:grid-cols-2">
+          <Card className="rounded-[1.75rem] border-emerald-500/15 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <TrendingUp className="h-5 w-5 text-emerald-600" />
+                Daily feed quality
+              </CardTitle>
+              <CardDescription>
+                Average owner-rated meal quality for {trendPetName || "your pet"} during the visible logger month.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {qualityTrend.length ? (
+                <div className="h-[260px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={qualityTrend} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.16} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        domain={[1, 3]}
+                        ticks={[1, 2, 3]}
+                        width={58}
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value: number) =>
+                          value === 3 ? "Healthy" : value === 2 ? "Okay" : "Poor"
+                        }
+                      />
+                      <Tooltip
+                        formatter={(value) => {
+                          const score = Number(value)
+                          return [
+                            score >= 2.5 ? "Healthy" : score >= 1.5 ? "Okay" : "Poor",
+                            "Daily quality",
+                          ]
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="score"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed text-center">
+                  <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
+                  <p className="mt-3 font-black">No quality trend yet</p>
+                  <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+                    Log meals and mark them Healthy, Okay or Poor. The daily graph will build automatically.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[1.75rem] border-sky-500/15 shadow-sm">
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Scale className="h-5 w-5 text-sky-600" />
+                  Weekly weight
+                </CardTitle>
+                <CardDescription>Last 90 days for {trendPetName || "your pet"}.</CardDescription>
+              </div>
+              {trendPetName && !needsWeightCheckIn && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => {
+                    setWeightKg(lastWeight?.weightKg ? String(lastWeight.weightKg) : "")
+                    setWeightOpen(true)
+                  }}
+                >
+                  Update weight
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {loadingWeights ? (
+                <div className="flex h-[260px] items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-sky-600" />
+                </div>
+              ) : weightTrend.length ? (
+                <div className="h-[260px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={weightTrend} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.16} />
+                      <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        width={48}
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(value: number) => `${value}kg`}
+                      />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} kg`, "Weight"]} />
+                      <Line
+                        type="monotone"
+                        dataKey="weight"
+                        strokeWidth={3}
+                        dot={{ r: 4 }}
+                        activeDot={{ r: 6 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed text-center">
+                  <Scale className="h-8 w-8 text-muted-foreground/30" />
+                  <p className="mt-3 font-black">Start the weight trend</p>
+                  <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+                    Log {trendPetName || "your pet"} once a week to see gradual changes instead of day-to-day noise.
+                  </p>
+                  {trendPetName && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-4 rounded-xl"
+                      onClick={() => setWeightOpen(true)}
+                    >
+                      Log first weight
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <Dialog open={weightOpen} onOpenChange={(open) => !savingWeight && setWeightOpen(open)}>
+        <DialogContent className="rounded-[2rem] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Scale className="h-5 w-5 text-sky-600" />
+              Weekly weight · {trendPetName}
+            </DialogTitle>
+            <DialogDescription>
+              Log weight once a week to keep the trend useful and easy to compare.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 pt-2">
+            <div className="grid gap-2">
+              <Label htmlFor="weekly-weight">Weight (kg)</Label>
+              <Input
+                id="weekly-weight"
+                type="number"
+                min="0.1"
+                max="250"
+                step="0.01"
+                inputMode="decimal"
+                placeholder="e.g. 12.40"
+                value={weightKg}
+                onChange={(event) => setWeightKg(event.target.value)}
+                className="h-12 rounded-xl text-lg font-black"
+                autoFocus
+              />
+            </div>
+            <Button
+              type="button"
+              className="h-11 rounded-xl font-black"
+              disabled={savingWeight || !weightKg}
+              onClick={handleWeightSave}
+            >
+              {savingWeight && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save weekly weight
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addOpen} onOpenChange={(open) => !saving && setAddOpen(open)}>
         <DialogContent className="logger-dialog max-h-[92vh] overflow-y-auto rounded-[2rem] border-orange-200/60 bg-background/95 p-0 shadow-2xl backdrop-blur-2xl sm:max-w-2xl dark:border-orange-950/60">
@@ -610,6 +1002,7 @@ export function LoggerClient() {
                               type="button"
                               onClick={() => {
                                 setPetName(pet.petName)
+                                setTrendPetName(pet.petName)
                                 setPetPickerOpen(false)
                               }}
                               className={`flex items-center gap-3 rounded-xl p-3 text-left transition-all duration-200 hover:translate-x-1 ${
@@ -717,7 +1110,37 @@ export function LoggerClient() {
               )}
             </div>
 
-            <div className="logger-enter grid grid-cols-2 gap-3" style={{ animationDelay: "80ms" }}>
+            <div className="logger-enter grid gap-2" style={{ animationDelay: "70ms" }}>
+              <Label className="text-xs">How was this meal?</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["healthy", "okay", "poor"] as FeedQuality[]).map((quality) => {
+                  const active = feedQuality === quality
+                  return (
+                    <button
+                      key={quality}
+                      type="button"
+                      onClick={() => setFeedQuality(quality)}
+                      className={`rounded-xl border px-3 py-2.5 text-xs font-black transition-all duration-250 ${
+                        active
+                          ? quality === "healthy"
+                            ? "border-emerald-500 bg-emerald-500 text-white shadow-lg shadow-emerald-500/15"
+                            : quality === "poor"
+                              ? "border-rose-500 bg-rose-500 text-white shadow-lg shadow-rose-500/15"
+                              : "border-amber-500 bg-amber-500 text-white shadow-lg shadow-amber-500/15"
+                          : "bg-background text-muted-foreground hover:-translate-y-0.5 hover:border-orange-300"
+                      }`}
+                    >
+                      {qualityLabels[quality]}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] leading-4 text-muted-foreground">
+                This is the owner’s meal-quality rating used for the trend graph; PawSattva does not infer healthfulness from the food name.
+              </p>
+            </div>
+
+            <div className="logger-enter grid grid-cols-2 gap-3" style={{ animationDelay: "100ms" }}>
               <div className="grid gap-2">
                 <Label htmlFor="logger-meal" className="text-xs">Meal</Label>
                 <div className="relative">
