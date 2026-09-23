@@ -1,0 +1,14 @@
+serviceId: pawsattva-logger
+location: asia-south1
+
+schema:
+  source: ./schema
+  datasource:
+    postgresql:
+      database: pawsattva
+      cloudSql:
+        instanceId: pawsattva-postgres
+        schemaValidation: COMPATIBLE
+
+connectorDirs:
+  - ./logger
