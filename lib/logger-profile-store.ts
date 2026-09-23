@@ -19,7 +19,7 @@ type ProfileData = {
 }
 
 type SaveProfileData = {
-  loggerProfile_upsert: LoggerContactProfile
+  loggerProfile_upsert: { userId: string }
 }
 
 const assertCurrentUser = (userId: string) => {
@@ -57,5 +57,9 @@ export async function saveLoggerContactProfile(
     }
   >("SaveMyLoggerProfile", profile)
 
-  return data.loggerProfile_upsert
+  return {
+    userId: data.loggerProfile_upsert.userId,
+    ...profile,
+    updatedAt: new Date().toISOString(),
+  }
 }
