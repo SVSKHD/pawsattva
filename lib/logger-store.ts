@@ -134,24 +134,25 @@ export async function getPetWeightEntries(
   const snapshot = await getDocs(
     query(
       weightCollection(userId),
-      where("petName", "==", petName.trim()),
       where("loggedOn", ">=", startDate),
       where("loggedOn", "<=", endDate),
       orderBy("loggedOn", "asc")
     )
   )
 
-  return snapshot.docs.map((entry) => {
-    const data = entry.data()
-    return {
-      id: entry.id,
-      userId,
-      petName: String(data.petName ?? ""),
-      loggedOn: String(data.loggedOn ?? ""),
-      weightKg: Number(data.weightKg ?? 0),
-      createdAt: toIsoString(data.createdAt),
-    }
-  })
+  return snapshot.docs
+    .map((entry) => {
+      const data = entry.data()
+      return {
+        id: entry.id,
+        userId,
+        petName: String(data.petName ?? ""),
+        loggedOn: String(data.loggedOn ?? ""),
+        weightKg: Number(data.weightKg ?? 0),
+        createdAt: toIsoString(data.createdAt),
+      }
+    })
+    .filter((entry) => entry.petName === petName.trim())
 }
 
 export async function savePetLoggerEntry(
