@@ -11,7 +11,6 @@ import {
   subDays,
 } from "date-fns"
 import {
-  AlertTriangle,
   CalendarDays,
   Cat,
   Check,
@@ -22,7 +21,6 @@ import {
   Loader2,
   PawPrint,
   Plus,
-  RefreshCw,
   Scale,
   Share2,
   Sparkles,
@@ -42,10 +40,6 @@ import {
 } from "recharts"
 
 import { getUserProfile, type PetFeedEntry } from "@/firebase/firestore"
-import {
-  isFirebaseSqlUnavailableError,
-  resetFirebaseSqlUnavailableState,
-} from "@/lib/firebase-sql-connect"
 import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -128,7 +122,6 @@ export function LoggerClient() {
   const [weightKg, setWeightKg] = useState("")
   const [savingWeight, setSavingWeight] = useState(false)
   const [loadingEntries, setLoadingEntries] = useState(true)
-  const [databaseUnavailable, setDatabaseUnavailable] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -181,7 +174,7 @@ export function LoggerClient() {
   }, [user])
 
   const loadMonth = useCallback(async () => {
-    if (!user || databaseUnavailable) return
+    if (!user) return
 
     setLoadingEntries(true)
     try {
@@ -203,24 +196,19 @@ export function LoggerClient() {
       )
       setPetName((current) => current || names[0] || "")
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setDatabaseUnavailable(true)
-        setEntries([])
-      } else {
-        console.error("Unable to load pet logger entries:", error)
-        toast.error("Could not load this month’s pet logs.")
-      }
+      console.error("Unable to load pet logger entries:", error)
+      toast.error("Could not load this month’s pet logs.")
     } finally {
       setLoadingEntries(false)
     }
-  }, [databaseUnavailable, user, visibleMonth])
+  }, [user, visibleMonth])
 
   useEffect(() => {
     void loadMonth()
   }, [loadMonth])
 
   const loadWeights = useCallback(async () => {
-    if (!user || !trendPetName || databaseUnavailable) {
+    if (!user || !trendPetName) {
       setWeightEntries([])
       return
     }
@@ -237,17 +225,12 @@ export function LoggerClient() {
       )
       setWeightEntries(weights)
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setDatabaseUnavailable(true)
-        setWeightEntries([])
-      } else {
-        console.error("Unable to load pet weight history:", error)
-        toast.error("Could not load weight history.")
-      }
+      console.error("Unable to load pet weight history:", error)
+      toast.error("Could not load weight history.")
     } finally {
       setLoadingWeights(false)
     }
-  }, [databaseUnavailable, trendPetName, user])
+  }, [trendPetName, user])
 
   useEffect(() => {
     void loadWeights()
@@ -374,13 +357,8 @@ export function LoggerClient() {
       resetForm()
       toast.success("Meal logged and nutrition trend updated.")
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setDatabaseUnavailable(true)
-        toast.error("Pet logger database is temporarily unavailable.")
-      } else {
-        console.error("Unable to save pet logger entry:", error)
-        toast.error("Could not save this food log.")
-      }
+      console.error("Unable to save pet logger entry:", error)
+      toast.error("Could not save this food log.")
     } finally {
       setSaving(false)
     }
@@ -411,13 +389,8 @@ export function LoggerClient() {
       setWeightOpen(false)
       toast.success(`${trendPetName}'s weekly weight was logged.`)
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setDatabaseUnavailable(true)
-        toast.error("Pet logger database is temporarily unavailable.")
-      } else {
-        console.error("Unable to save pet weight:", error)
-        toast.error("Could not save this weight.")
-      }
+      console.error("Unable to save pet weight:", error)
+      toast.error("Could not save this weight.")
     } finally {
       setSavingWeight(false)
     }
@@ -432,13 +405,8 @@ export function LoggerClient() {
       setEntries((current) => current.filter((item) => item.id !== entry.id))
       toast.success("Log entry removed.")
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setDatabaseUnavailable(true)
-        toast.error("Pet logger database is temporarily unavailable.")
-      } else {
-        console.error("Unable to delete logger entry:", error)
-        toast.error("Could not remove this log entry.")
-      }
+      console.error("Unable to delete logger entry:", error)
+      toast.error("Could not remove this log entry.")
     } finally {
       setDeletingId(null)
     }
@@ -485,11 +453,6 @@ export function LoggerClient() {
     }
   }
 
-  const retryDatabase = () => {
-    resetFirebaseSqlUnavailableState()
-    window.location.reload()
-  }
-
   if (authLoading || (!user && !authLoading)) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
@@ -519,7 +482,6 @@ export function LoggerClient() {
             type="button"
             size="lg"
             className="rounded-2xl font-bold"
-            disabled={databaseUnavailable}
             onClick={() => {
               resetForm()
               setAddOpen(true)
@@ -530,33 +492,6 @@ export function LoggerClient() {
           </Button>
         </div>
       </section>
-
-      {databaseUnavailable && (
-        <Card className="mb-6 overflow-hidden rounded-[1.6rem] border-amber-300/70 bg-gradient-to-r from-amber-50 via-orange-50 to-background shadow-sm dark:border-amber-900/60 dark:from-amber-950/20 dark:via-orange-950/10">
-          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-md shadow-amber-500/20">
-                <AlertTriangle className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="font-black">Pet logger database is temporarily unavailable</p>
-                <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-                  Your Pet Feed profiles are still available, but meal history and weekly weights cannot be read or saved until the logger database service is active.
-                </p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-xl font-bold"
-              onClick={retryDatabase}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Retry database
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
         <Card className="h-fit rounded-[1.75rem] border-orange-100/70 shadow-sm dark:border-orange-950/50">
@@ -617,7 +552,6 @@ export function LoggerClient() {
                 <Button
                   type="button"
                   className="rounded-xl"
-                  disabled={databaseUnavailable}
                   onClick={() => {
                     resetForm()
                     setAddOpen(true)
@@ -762,7 +696,7 @@ export function LoggerClient() {
           )}
         </div>
 
-        {trendPetName && !databaseUnavailable && needsWeightCheckIn && (
+        {trendPetName && needsWeightCheckIn && (
           <Card className="overflow-hidden rounded-[1.6rem] border-amber-300/60 bg-gradient-to-r from-amber-50 to-orange-50 shadow-sm dark:border-amber-900/60 dark:from-amber-950/20 dark:to-orange-950/10">
             <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
@@ -866,7 +800,7 @@ export function LoggerClient() {
                 </CardTitle>
                 <CardDescription>Last 90 days for {trendPetName || "your pet"}.</CardDescription>
               </div>
-              {trendPetName && !databaseUnavailable && !needsWeightCheckIn && (
+              {trendPetName && !needsWeightCheckIn && (
                 <Button
                   type="button"
                   size="sm"
@@ -921,7 +855,7 @@ export function LoggerClient() {
                   <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
                     Log {trendPetName || "your pet"} once a week to see gradual changes instead of day-to-day noise.
                   </p>
-                  {trendPetName && !databaseUnavailable && (
+                  {trendPetName && (
                     <Button
                       type="button"
                       size="sm"
