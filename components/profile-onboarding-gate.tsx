@@ -21,7 +21,6 @@ import {
   getLoggerContactProfile,
   saveLoggerContactProfile,
 } from "@/lib/logger-profile-store"
-import { isFirebaseSqlUnavailableError } from "@/lib/firebase-sql-connect"
 
 const isValidPhone = (value: string) => {
   const digits = value.replace(/\D/g, "")
@@ -70,12 +69,7 @@ export function ProfileOnboardingGate() {
 
         setOpen(!complete)
       } catch (error) {
-        if (isFirebaseSqlUnavailableError(error)) {
-          console.warn("Firebase SQL contact profile deferred: SQL Connect is unavailable.")
-          if (active) setOpen(false)
-        } else {
-          console.error("Unable to load Firebase SQL contact profile:", error)
-        }
+        console.error("Unable to load contact profile:", error)
       } finally {
         if (active) setCheckedUserId(user.uid)
       }
@@ -113,13 +107,8 @@ export function ProfileOnboardingGate() {
       setOpen(false)
       toast.success("Contact details saved.")
     } catch (error) {
-      if (isFirebaseSqlUnavailableError(error)) {
-        setOpen(false)
-        toast.error("Pet logger database is temporarily unavailable.")
-      } else {
-        console.error("Unable to save Firebase SQL contact profile:", error)
-        toast.error("Could not save your contact details. Please try again.")
-      }
+      console.error("Unable to save contact profile:", error)
+      toast.error("Could not save your contact details. Please try again.")
     } finally {
       setSaving(false)
     }
