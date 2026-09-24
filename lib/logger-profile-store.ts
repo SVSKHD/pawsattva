@@ -1,10 +1,7 @@
 "use client"
 
 import { auth } from "@/firebase/firebase"
-import {
-  runSqlMutation,
-  runSqlQueryWithoutVariables,
-} from "@/lib/firebase-sql-connect"
+import { getUserProfile, updateUser } from "@/firebase/firestore"
 
 export interface LoggerContactProfile {
   userId: string
@@ -12,14 +9,6 @@ export interface LoggerContactProfile {
   whatsappPhone: string
   whatsappSameAsPhone: boolean
   updatedAt?: string
-}
-
-type ProfileData = {
-  loggerProfile: LoggerContactProfile | null
-}
-
-type SaveProfileData = {
-  loggerProfile_upsert: { userId: string }
 }
 
 const assertCurrentUser = (userId: string) => {
@@ -33,10 +22,23 @@ export async function getLoggerContactProfile(
   userId: string
 ): Promise<LoggerContactProfile | null> {
   assertCurrentUser(userId)
-  const data = await runSqlQueryWithoutVariables<ProfileData>(
-    "GetMyLoggerProfile"
-  )
-  return data.loggerProfile
+  const profile = await getUserProfile(userId)
+  if (!profile) return null
+
+  const phone = profile.phone?.trim() ?? ""
+  const whatsappSameAsPhone = profile.whatsappSameAsPhone ?? true
+  const whatsappPhone = whatsappSameAsPhone
+    ? phone
+    : profile.whatsappPhone?.trim() ?? ""
+
+  if (!phone && !whatsappPhone) return null
+
+  return {
+    userId,
+    phone,
+    whatsappPhone,
+    whatsappSameAsPhone,
+  }
 }
 
 export async function saveLoggerContactProfile(
@@ -48,17 +50,14 @@ export async function saveLoggerContactProfile(
 ): Promise<LoggerContactProfile> {
   assertCurrentUser(userId)
 
-  const data = await runSqlMutation<
-    SaveProfileData,
-    {
-      phone: string
-      whatsappPhone: string
-      whatsappSameAsPhone: boolean
-    }
-  >("SaveMyLoggerProfile", profile)
+  await updateUser(userId, {
+    phone: profile.phone,
+    whatsappPhone: profile.whatsappPhone,
+    whatsappSameAsPhone: profile.whatsappSameAsPhone,
+  })
 
   return {
-    userId: data.loggerProfile_upsert.userId,
+    userId,
     ...profile,
     updatedAt: new Date().toISOString(),
   }

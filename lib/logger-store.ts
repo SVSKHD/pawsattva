@@ -1,10 +1,20 @@
 "use client"
 
-import { auth } from "@/firebase/firebase"
 import {
-  runSqlMutation,
-  runSqlQuery,
-} from "@/lib/firebase-sql-connect"
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+} from "firebase/firestore"
+
+import { auth } from "@/firebase/firebase"
+import { db } from "@/firebase/db"
 
 export type LoggerMealType =
   | "breakfast"
@@ -44,47 +54,6 @@ export interface PetWeightEntry {
 export type NewPetLoggerEntry = Omit<PetLoggerEntry, "id" | "createdAt">
 export type NewPetWeightEntry = Omit<PetWeightEntry, "id" | "createdAt">
 
-type LoggerRow = {
-  id: string
-  userId: string
-  loggedOn: string
-  petName: string
-  mealType: LoggerMealType
-  loggedAt?: string | null
-  foodName: string
-  feedQuality?: FeedQuality | null
-  quantity?: string | null
-  waterMl?: number | null
-  treats?: string | null
-  notes?: string | null
-  createdAt?: string | null
-}
-
-type WeightRow = {
-  id: string
-  userId: string
-  petName: string
-  loggedOn: string
-  weightGrams: number
-  createdAt?: string | null
-}
-
-type ListLoggerEntriesData = {
-  petLoggerEntries: LoggerRow[]
-}
-
-type ListWeightEntriesData = {
-  petWeightEntries: WeightRow[]
-}
-
-type CreateLoggerEntryData = {
-  petLoggerEntry_insert: { id: string }
-}
-
-type CreateWeightEntryData = {
-  petWeightEntry_insert: { id: string }
-}
-
 const assertCurrentUser = (userId: string) => {
   const currentUserId = auth.currentUser?.uid
   if (!currentUserId || currentUserId !== userId) {
@@ -92,30 +61,31 @@ const assertCurrentUser = (userId: string) => {
   }
 }
 
-const mapRow = (row: LoggerRow): PetLoggerEntry => ({
-  id: row.id,
-  userId: row.userId,
-  loggedOn: row.loggedOn,
-  petName: row.petName,
-  mealType: row.mealType,
-  loggedAt: row.loggedAt ?? undefined,
-  foodName: row.foodName,
-  feedQuality: row.feedQuality ?? undefined,
-  quantity: row.quantity ?? undefined,
-  waterMl: row.waterMl ?? undefined,
-  treats: row.treats ?? undefined,
-  notes: row.notes ?? undefined,
-  createdAt: row.createdAt ?? undefined,
-})
+const loggerCollection = (userId: string) =>
+  collection(db, "users", userId, "petLoggerEntries")
 
-const mapWeightRow = (row: WeightRow): PetWeightEntry => ({
-  id: row.id,
-  userId: row.userId,
-  petName: row.petName,
-  loggedOn: row.loggedOn,
-  weightKg: row.weightGrams / 1000,
-  createdAt: row.createdAt ?? undefined,
-})
+const weightCollection = (userId: string) =>
+  collection(db, "users", userId, "petWeightEntries")
+
+const toIsoString = (value: unknown) => {
+  if (!value) return undefined
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    return (value as { toDate: () => Date }).toDate().toISOString()
+  }
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value === "string") return value
+  return undefined
+}
+
+const stripUndefined = <T extends Record<string, unknown>>(value: T) =>
+  Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined)
+  )
 
 export async function getPetLoggerEntries(
   userId: string,
@@ -124,15 +94,33 @@ export async function getPetLoggerEntries(
 ): Promise<PetLoggerEntry[]> {
   assertCurrentUser(userId)
 
-  const data = await runSqlQuery<
-    ListLoggerEntriesData,
-    { start: string; end: string }
-  >("GetMyPetLoggerEntries", {
-    start: startDate,
-    end: endDate,
-  })
+  const snapshot = await getDocs(
+    query(
+      loggerCollection(userId),
+      where("loggedOn", ">=", startDate),
+      where("loggedOn", "<=", endDate),
+      orderBy("loggedOn", "desc")
+    )
+  )
 
-  return data.petLoggerEntries.map(mapRow)
+  return snapshot.docs.map((entry) => {
+    const data = entry.data()
+    return {
+      id: entry.id,
+      userId,
+      loggedOn: String(data.loggedOn ?? ""),
+      petName: String(data.petName ?? ""),
+      mealType: (data.mealType ?? "other") as LoggerMealType,
+      loggedAt: data.loggedAt || undefined,
+      foodName: String(data.foodName ?? ""),
+      feedQuality: data.feedQuality as FeedQuality | undefined,
+      quantity: data.quantity || undefined,
+      waterMl: typeof data.waterMl === "number" ? data.waterMl : undefined,
+      treats: data.treats || undefined,
+      notes: data.notes || undefined,
+      createdAt: toIsoString(data.createdAt),
+    }
+  })
 }
 
 export async function getPetWeightEntries(
@@ -143,16 +131,28 @@ export async function getPetWeightEntries(
 ): Promise<PetWeightEntry[]> {
   assertCurrentUser(userId)
 
-  const data = await runSqlQuery<
-    ListWeightEntriesData,
-    { petName: string; start: string; end: string }
-  >("GetMyPetWeightEntries", {
-    petName: petName.trim(),
-    start: startDate,
-    end: endDate,
-  })
+  const snapshot = await getDocs(
+    query(
+      weightCollection(userId),
+      where("loggedOn", ">=", startDate),
+      where("loggedOn", "<=", endDate),
+      orderBy("loggedOn", "asc")
+    )
+  )
 
-  return data.petWeightEntries.map(mapWeightRow)
+  return snapshot.docs
+    .map((entry) => {
+      const data = entry.data()
+      return {
+        id: entry.id,
+        userId,
+        petName: String(data.petName ?? ""),
+        loggedOn: String(data.loggedOn ?? ""),
+        weightKg: Number(data.weightKg ?? 0),
+        createdAt: toIsoString(data.createdAt),
+      }
+    })
+    .filter((entry) => entry.petName === petName.trim())
 }
 
 export async function savePetLoggerEntry(
@@ -160,35 +160,24 @@ export async function savePetLoggerEntry(
 ): Promise<PetLoggerEntry> {
   assertCurrentUser(entry.userId)
 
-  const data = await runSqlMutation<
-    CreateLoggerEntryData,
-    {
-      loggedOn: string
-      petName: string
-      mealType: string
-      loggedAt?: string | null
-      foodName: string
-      feedQuality: string
-      quantity?: string | null
-      waterMl?: number | null
-      treats?: string | null
-      notes?: string | null
-    }
-  >("AddPetLoggerEntry", {
+  const payload = stripUndefined({
     loggedOn: entry.loggedOn,
     petName: entry.petName.trim(),
     mealType: entry.mealType,
-    loggedAt: entry.loggedAt || null,
+    loggedAt: entry.loggedAt || undefined,
     foodName: entry.foodName.trim(),
     feedQuality: entry.feedQuality || "okay",
-    quantity: entry.quantity?.trim() || null,
-    waterMl: entry.waterMl ?? null,
-    treats: entry.treats?.trim() || null,
-    notes: entry.notes?.trim() || null,
+    quantity: entry.quantity?.trim() || undefined,
+    waterMl: entry.waterMl,
+    treats: entry.treats?.trim() || undefined,
+    notes: entry.notes?.trim() || undefined,
+    createdAt: serverTimestamp(),
   })
 
+  const saved = await addDoc(loggerCollection(entry.userId), payload)
+
   return {
-    id: data.petLoggerEntry_insert.id,
+    id: saved.id,
     userId: entry.userId,
     loggedOn: entry.loggedOn,
     petName: entry.petName.trim(),
@@ -209,18 +198,27 @@ export async function savePetWeightEntry(
 ): Promise<PetWeightEntry> {
   assertCurrentUser(entry.userId)
 
-  const weightGrams = Math.round(entry.weightKg * 1000)
-  const data = await runSqlMutation<
-    CreateWeightEntryData,
-    { petName: string; loggedOn: string; weightGrams: number }
-  >("AddPetWeightEntry", {
-    petName: entry.petName.trim(),
-    loggedOn: entry.loggedOn,
-    weightGrams,
-  })
+  const safePetKey =
+    entry.petName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "pet"
+  const weightId = `${safePetKey}-${entry.loggedOn}`
+
+  await setDoc(
+    doc(db, "users", entry.userId, "petWeightEntries", weightId),
+    {
+      petName: entry.petName.trim(),
+      loggedOn: entry.loggedOn,
+      weightKg: entry.weightKg,
+      createdAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
 
   return {
-    id: data.petWeightEntry_insert.id,
+    id: weightId,
     userId: entry.userId,
     petName: entry.petName.trim(),
     loggedOn: entry.loggedOn,
@@ -234,9 +232,5 @@ export async function deletePetLoggerEntry(
   userId: string
 ): Promise<void> {
   assertCurrentUser(userId)
-
-  await runSqlMutation<
-    { petLoggerEntry_delete?: { id: string } | null },
-    { id: string }
-  >("DeleteMyPetLoggerEntry", { id: entryId })
+  await deleteDoc(doc(db, "users", userId, "petLoggerEntries", entryId))
 }
