@@ -89,7 +89,7 @@ export function SocialPetGuide() {
     <aside
       aria-label="Paw Sattva greeting guide"
       data-open={open}
-      className="pet-guide-shell fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] left-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-start md:bottom-6 md:left-6"
+      className="pet-guide-shell fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-end md:bottom-6 md:right-6"
     >
       <style>{`
         @keyframes pet-guide-walk {
@@ -255,12 +255,12 @@ export function SocialPetGuide() {
         </div>
       )}
 
-      <div className="relative min-h-32 min-w-64">
+      <div className="relative min-h-24 min-w-44">
         {greetingVisible && !open && (
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="pet-guide-greeting absolute bottom-20 left-14 z-10 rounded-[1.35rem] border border-orange-100 bg-white/95 px-4 py-3 text-left shadow-lg md:backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/95"
+            className="pet-guide-greeting absolute bottom-16 right-12 z-10 rounded-[1.35rem] border border-orange-100 bg-white/95 px-4 py-3 text-left shadow-lg md:backdrop-blur-sm dark:border-white/10 dark:bg-zinc-950/95"
           >
             <span className="block font-[family-name:var(--font-pacifico)] text-xl leading-none text-orange-600">
               Hi! I’m here.
@@ -276,7 +276,7 @@ export function SocialPetGuide() {
           onClick={() => { setOpen((current) => !current); setGreetingVisible(false) }}
           aria-expanded={open}
           aria-label={open ? "Close Paw Sattva greeting guide" : "Open Paw Sattva greeting guide"}
-          className="pet-guide-walk absolute bottom-0 left-0 rounded-[2rem] p-2 transition-transform hover:scale-[1.03] active:scale-[0.98]"
+          className="pet-guide-walk absolute bottom-0 right-0 rounded-[2rem] p-1.5 transition-transform hover:scale-[1.03] active:scale-[0.98]"
         >
           <MascotCharacter mascot={mascot} />
           <span className="sr-only">Animated {mascot} saying hi</span>
@@ -291,62 +291,110 @@ function MascotCharacter({ mascot }: { mascot: Mascot }) {
 
   return (
     <svg
-      width="118"
-      height="118"
-      viewBox="0 0 118 118"
+      width="88"
+      height="88"
+      viewBox="0 0 96 96"
       role="img"
       aria-label={`Animated ${mascot} mascot`}
       className="pet-guide-shadow"
     >
-      <ellipse cx="58" cy="101" rx="42" ry="9" fill="rgba(15,23,42,0.18)" />
+      <ellipse cx="48" cy="84" rx="27" ry="6" fill="rgba(15,23,42,0.14)" />
+
       <g className="pet-guide-tail">
-        <path
-          d={isCat ? "M28 68 C7 56 15 32 32 39 C19 45 21 57 35 61" : "M28 68 C9 57 13 39 27 35 C31 48 39 55 36 66"}
-          fill="none"
-          stroke={isCat ? "#f59e0b" : "#92400e"}
-          strokeWidth="10"
-          strokeLinecap="round"
-        />
+        {isCat ? (
+          <path
+            d="M27 65 C10 62 8 44 18 37 C28 30 35 40 29 48 C25 53 19 50 18 45"
+            fill="none"
+            stroke="#D97706"
+            strokeWidth="7"
+            strokeLinecap="round"
+          />
+        ) : (
+          <path
+            d="M69 65 C83 59 84 47 75 43"
+            fill="none"
+            stroke="#92400E"
+            strokeWidth="8"
+            strokeLinecap="round"
+          />
+        )}
       </g>
+
       <g className="pet-guide-body">
-        <ellipse cx="58" cy="70" rx="34" ry="29" fill={isCat ? "#fbbf24" : "#d97706"} />
-        <ellipse cx="68" cy="78" rx="17" ry="13" fill={isCat ? "#fde68a" : "#fed7aa"} opacity="0.9" />
+        <ellipse
+          cx="48"
+          cy="64"
+          rx={isCat ? "23" : "25"}
+          ry={isCat ? "20" : "21"}
+          fill={isCat ? "#F59E0B" : "#D97706"}
+        />
+
+        <ellipse
+          cx="48"
+          cy="68"
+          rx="13"
+          ry="11"
+          fill={isCat ? "#FDE68A" : "#FED7AA"}
+          opacity="0.95"
+        />
+
         <g className="pet-guide-leg-left">
-          <rect x="35" y="86" width="13" height="20" rx="7" fill={isCat ? "#f59e0b" : "#b45309"} />
+          <ellipse cx="34" cy="79" rx="7" ry="10" fill={isCat ? "#D97706" : "#B45309"} />
         </g>
         <g className="pet-guide-leg-right">
-          <rect x="70" y="86" width="13" height="20" rx="7" fill={isCat ? "#f59e0b" : "#b45309"} />
+          <ellipse cx="62" cy="79" rx="7" ry="10" fill={isCat ? "#D97706" : "#B45309"} />
         </g>
-        <circle cx="58" cy="43" r="26" fill={isCat ? "#fbbf24" : "#d97706"} />
+
         {isCat ? (
           <>
-            <path d="M37 23 L45 6 L52 28 Z" fill="#f59e0b" />
-            <path d="M79 23 L71 6 L64 28 Z" fill="#f59e0b" />
-            <path d="M42 22 L46 13 L49 26 Z" fill="#fde68a" opacity="0.9" />
-            <path d="M74 22 L70 13 L67 26 Z" fill="#fde68a" opacity="0.9" />
+            <path d="M28 31 L32 11 L43 29 Z" fill="#D97706" />
+            <path d="M68 31 L64 11 L53 29 Z" fill="#D97706" />
+            <path d="M32 28 L34 17 L39 29 Z" fill="#FDE68A" />
+            <path d="M64 28 L62 17 L57 29 Z" fill="#FDE68A" />
           </>
         ) : (
           <>
-            <ellipse cx="35" cy="37" rx="10" ry="19" fill="#92400e" transform="rotate(25 35 37)" />
-            <ellipse cx="81" cy="37" rx="10" ry="19" fill="#92400e" transform="rotate(-25 81 37)" />
+            <ellipse cx="28" cy="34" rx="8" ry="15" fill="#78350F" transform="rotate(20 28 34)" />
+            <ellipse cx="68" cy="34" rx="8" ry="15" fill="#78350F" transform="rotate(-20 68 34)" />
           </>
         )}
-        <ellipse cx="58" cy="50" rx="16" ry="12" fill={isCat ? "#fffbeb" : "#fed7aa"} />
-        <circle cx="49" cy="39" r="3" fill="#1f2937" />
-        <circle cx="67" cy="39" r="3" fill="#1f2937" />
-        <path d="M58 46 L54 51 L62 51 Z" fill={isCat ? "#ef4444" : "#3f1f0f"} />
-        <path d="M50 55 Q58 61 66 55" fill="none" stroke="#3f1f0f" strokeWidth="3" strokeLinecap="round" />
+
+        <circle cx="48" cy="39" r="22" fill={isCat ? "#F59E0B" : "#D97706"} />
+
+        {isCat ? (
+          <ellipse cx="48" cy="47" rx="11" ry="8" fill="#FFFBEB" />
+        ) : (
+          <ellipse cx="48" cy="48" rx="13" ry="9" fill="#FED7AA" />
+        )}
+
+        <ellipse cx="40" cy="37" rx="2.6" ry="3.2" fill="#1F2937" />
+        <ellipse cx="56" cy="37" rx="2.6" ry="3.2" fill="#1F2937" />
+        <circle cx="39.2" cy="36.2" r="0.8" fill="white" />
+        <circle cx="55.2" cy="36.2" r="0.8" fill="white" />
+
+        <path
+          d={isCat ? "M48 43 L44 47 L52 47 Z" : "M48 43 C45 43 44 45 44 47 C46 49 50 49 52 47 C52 45 51 43 48 43 Z"}
+          fill={isCat ? "#FB7185" : "#3F1F0F"}
+        />
+        <path d="M41 51 Q48 57 55 51" fill="none" stroke="#3F1F0F" strokeWidth="2.3" strokeLinecap="round" />
+
         {isCat && (
           <>
-            <path d="M40 50 H27 M42 55 H29 M76 50 H89 M74 55 H87" stroke="#92400e" strokeWidth="2" strokeLinecap="round" />
+            <path d="M35 47 H23 M36 51 H25 M61 47 H73 M60 51 H71" stroke="#92400E" strokeWidth="1.7" strokeLinecap="round" />
           </>
         )}
+
         <g className="pet-guide-paw">
-          <rect x="82" y="54" width="13" height="28" rx="8" fill={isCat ? "#f59e0b" : "#b45309"} />
-          <circle cx="88.5" cy="53" r="7" fill={isCat ? "#fde68a" : "#fed7aa"} />
+          <ellipse
+            cx="71"
+            cy="61"
+            rx="7"
+            ry="11"
+            fill={isCat ? "#D97706" : "#B45309"}
+            transform="rotate(-18 71 61)"
+          />
+          <circle cx="73" cy="53" r="5" fill={isCat ? "#FDE68A" : "#FED7AA"} />
         </g>
-        <circle cx="42" cy="49" r="3" fill="#fef3c7" opacity="0.55" />
-        <circle cx="74" cy="49" r="3" fill="#fef3c7" opacity="0.55" />
       </g>
     </svg>
   )
