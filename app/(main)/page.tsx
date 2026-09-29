@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Zap,
   ChevronRight,
-  CheckCircle2,
   Calendar,
   Clock,
   ArrowUpRight
@@ -17,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
+import { HomePetCarousel } from "@/components/home-pet-carousel";
 import { AuthDialogTrigger } from "@/components/auth-dialog-trigger";
 import { Blog, getBlogs, getCategories } from "@/firebase/firestore";
 
@@ -118,40 +118,8 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* Hero Image / Visual */}
-            <div className="relative animate-in fade-in zoom-in-95 duration-1000">
-              <div className="relative aspect-square lg:aspect-auto lg:h-[600px] w-full rounded-[3rem] overflow-hidden shadow-2xl shadow-primary/10">
-                <Image
-                  src="https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=80&w=2500&auto=format&fit=crop"
-                  alt="Happy Dog"
-                  fill
-                  className="object-cover"
-                  priority
-                  sizes="100vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-transparent" />
-
-                {/* Floating Glass Cards */}
-                <div className="absolute bottom-8 left-8 right-8">
-                  <div className="liquid-card p-6 flex items-center gap-4 transition-transform hover:translate-y-[-4px] duration-300">
-                    <div className="w-12 h-12 rounded-2xl bg-orange-500 flex items-center justify-center text-white shrink-0 shadow-lg">
-                      <Heart className="w-6 h-6 fill-current" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg leading-tight">Nutrition-Led Guidance</h4>
-                      <p className="text-sm text-foreground/70 font-medium">Built around practical pet nutrition and everyday wellness.</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute top-8 right-8 hidden md:block">
-                  <div className="liquid-card p-4 flex items-center gap-3 backdrop-blur-2xl">
-                    <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    <span className="text-sm font-bold uppercase tracking-wider">Premium Nutrition</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Multi-pet hero carousel */}
+            <HomePetCarousel />
           </div>
         </div>
       </section>
