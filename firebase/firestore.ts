@@ -200,7 +200,7 @@ export interface PetFeedDraft {
 export type ContentGoalType = "blog" | "instagram";
 export type ContentGoalStatus = "active" | "completed";
 
-export type PageSeoKey = "home" | "blog" | "pet-feed" | "consultation";
+export type PageSeoKey = "home" | "blog" | "pet-feed" | "consultation" | "walks";
 
 export interface PageSeoConfig {
   key: PageSeoKey;
