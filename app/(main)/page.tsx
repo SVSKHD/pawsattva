@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
 import { HomePetCarousel } from "@/components/home-pet-carousel";
+import { HomeHeroCopy } from "@/components/home-hero-copy";
 import { AuthDialogTrigger } from "@/components/auth-dialog-trigger";
 import { Blog, getBlogs, getCategories } from "@/firebase/firestore";
 
@@ -93,12 +94,7 @@ export default async function Home() {
                 <Sparkles className="w-4 h-4" />
                 The Ultimate Haven for Pet Care
               </Badge>
-              <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
-                Nurture Your Pet with <span className="text-primary italic">Deep</span> Care.
-              </h1>
-              <p className="text-xl text-muted-foreground max-w-xl mx-auto lg:mx-0 leading-relaxed font-medium">
-                At Paw Sattva, we believe every pet deserves a harmonious life. Discover expert guides, premium nutrition advice, and a community that loves your pets as much as you do.
-              </p>
+              <HomeHeroCopy />
               <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start">
                 <Link href="/blog">
                   <Button size="lg" className="h-14 px-8 rounded-2xl bg-primary hover:bg-orange-600 text-white font-bold text-lg shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
