@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import * as React from "react";
-import { CheckCircle2, Heart } from "lucide-react";
+import { Cat, CheckCircle2, Dog, Heart, PawPrint } from "lucide-react";
 import {
   type CarouselApi,
   Carousel,
@@ -14,28 +14,39 @@ import {
 
 const petSlides = [
   {
-    src: "https://images.unsplash.com/photo-1543466835-00a7907e9de1?q=85&w=1800&auto=format&fit=crop",
-    alt: "Happy dog outdoors",
-    label: "Dogs",
-    note: "Nutrition, movement and everyday wellness",
+    src: "https://images.unsplash.com/photo-1589941013453-ec89f33b5e95?q=85&w=1800&auto=format&fit=crop",
+    alt: "German Shepherd dog outdoors",
+    label: "German Shepherd",
+    kind: "Dog",
+    note: "Smart, active and highly trainable companions",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1567752881298-894bb81f9379?q=85&w=1800&auto=format&fit=crop",
+    alt: "Rottweiler dog portrait",
+    label: "Rottweiler",
+    kind: "Dog",
+    note: "Strong, loyal and deeply family-oriented",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1605568427561-40dd23c2acea?q=85&w=1800&auto=format&fit=crop",
+    alt: "Siberian Husky dog outdoors",
+    label: "Siberian Husky",
+    kind: "Dog",
+    note: "Energetic, expressive and built for movement",
   },
   {
     src: "https://images.unsplash.com/photo-1574158622682-e40e69881006?q=85&w=1800&auto=format&fit=crop",
-    alt: "Relaxed cat resting indoors",
+    alt: "Relaxed domestic cat resting indoors",
     label: "Cats",
-    note: "Calm routines, enrichment and balanced care",
+    kind: "Cat",
+    note: "Calm routines, enrichment and balanced nutrition",
   },
   {
-    src: "https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?q=85&w=1800&auto=format&fit=crop",
-    alt: "Rabbit sitting in soft natural light",
-    label: "Small Pets",
-    note: "Gentle care for every companion",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?q=85&w=1800&auto=format&fit=crop",
-    alt: "Colourful companion bird",
-    label: "Birds",
-    note: "Wellness guidance beyond cats and dogs",
+    src: "https://images.unsplash.com/photo-1495360010541-f48722b34f7d?q=85&w=1800&auto=format&fit=crop",
+    alt: "Close-up portrait of a domestic cat",
+    label: "Cat Care",
+    kind: "Cat",
+    note: "Everyday care for curious indoor companions",
   },
 ];
 
@@ -62,15 +73,13 @@ export function HomePetCarousel() {
     if (!api || hovered) return;
 
     const id = window.setInterval(() => {
-      if (api.canScrollNext()) {
-        api.scrollNext();
-      } else {
-        api.scrollTo(0);
-      }
-    }, 5200);
+      api.scrollNext();
+    }, 5000);
 
     return () => window.clearInterval(id);
   }, [api, hovered]);
+
+  const activePet = petSlides[selected] ?? petSlides[0];
 
   return (
     <div
@@ -78,60 +87,81 @@ export function HomePetCarousel() {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <Carousel
-        setApi={setApi}
-        opts={{ loop: true, align: "start" }}
-        className="w-full"
-        aria-label="Paw Sattva pet carousel"
-      >
-        <CarouselContent className="ml-0">
-          {petSlides.map((pet, index) => (
-            <CarouselItem key={pet.label} className="pl-0">
-              <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[2.5rem] shadow-2xl shadow-primary/10 sm:aspect-square lg:h-[600px] lg:aspect-auto">
-                <Image
-                  src={pet.src}
-                  alt={pet.alt}
-                  fill
-                  className="object-cover transition-transform duration-[1400ms] ease-out hover:scale-[1.03]"
-                  priority={index === 0}
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                />
-                <div className="absolute inset-0 bg-gradient-to-tr from-black/55 via-black/5 to-transparent" />
+      <div className="absolute -inset-4 -z-10 rounded-[3rem] bg-gradient-to-br from-orange-200/35 via-transparent to-emerald-200/30 blur-2xl dark:from-orange-500/10 dark:to-emerald-500/10" />
 
-                <div className="absolute left-5 right-5 bottom-5 sm:left-8 sm:right-8 sm:bottom-8">
-                  <div className="liquid-card flex items-center gap-4 p-4 sm:p-6">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-lg sm:h-12 sm:w-12">
-                      <Heart className="h-5 w-5 fill-current sm:h-6 sm:w-6" />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white shadow-lg shadow-orange-500/20">
+            <PawPrint className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Meet the pack</p>
+            <p className="text-sm font-semibold text-muted-foreground">Dogs & cats at Paw Sattva</p>
+          </div>
+        </div>
+
+        <div className="hidden rounded-full border border-border/70 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground shadow-sm backdrop-blur-sm sm:block">
+          Swipe to explore
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-background/30 p-2 shadow-2xl shadow-primary/10 backdrop-blur-sm sm:rounded-[2.5rem] sm:p-3">
+        <Carousel
+          setApi={setApi}
+          opts={{ loop: true, align: "start" }}
+          className="w-full"
+          aria-label="Paw Sattva dog and cat carousel"
+        >
+          <CarouselContent className="ml-0">
+            {petSlides.map((pet, index) => (
+              <CarouselItem key={pet.label} className="pl-0">
+                <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[1.6rem] sm:aspect-square sm:rounded-[2rem] lg:h-[560px] lg:aspect-auto">
+                  <Image
+                    src={pet.src}
+                    alt={pet.alt}
+                    fill
+                    className="object-cover transition-transform duration-[1400ms] ease-out hover:scale-[1.035]"
+                    priority={index === 0}
+                    sizes="(max-width: 1024px) 100vw, 50vw"
+                  />
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/5 to-black/10" />
+
+                  <div className="absolute left-4 top-4 flex items-center gap-2 sm:left-6 sm:top-6">
+                    <div className="flex items-center gap-2 rounded-full border border-white/30 bg-black/25 px-3 py-2 text-xs font-bold text-white backdrop-blur-xl">
+                      {pet.kind === "Dog" ? <Dog className="h-4 w-4" /> : <Cat className="h-4 w-4" />}
+                      {pet.kind}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-base font-bold leading-tight sm:text-lg">{pet.label}</h4>
-                        <span className="hidden h-1 w-1 rounded-full bg-foreground/30 sm:block" />
-                        <span className="hidden text-xs font-semibold uppercase tracking-wider text-foreground/60 sm:block">
-                          Paw Sattva care
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-medium text-foreground/70 sm:text-sm">{pet.note}</p>
+                    <div className="hidden items-center gap-1.5 rounded-full border border-white/30 bg-black/25 px-3 py-2 text-xs font-semibold text-white backdrop-blur-xl sm:flex">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                      Wellness first
+                    </div>
+                  </div>
+
+                  <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
+                    <div className="max-w-lg">
+                      <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-orange-300">
+                        Paw Sattva companion guide
+                      </p>
+                      <h3 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+                        {pet.label}
+                      </h3>
+                      <p className="mt-2 max-w-md text-sm font-medium leading-6 text-white/80 sm:text-base">
+                        {pet.note}
+                      </p>
                     </div>
                   </div>
                 </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
 
-                <div className="absolute right-5 top-5 hidden sm:block sm:right-8 sm:top-8">
-                  <div className="liquid-card flex items-center gap-3 p-4 backdrop-blur-2xl">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    <span className="text-sm font-bold uppercase tracking-wider">Whole-pet wellness</span>
-                  </div>
-                </div>
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
+          <CarouselPrevious className="left-4 top-[46%] h-10 w-10 border-white/40 bg-black/30 text-white backdrop-blur-md hover:bg-black/55 hover:text-white sm:left-6" />
+          <CarouselNext className="right-4 top-[46%] h-10 w-10 border-white/40 bg-black/30 text-white backdrop-blur-md hover:bg-black/55 hover:text-white sm:right-6" />
+        </Carousel>
+      </div>
 
-        <CarouselPrevious className="left-3 h-10 w-10 border-white/50 bg-black/25 text-white backdrop-blur-md hover:bg-black/45 hover:text-white sm:left-5" />
-        <CarouselNext className="right-3 h-10 w-10 border-white/50 bg-black/25 text-white backdrop-blur-md hover:bg-black/45 hover:text-white sm:right-5" />
-      </Carousel>
-
-      <div className="mt-5 flex items-center justify-center gap-2" aria-label="Choose pet slide">
+      <div className="mt-4 grid grid-cols-5 gap-2">
         {petSlides.map((pet, index) => (
           <button
             key={pet.label}
@@ -139,13 +169,41 @@ export function HomePetCarousel() {
             onClick={() => api?.scrollTo(index)}
             aria-label={`Show ${pet.label}`}
             aria-current={selected === index ? "true" : undefined}
-            className={`h-2.5 rounded-full transition-all duration-300 ${
+            className={`group min-w-0 rounded-2xl border p-1.5 text-left transition-all duration-300 ${
               selected === index
-                ? "w-8 bg-primary"
-                : "w-2.5 bg-foreground/20 hover:bg-foreground/40"
+                ? "border-orange-400 bg-orange-50 shadow-md shadow-orange-500/10 dark:bg-orange-500/10"
+                : "border-border/70 bg-background/70 hover:border-orange-300"
             }`}
-          />
+          >
+            <div className="relative aspect-square overflow-hidden rounded-xl">
+              <Image
+                src={pet.src}
+                alt=""
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                sizes="96px"
+              />
+            </div>
+            <span className="mt-1.5 hidden truncate px-1 text-[10px] font-bold sm:block">
+              {pet.label}
+            </span>
+          </button>
         ))}
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/40 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
+            <Heart className="h-4 w-4 fill-current" />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold">{activePet.label}</p>
+            <p className="truncate text-xs text-muted-foreground">{activePet.note}</p>
+          </div>
+        </div>
+        <span className="shrink-0 text-xs font-bold text-muted-foreground">
+          {selected + 1}/{petSlides.length}
+        </span>
       </div>
     </div>
   );
