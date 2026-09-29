@@ -11,6 +11,7 @@ import Paw from "../app/pawsattva.png"
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
+  { href: "/walks", label: "Walks" },
   { href: "/pet-feed", label: "Pet Feed" },
   { href: "/logger", label: "Logger" },
   { href: "/consultation", label: "Consultation" },
