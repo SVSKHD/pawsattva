@@ -11,7 +11,9 @@ import {
   ChevronRight,
   Calendar,
   Clock,
-  ArrowUpRight
+  ArrowUpRight,
+  Droplets,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -164,6 +166,42 @@ export default async function Home() {
                 <p className="text-muted-foreground font-medium leading-relaxed">{f.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── PET-FRIENDLY HOME WATER CARE ─────────────────────────────────────── */}
+      <section className="py-12">
+        <div className="container mx-auto px-4">
+          <div className="relative overflow-hidden rounded-[2.25rem] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-8 shadow-sm md:p-10">
+            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-200/30 blur-3xl" />
+            <div className="relative grid gap-8 lg:grid-cols-[1.35fr_0.65fr] lg:items-center">
+              <div>
+                <Badge className="border-none bg-cyan-100 px-3 py-1 text-cyan-700">
+                  <Droplets className="mr-1.5 h-3.5 w-3.5" />
+                  Pet-friendly home water care
+                </Badge>
+                <h2 className="mt-5 text-3xl font-extrabold tracking-tight md:text-4xl">
+                  Hard water at home can affect more than taps and tiles.
+                </h2>
+                <p className="mt-4 max-w-3xl text-base font-medium leading-7 text-muted-foreground">
+                  For pet households managing hard water in bathing, grooming, laundry and everyday cleaning,
+                  explore household water-softening solutions from Aquakart. For your pet&apos;s drinking water,
+                  follow your veterinarian&apos;s advice and your local water-quality guidance.
+                </p>
+              </div>
+              <div className="flex lg:justify-end">
+                <a
+                  href="https://aquakart.co.in/category/Softeners"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-700"
+                >
+                  Explore water softeners
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       </section>
