@@ -209,6 +209,14 @@ export default async function BlogPostPage({
 
   return (
     <div className="blog-reading-page relative min-h-screen overflow-hidden bg-background">
+      {managedBlogSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(managedBlogSchema).replace(/</g, "\\u003c"),
+          }}
+        />
+      )}
       {/* Scroll progress + back-to-top (client) */}
       <ReadingEnhancements toc={toc} title={blog.title} />
       <BlogViewTracker blogId={blog.id} title={blog.title} />
