@@ -33,6 +33,14 @@ export async function getManagedPageMetadata(
         keywords: config.keywords,
         image: config.image || defaults.image,
         pathname: defaults.pathname,
+        canonicalUrl: config.canonicalUrl,
+        robots: config.robots,
+        ogTitle: config.ogTitle,
+        ogDescription: config.ogDescription,
+        ogImage: config.ogImage,
+        twitterTitle: config.twitterTitle,
+        twitterDescription: config.twitterDescription,
+        twitterImage: config.twitterImage,
       })
     }
   } catch (error) {
