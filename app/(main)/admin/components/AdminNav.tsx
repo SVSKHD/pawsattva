@@ -32,7 +32,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
         dot: "bg-emerald-500",
       },
       {
-        label: "Page SEO",
+        label: "SEO Command Center",
         primaryValue: "page-seo",
         adminOnly: true,
         relatedValues: [],

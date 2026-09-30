@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
 import { getManagedPageMetadata } from "@/lib/page-seo"
+import { ManagedJsonLd } from "@/components/managed-json-ld"
 
 export const revalidate = 300
 
@@ -15,5 +16,5 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function BlogLayout({ children }: { children: ReactNode }) {
-  return <>{children}</>
+  return <><ManagedJsonLd pageKey="blog" />{children}</>
 }

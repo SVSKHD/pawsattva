@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getManagedPageMetadata } from "@/lib/page-seo"
+import { ManagedJsonLd } from "@/components/managed-json-ld"
 
 export const revalidate = 300
 
@@ -43,6 +44,7 @@ const reusePoints = [
 export default function ConsultationPage() {
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_45%,#f6f8f3_100%)] pb-20 pt-32">
+      <ManagedJsonLd pageKey="consultation" />
       <section className="container mx-auto px-4">
         <div className="mx-auto max-w-5xl">
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">

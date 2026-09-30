@@ -55,31 +55,43 @@ export async function generateMetadata({
   const plainExcerpt =
     blog.excerpt ||
     blog.content.replace(/<[^>]*>/g, '').substring(0, 160) + '...';
+  const seo = blog.seo;
+  const title = seo?.title || blog.title;
+  const description = seo?.description || plainExcerpt;
+  const canonical = seo?.canonicalUrl || `${siteConfig.url}/blog/${slug}`;
+  const socialImage = seo?.ogImage || seo?.image || blog.image;
+  const robots = (seo?.robots || "index,follow").toLowerCase();
 
   return {
-    title: `${blog.title} | ${siteConfig.name}`,
-    description: plainExcerpt,
-    keywords: blog.keywords
-      ? blog.keywords.split(',').map((k: string) => k.trim())
-      : undefined,
+    title: `${title} | ${siteConfig.name}`,
+    description,
+    keywords: seo?.keywords?.length
+      ? seo.keywords
+      : blog.keywords
+        ? blog.keywords.split(',').map((k: string) => k.trim())
+        : undefined,
+    robots: {
+      index: !robots.includes("noindex"),
+      follow: !robots.includes("nofollow"),
+    },
     openGraph: {
       type: 'article',
-      title: `${blog.title} | ${siteConfig.name}`,
-      description: plainExcerpt,
-      url: `${siteConfig.url}/blog/${slug}`,
+      title: seo?.ogTitle || title,
+      description: seo?.ogDescription || description,
+      url: canonical,
       siteName: siteConfig.name,
-      images: blog.image ? [{ url: blog.image, width: 1200, height: 630 }] : [],
+      images: socialImage ? [{ url: socialImage, width: 1200, height: 630 }] : [],
       publishedTime: blog.date,
       authors: [blog.authorName || 'Paw Sattva Team'],
     },
     twitter: {
       card: 'summary_large_image',
-      title: blog.title,
-      description: plainExcerpt,
-      images: blog.image ? [blog.image] : [],
+      title: seo?.twitterTitle || title,
+      description: seo?.twitterDescription || description,
+      images: seo?.twitterImage ? [seo.twitterImage] : socialImage ? [socialImage] : [],
     },
     alternates: {
-      canonical: `${siteConfig.url}/blog/${slug}`,
+      canonical,
     },
   };
 }
@@ -152,6 +164,15 @@ export default async function BlogPostPage({
 
   if (!blog) notFound();
 
+  let managedBlogSchema: Record<string, unknown> | null = null;
+  if (blog.seo?.schemaJson?.trim()) {
+    try {
+      managedBlogSchema = JSON.parse(blog.seo.schemaJson);
+    } catch {
+      managedBlogSchema = null;
+    }
+  }
+
   const allBlogs = await getBlogs();
   const published = allBlogs.filter((b) => b.status === 'published');
 
@@ -188,6 +209,14 @@ export default async function BlogPostPage({
 
   return (
     <div className="blog-reading-page relative min-h-screen overflow-hidden bg-background">
+      {managedBlogSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(managedBlogSchema).replace(/</g, "\\u003c"),
+          }}
+        />
+      )}
       {/* Scroll progress + back-to-top (client) */}
       <ReadingEnhancements toc={toc} title={blog.title} />
       <BlogViewTracker blogId={blog.id} title={blog.title} />

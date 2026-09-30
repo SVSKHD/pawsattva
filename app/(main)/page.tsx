@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getManagedPageMetadata } from '@/lib/page-seo';
+import { ManagedJsonLd } from "@/components/managed-json-ld";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -81,6 +82,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      <ManagedJsonLd pageKey="home" />
       {/* ── HERO SECTION ───────────────────────────────────────────────────────── */}
       <section className="relative w-full py-20 lg:py-32 overflow-hidden">
         {/* Animated Background Spheres (Liquid Aesthetic) */}
