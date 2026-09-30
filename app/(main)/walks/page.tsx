@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Footprints, MapPinned, PawPrint, Sparkles } from "lucide-react";
 import { getManagedPageMetadata } from "@/lib/page-seo";
+import { ManagedJsonLd } from "@/components/managed-json-ld";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -78,6 +79,7 @@ function CityPlaceholder({ city }: { city: string }) {
 export default function WalksPage() {
   return (
     <div className="min-h-screen bg-background">
+      <ManagedJsonLd pageKey="walks" />
       <section className="relative overflow-hidden px-4 pb-14 pt-28 sm:pt-32 lg:pb-20">
         <div className="pointer-events-none absolute left-[-8rem] top-16 h-80 w-80 rounded-full bg-orange-200/40 blur-[110px] dark:bg-orange-500/10" />
         <div className="pointer-events-none absolute right-[-8rem] top-40 h-80 w-80 rounded-full bg-emerald-200/35 blur-[110px] dark:bg-emerald-500/10" />
