@@ -23,6 +23,22 @@ import { db } from "./db";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
+export interface SeoConfigFields {
+  title: string;
+  description: string;
+  keywords: string[];
+  canonicalUrl?: string;
+  robots?: string;
+  image?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
+  schemaJson?: string;
+}
+
 export interface Blog {
   id: string;
   title: string;
@@ -51,6 +67,7 @@ export interface Blog {
   instagramPostId?: string;
   instagramPostStatus?: 'pending' | 'posted' | 'failed';
   instagramPostError?: string;
+  seo?: SeoConfigFields;
   date: any;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -202,12 +219,8 @@ export type ContentGoalStatus = "active" | "completed";
 
 export type PageSeoKey = "home" | "blog" | "pet-feed" | "consultation" | "walks";
 
-export interface PageSeoConfig {
+export interface PageSeoConfig extends SeoConfigFields {
   key: PageSeoKey;
-  title: string;
-  description: string;
-  keywords: string[];
-  image?: string;
   updatedAt?: any;
 }
 
