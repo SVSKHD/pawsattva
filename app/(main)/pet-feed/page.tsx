@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getManagedPageMetadata } from "@/lib/page-seo";
+import { ManagedJsonLd } from "@/components/managed-json-ld";
 import { PetFeedForm } from "@/components/pet-feed-form"
 import { PetCareAuthGate } from "@/components/pet-care-auth-gate"
 import { Badge } from "@/components/ui/badge"
@@ -19,6 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function PetFeedPage() {
   return (
     <div className="min-h-screen bg-background pb-20 pt-32">
+      <ManagedJsonLd pageKey="pet-feed" />
       {/* Animated Background Spheres */}
       <div className="mobile-ambient-orb fixed top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-200/30 rounded-full blur-[120px] animate-pulse pointer-events-none" />
       <div className="mobile-ambient-orb fixed bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] animate-pulse pointer-events-none" />
