@@ -84,7 +84,11 @@ type BlogUrlPrefill = {
   template?: string
   title?: string
   description?: string
+  excerpt?: string
   keywords?: string
+  seoTitle?: string
+  seoDescription?: string
+  seoKeywords?: string
   content?: string
   image?: string
 }
@@ -211,6 +215,9 @@ export default function AdminPanel({
   const [blogSlug, setBlogSlug] = useState("")
   const [blogKeywords, setBlogKeywords] = useState("")
   const [blogExcerpt, setBlogExcerpt] = useState("")
+  const [blogSeoTitle, setBlogSeoTitle] = useState("")
+  const [blogSeoDescription, setBlogSeoDescription] = useState("")
+  const [blogSeoKeywords, setBlogSeoKeywords] = useState("")
   const [blogImage, setBlogImage] = useState("")
   const [blogContent, setBlogContent] = useState("")
   const [blogCategories, setBlogCategories] = useState<string[]>([])
@@ -228,11 +235,15 @@ export default function AdminPanel({
 
     const title = initialBlogPrefill.title?.trim() || ""
     const description = initialBlogPrefill.description?.trim() || ""
+    const excerpt = initialBlogPrefill.excerpt?.trim() || ""
     const keywords = initialBlogPrefill.keywords?.trim() || ""
+    const seoTitle = initialBlogPrefill.seoTitle?.trim() || ""
+    const seoDescription = initialBlogPrefill.seoDescription?.trim() || description
+    const seoKeywords = initialBlogPrefill.seoKeywords?.trim() || keywords
     const content = initialBlogPrefill.content?.trim() || ""
     const image = initialBlogPrefill.image?.trim() || ""
 
-    if (!title && !description && !keywords && !content && !image) return
+    if (!title && !description && !excerpt && !keywords && !seoTitle && !seoDescription && !seoKeywords && !content && !image) return
 
     urlPrefillAppliedRef.current = true
     if (title) {
@@ -244,8 +255,13 @@ export default function AdminPanel({
           .replace(/^-+|-+$/g, "")
       )
     }
-    if (description) setBlogExcerpt(description)
+    if (excerpt) setBlogExcerpt(excerpt)
+    else if (description) setBlogExcerpt(description)
     if (keywords) setBlogKeywords(keywords)
+    if (seoTitle) setBlogSeoTitle(seoTitle)
+    else if (title) setBlogSeoTitle(title)
+    if (seoDescription) setBlogSeoDescription(seoDescription)
+    if (seoKeywords) setBlogSeoKeywords(seoKeywords)
     if (content) {
       setBlogContent(content)
     } else if (description) {
@@ -431,6 +447,13 @@ export default function AdminPanel({
     setBlogExcerpt(
       "A practical PawSattva guide to how household water softening can support easier pet bathing, grooming, laundry and home care—while keeping drinking-water decisions separate."
     )
+    setBlogSeoTitle("Hard Water & Pets: Is Soft Water Better for Dogs and Cats?")
+    setBlogSeoDescription(
+      "Hard water can affect bathing, coat care and grooming for dogs and cats. Learn how softer water may help, plus what pet owners should know about drinking water."
+    )
+    setBlogSeoKeywords(
+      "hard water and pets, soft water for dogs, soft water for cats, hard water dog bathing, pet grooming hard water, water softener for pets, hard water dog coat, hard water cat coat, soft water for pet bathing, is soft water good for dogs, is softened water safe for pets, hard water effects on dog skin and coat"
+    )
     setBlogContent(`
 <p>Pet parents think carefully about food, exercise, grooming and veterinary care—but the <strong>water used around the home</strong> can also shape everyday pet-care routines. In homes with hard water, bathing a dog or cat, washing bedding, cleaning bowls and keeping bathrooms free from mineral scale can all feel more difficult.</p>
 
@@ -599,7 +622,11 @@ export default function AdminPanel({
 
     const title = initialBlogPrefill.title?.trim()
     const description = initialBlogPrefill.description?.trim()
+    const excerpt = initialBlogPrefill.excerpt?.trim()
     const keywords = initialBlogPrefill.keywords?.trim()
+    const seoTitle = initialBlogPrefill.seoTitle?.trim()
+    const seoDescription = initialBlogPrefill.seoDescription?.trim() || description
+    const seoKeywords = initialBlogPrefill.seoKeywords?.trim() || keywords
     const content = initialBlogPrefill.content?.trim()
     const image = initialBlogPrefill.image?.trim()
 
@@ -607,8 +634,11 @@ export default function AdminPanel({
       setBlogTitle(title)
       setBlogSlug(generateSlug(title))
     }
-    if (description) setBlogExcerpt(description)
+    if (excerpt) setBlogExcerpt(excerpt)
     if (keywords) setBlogKeywords(keywords)
+    if (seoTitle) setBlogSeoTitle(seoTitle)
+    if (seoDescription) setBlogSeoDescription(seoDescription)
+    if (seoKeywords) setBlogSeoKeywords(seoKeywords)
     if (content) setBlogContent(content)
     if (image) setBlogImage(image)
 
@@ -618,6 +648,7 @@ export default function AdminPanel({
 
   const resetBlogForm = () => {
     setBlogTitle(""); setBlogSlug(""); setBlogKeywords(""); setBlogExcerpt("")
+    setBlogSeoTitle(""); setBlogSeoDescription(""); setBlogSeoKeywords("")
     setBlogImage(""); setBlogContent(""); setBlogCategories([])
     setInstagramAutoPost(false); setInstagramCaption("")
     setBlogAuthorId(""); setBlogStatus("draft"); setEditingBlogId(null)
@@ -636,6 +667,23 @@ export default function AdminPanel({
       const blogData = {
         title: blogTitle, slug: blogSlug, keywords: blogKeywords,
         excerpt: blogExcerpt, image: blogImage, content: blogContent,
+        seo: {
+          title: blogSeoTitle.trim() || blogTitle.trim(),
+          description: blogSeoDescription.trim() || blogExcerpt.trim(),
+          keywords: (blogSeoKeywords.trim() || blogKeywords)
+            .split(",")
+            .map((keyword) => keyword.trim())
+            .filter(Boolean),
+          canonicalUrl: `https://pawsattva.com/blog/${blogSlug}`,
+          robots: "index,follow",
+          image: blogImage,
+          ogTitle: blogSeoTitle.trim() || blogTitle.trim(),
+          ogDescription: blogSeoDescription.trim() || blogExcerpt.trim(),
+          ogImage: blogImage,
+          twitterTitle: blogSeoTitle.trim() || blogTitle.trim(),
+          twitterDescription: blogSeoDescription.trim() || blogExcerpt.trim(),
+          twitterImage: blogImage,
+        },
         categoryId: blogCategories[0], categoryIds: blogCategories,
         authorId: isAuthor ? user?.uid : blogAuthorId,
         authorName: isAuthor ? (user?.displayName || user?.email || "Author") : selectedAuthor?.displayName || selectedAuthor?.email || "Unknown Author",
@@ -713,6 +761,9 @@ export default function AdminPanel({
   const handleEditBlog = (blog: Blog) => {
     setBlogTitle(blog.title); setBlogSlug(blog.slug)
     setBlogKeywords(blog.keywords || ""); setBlogExcerpt(blog.excerpt || "")
+    setBlogSeoTitle(blog.seo?.title || blog.title)
+    setBlogSeoDescription(blog.seo?.description || blog.excerpt || "")
+    setBlogSeoKeywords(blog.seo?.keywords?.join(", ") || blog.keywords || "")
     setBlogImage(blog.image || ""); setBlogContent(blog.content)
     setInstagramAutoPost(Boolean(blog.instagramAutoPost)); setInstagramCaption(blog.instagramCaption || "")
     setBlogCategories(blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : [])
@@ -954,6 +1005,9 @@ export default function AdminPanel({
                 blogSlug={blogSlug} setBlogSlug={setBlogSlug}
                 blogKeywords={blogKeywords} setBlogKeywords={setBlogKeywords}
                 blogExcerpt={blogExcerpt} setBlogExcerpt={setBlogExcerpt}
+                blogSeoTitle={blogSeoTitle} setBlogSeoTitle={setBlogSeoTitle}
+                blogSeoDescription={blogSeoDescription} setBlogSeoDescription={setBlogSeoDescription}
+                blogSeoKeywords={blogSeoKeywords} setBlogSeoKeywords={setBlogSeoKeywords}
                 blogImage={blogImage} setBlogImage={setBlogImage}
                 handleFeaturedImageUpload={handleFeaturedImageUpload}
                 uploadingFeaturedImage={uploadingFeaturedImage}
