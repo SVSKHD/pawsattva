@@ -232,7 +232,7 @@ export default async function BlogPostPage({
       </div>
 
       {/* Hero */}
-      <header data-blog-hero className="relative z-10 w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
+      <header data-blog-hero className="relative z-10 w-full min-h-[420px] md:min-h-[460px] lg:sticky lg:top-0 lg:h-[60vh] lg:min-h-[650px] lg:overflow-hidden">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
@@ -331,7 +331,7 @@ export default async function BlogPostPage({
         </div>
       </header>
 
-      <div data-blog-reading-shell className="blog-reading-shell container relative z-10 mx-auto px-4 py-10 sm:py-16">
+      <div data-blog-reading-shell className="blog-reading-shell container relative z-20 mx-auto px-4 py-10 sm:py-16 lg:-mt-20">
         <div className="flex flex-col lg:flex-row gap-12 xl:gap-16 relative">
           {/* Sticky share rail — desktop only */}
           <div className="hidden xl:flex flex-col items-center sticky top-28 h-fit">
@@ -595,30 +595,27 @@ export default async function BlogPostPage({
           filter: blur(18px) saturate(1.18);
           transform: scale(1.05);
         }
-        .blog-hero-panel,
-        .blog-reading-shell {
-          will-change: transform;
+        .blog-hero-panel {
+          will-change: transform, opacity;
         }
         @media (min-width: 1024px) {
+          [data-blog-hero] {
+            box-shadow: inset 0 -90px 90px -70px rgba(0,0,0,0.45);
+          }
           .blog-hero-panel {
             transform: translate3d(
-              calc(var(--blog-hero-progress, 0) * -7vw),
-              calc(var(--blog-hero-progress, 0) * -18px),
+              calc(var(--blog-hero-progress, 0) * -5vw),
+              0,
               0
             );
-            opacity: calc(1 - (var(--blog-hero-progress, 0) * 0.08));
-            transition: transform 80ms linear, opacity 120ms linear;
+            opacity: calc(1 - (var(--blog-hero-progress, 0) * 0.32));
+            transition: transform 90ms linear, opacity 120ms linear;
           }
           .blog-reading-shell {
-            transform: translate3d(
-              0,
-              calc(var(--blog-hero-progress, 0) * -110px),
-              0
-            );
-            transition: transform 80ms linear;
+            margin-top: -5rem;
           }
           [data-blog-hero][data-scrolled="true"] .blog-hero-panel {
-            filter: saturate(0.98);
+            filter: saturate(0.96);
           }
         }
         .blog-glass-card {
