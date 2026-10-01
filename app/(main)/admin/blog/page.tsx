@@ -1,36 +1,30 @@
-import { Metadata } from "next"
-import { constructMetadata } from "@/lib/metadata"
-import AdminPanel from "../admin-panel"
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = constructMetadata({
-  title: "Create Blog",
-  description: "Prefilled PawSattva blog editor.",
-  noIndex: true,
-  pathname: "/admin/blog",
-})
-
-type SearchParams = Promise<Record<string, string | string[] | undefined>>
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 const first = (value: string | string[] | undefined) =>
-  Array.isArray(value) ? value[0] || "" : value || ""
+  Array.isArray(value) ? value[0] || "" : value || "";
 
-export default async function AdminBlogPage({
+export default async function AdminBlogRedirect({
   searchParams,
 }: {
-  searchParams: SearchParams
+  searchParams: SearchParams;
 }) {
-  const params = await searchParams
+  const params = await searchParams;
+  const next = new URLSearchParams();
+  next.set("tab", "blog");
 
-  return (
-    <AdminPanel
-      initialTab="blog"
-      initialBlogPrefill={{
-        title: first(params.title),
-        description: first(params.description || params.excerpt),
-        keywords: first(params.keywords),
-        content: first(params.content),
-        image: first(params.image),
-      }}
-    />
-  )
+  const title = first(params.title);
+  const description = first(params.description || params.excerpt);
+  const keywords = first(params.keywords);
+  const content = first(params.content);
+  const image = first(params.image);
+
+  if (title) next.set("title", title);
+  if (description) next.set("description", description);
+  if (keywords) next.set("keywords", keywords);
+  if (content) next.set("content", content);
+  if (image) next.set("image", image);
+
+  redirect(`/admin?${next.toString()}`);
 }
