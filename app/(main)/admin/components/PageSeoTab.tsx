@@ -88,7 +88,9 @@ const seoScore = (seo: SeoConfigFields) => {
   return score
 }
 
-const statusFor = (seo: SeoConfigFields) => {
+type SeoReadinessStatus = "ready" | "incomplete" | "critical"
+
+const statusFor = (seo: SeoConfigFields): SeoReadinessStatus => {
   const score = seoScore(seo)
   if (score >= 90) return "ready"
   if (score >= 60) return "incomplete"
@@ -426,7 +428,7 @@ function ScoreBadge({ score }: { score: number }) {
   return <span className={`rounded-full px-2.5 py-1 text-xs font-black ${tone}`}>{score}%</span>
 }
 
-function StatusBadge({ status }: { status: "ready" | "incomplete" | "critical" }) {
+function StatusBadge({ status }: { status: SeoReadinessStatus }) {
   const tone = status === "ready" ? "bg-emerald-500/10 text-emerald-700" : status === "incomplete" ? "bg-amber-500/10 text-amber-700" : "bg-rose-500/10 text-rose-700"
   return <span className={`hidden rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide sm:inline ${tone}`}>{status}</span>
 }
