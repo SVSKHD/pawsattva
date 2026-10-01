@@ -446,9 +446,20 @@ a {
   animation: loader-logo-float 2.8s ease-in-out infinite;
 }
 
-.loader-step {
-  display: inline-block;
-  animation: loader-step 1.35s ease-in-out infinite;
+.loader-logo-ring-secondary {
+  animation: loader-ring-reverse 6.5s linear infinite;
+}
+
+.loader-runner-track {
+  opacity: 0.8;
+}
+
+.loader-dog-run {
+  animation: loader-dog-run 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.loader-cat-run {
+  animation: loader-cat-run 2.7s cubic-bezier(0.22, 1, 0.36, 1) infinite 180ms;
 }
 
 .loader-progress {
@@ -457,6 +468,26 @@ a {
 
 @keyframes loader-ring {
   to { transform: rotate(360deg); }
+}
+
+@keyframes loader-ring-reverse {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes loader-dog-run {
+  0% { transform: translateX(-2.5rem) translateY(2px) scale(0.94); opacity: 0; }
+  12% { opacity: 1; }
+  48% { transform: translateX(5.2rem) translateY(-3px) scale(1); opacity: 1; }
+  76% { transform: translateX(10.4rem) translateY(1px) scale(0.98); opacity: 0.95; }
+  100% { transform: translateX(13rem) translateY(2px) scale(0.94); opacity: 0; }
+}
+
+@keyframes loader-cat-run {
+  0% { transform: translateX(2.8rem) translateY(1px) scale(0.94); opacity: 0; }
+  14% { opacity: 1; }
+  50% { transform: translateX(-4.4rem) translateY(-3px) scale(1); opacity: 1; }
+  78% { transform: translateX(-9rem) translateY(1px) scale(0.98); opacity: 0.95; }
+  100% { transform: translateX(-12rem) translateY(2px) scale(0.94); opacity: 0; }
 }
 
 @keyframes loader-logo-float {
