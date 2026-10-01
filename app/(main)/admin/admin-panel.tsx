@@ -611,9 +611,215 @@ export default function AdminPanel({
     toast.success("Soft Water & Pets blog template loaded. Add a featured image, category and author, then publish.")
   }
 
+  const loadMediumDogBreedsTemplate = () => {
+    const title = "Medium-Sized Dog Breeds: A Practical Guide for Pet Parents"
+    const keywords = "medium sized dog breeds, medium dog breeds, medium dogs for families, medium breed dog care, medium dog exercise, medium dog feeding, medium dogs for apartments, active medium dog breeds, medium dog grooming, medium dog nutrition"
+
+    setBlogTitle(title)
+    setBlogSlug("medium-sized-dog-breeds-practical-guide-for-pet-parents")
+    setBlogKeywords(keywords)
+    setBlogExcerpt(
+      "Medium-sized dogs can offer a practical balance of strength, trainability and adaptability. Here is how to choose, feed, exercise and care for them well."
+    )
+    setBlogSeoTitle("Medium-Sized Dog Breeds: Care, Exercise & Feeding Guide")
+    setBlogSeoDescription(
+      "Explore medium-sized dog breeds, their exercise, feeding, grooming and space needs, plus practical tips for choosing the right companion for your home."
+    )
+    setBlogSeoKeywords(
+      "medium sized dog breeds, medium dog breeds, medium breed dog care, medium dog exercise, medium dog feeding, medium dogs for families, medium dogs for apartments, active medium dog breeds, medium dog grooming, medium dog nutrition"
+    )
+    setBlogContent(`
+<p>Medium-sized dogs are often described as a comfortable middle ground between small companion dogs and larger working or guardian breeds. They can be sturdy enough for active households while still being manageable in many homes, cars and everyday routines.</p>
+
+<p>There is no single universal weight range that defines a “medium-sized” dog. Breed clubs, veterinary references and pet-care websites may use slightly different cut-offs, and individual dogs within the same breed can vary. For practical pet care, it is more useful to look at the dog's <strong>adult body size, body condition, activity level, coat type and lifestyle needs</strong> rather than relying on one number.</p>
+
+<h2>What makes a dog “medium-sized”?</h2>
+
+<p>In everyday use, medium-sized dogs sit between toy or small breeds and large breeds. What matters most is not the label itself, but how the dog's mature size affects:</p>
+
+<ul>
+  <li>Daily food requirement</li>
+  <li>Exercise and enrichment needs</li>
+  <li>Space inside the home</li>
+  <li>Ease of travel and handling</li>
+  <li>Grooming workload</li>
+  <li>Training and behaviour management</li>
+</ul>
+
+<p>A lean, athletic medium dog may need far more exercise than a heavier but calmer dog of a similar weight. Size alone should never be used to predict temperament or activity.</p>
+
+<h2>Examples of medium-sized dog breeds</h2>
+
+<p>Dogs commonly described as medium-sized include breeds such as the <strong>Beagle, Cocker Spaniel, Border Collie, Australian Shepherd and English Springer Spaniel</strong>. Depending on the individual dog and the classification being used, some breeds may sit near the small-medium or medium-large boundary.</p>
+
+<p>Mixed-breed dogs can also fall comfortably into this size group. For them, adult size, body condition and behaviour are more useful than trying to force the dog into a breed-based category.</p>
+
+<h2>Why many families consider medium dogs</h2>
+
+<h3>1. A manageable physical size</h3>
+
+<p>Many medium dogs are large enough to enjoy active walks, outdoor play and training sessions without being as physically difficult to handle as some much larger breeds. At the same time, they are usually more substantial than toy breeds.</p>
+
+<h3>2. Wide variety of temperaments</h3>
+
+<p>The medium-size category includes scent hounds, spaniels, herding dogs and companion-type dogs. That means two dogs of similar size can have completely different personalities and daily needs.</p>
+
+<h3>3. Adaptability to different homes</h3>
+
+<p>Some medium-sized dogs can live comfortably in apartments when their exercise and enrichment needs are met. Others are much better suited to homes where they have more room and regular outdoor activity. <strong>Energy level matters more than floor area alone.</strong></p>
+
+<h2>How to choose the right medium-sized dog</h2>
+
+<p>Start with your real routine rather than choosing only by appearance.</p>
+
+<ul>
+  <li><strong>Activity:</strong> How much walking, play and training can you provide every day?</li>
+  <li><strong>Time alone:</strong> How long will the dog regularly be left without company?</li>
+  <li><strong>Children and other pets:</strong> Does the individual dog's temperament fit the household?</li>
+  <li><strong>Grooming:</strong> Are you comfortable with brushing, coat maintenance and professional grooming if needed?</li>
+  <li><strong>Training:</strong> Can you provide consistent boundaries, socialisation and mental enrichment?</li>
+  <li><strong>Budget:</strong> Food, preventive care, grooming, equipment and veterinary costs all continue throughout the dog's life.</li>
+</ul>
+
+<h2>Exercise needs: size does not tell the whole story</h2>
+
+<p>One of the biggest mistakes is assuming that every medium-sized dog needs the same amount of exercise. A working or herding breed may need substantial physical activity and structured mental work, while another medium dog may be satisfied with moderate walks and interactive play.</p>
+
+<p>A good routine can include:</p>
+
+<ul>
+  <li>Daily walks suited to the dog's age and fitness</li>
+  <li>Sniffing and exploration</li>
+  <li>Short training sessions</li>
+  <li>Food puzzles and enrichment toys</li>
+  <li>Safe play with people or compatible dogs</li>
+  <li>Rest and recovery between activities</li>
+</ul>
+
+<p>Puppies should not simply be exercised like miniature adults. Their activity should be age-appropriate and should avoid repetitive overloading while they are still growing.</p>
+
+<h2>Feeding a medium-sized dog</h2>
+
+<p>Feeding should be based on the individual dog, not only the breed name. Two medium dogs of similar size can have very different calorie needs because of age, neuter status, activity, body composition and health.</p>
+
+<h3>Use body condition, not the feeding chart alone</h3>
+
+<p>Commercial feeding guides are useful starting points, but the dog's body condition should guide adjustments. You should be able to monitor the ribs, waist and abdominal tuck and make gradual changes when needed.</p>
+
+<h3>Choose a life-stage appropriate diet</h3>
+
+<p>Puppies, healthy adults and senior dogs do not have identical nutritional needs. Use a complete and balanced diet appropriate for the dog's life stage and discuss special requirements with a veterinarian or qualified animal-nutrition professional.</p>
+
+<h3>Watch treats and extras</h3>
+
+<p>Treats, table foods, chews and training rewards all add calories. They can quietly push an otherwise appropriate diet above the dog's daily requirement.</p>
+
+<h2>Grooming needs vary enormously</h2>
+
+<p>Medium-sized does not mean medium-maintenance. Coat type is a better predictor of grooming work.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Coat type</th>
+      <th>Typical care focus</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Short coat</strong></td>
+      <td>Regular brushing, skin checks and nail care</td>
+    </tr>
+    <tr>
+      <td><strong>Double coat</strong></td>
+      <td>Frequent brushing during shedding periods and thorough drying after baths</td>
+    </tr>
+    <tr>
+      <td><strong>Long or feathered coat</strong></td>
+      <td>Tangle prevention, brushing and extra attention around ears, legs and tail</td>
+    </tr>
+    <tr>
+      <td><strong>Curly or continuously growing coat</strong></td>
+      <td>Routine brushing and, for some dogs, scheduled professional grooming</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Training matters more as strength increases</h2>
+
+<p>A medium-sized dog can be physically powerful enough to pull an adult off balance, jump on visitors or become difficult to manage if basic training is ignored. Early training should focus on practical household skills such as:</p>
+
+<ul>
+  <li>Loose-leash walking</li>
+  <li>Recall</li>
+  <li>Waiting at doors</li>
+  <li>Settling calmly</li>
+  <li>Handling for grooming and veterinary care</li>
+  <li>Appropriate greetings</li>
+</ul>
+
+<p>Reward-based, consistent training helps the dog understand what is expected without relying on intimidation.</p>
+
+<h2>Apartment living with a medium-sized dog</h2>
+
+<p>A medium dog can live successfully in an apartment when its physical and behavioural needs are met. A large house does not automatically create a well-exercised dog, and an apartment does not automatically create an inactive one.</p>
+
+<p>Before choosing a dog for apartment life, consider barking tendency, energy level, access to safe walking areas, elevator or stair use, toilet routine and how easily the dog settles indoors.</p>
+
+<h2>Health and preventive care</h2>
+
+<p>Preventive care should be individualised with your veterinarian. Routine priorities generally include vaccination where appropriate, parasite control, dental care, healthy body condition, nail care and prompt attention to changes in appetite, mobility, skin, coat or behaviour.</p>
+
+<p>Breed can influence health risks, but individual dogs should not be assumed to have a condition simply because of their breed. Ask about responsible breeding, family history and recommended screening when considering a pedigree puppy.</p>
+
+<h2>Common mistakes with medium-sized dogs</h2>
+
+<ul>
+  <li>Choosing by appearance without researching temperament and energy</li>
+  <li>Underestimating exercise or mental-enrichment needs</li>
+  <li>Overfeeding because the dog “looks hungry”</li>
+  <li>Allowing gradual weight gain to go unnoticed</li>
+  <li>Skipping leash and recall training</li>
+  <li>Assuming apartment living is impossible purely because of size</li>
+  <li>Assuming every medium dog will be naturally good with children or other pets</li>
+</ul>
+
+<h2>A simple PawSattva checklist</h2>
+
+<ol>
+  <li><strong>Know the individual dog.</strong> Breed gives clues, not guarantees.</li>
+  <li><strong>Match energy to lifestyle.</strong> Be realistic about daily exercise.</li>
+  <li><strong>Feed to body condition.</strong> Adjust portions as the dog changes.</li>
+  <li><strong>Train practical skills early.</strong> A manageable dog is easier to include in family life.</li>
+  <li><strong>Plan grooming by coat type.</strong> Size alone does not predict coat maintenance.</li>
+  <li><strong>Keep preventive care consistent.</strong> Small problems are easier to address early.</li>
+</ol>
+
+<h2>Where PawSattva can help</h2>
+
+<p>If you already have a medium-sized dog, PawSattva can help you organise the nutrition side of everyday care. Use the <a href="/pet-feed"><strong>PawSattva Pet Feed & Wellness assessment</strong></a> to record your dog's breed, life stage, weight, activity and feeding routine.</p>
+
+<blockquote>
+  <strong>PawSattva takeaway:</strong> the best medium-sized dog is not the one that fits a number on a chart. It is the dog whose temperament, activity, care needs and long-term costs fit your household.
+</blockquote>
+
+<h2>Final thought</h2>
+
+<p>Medium-sized dogs are incredibly diverse. Some are relaxed companions, while others are energetic workers that need daily challenges. Choosing well means looking beyond size and asking a better question: <strong>Can I meet this individual dog's physical, nutritional, behavioural and grooming needs for life?</strong></p>
+    `.trim())
+    setInstagramCaption(
+      "Thinking about a medium-sized dog? 🐾 Size is only the beginning. Exercise, temperament, feeding, grooming and training needs can vary hugely between breeds. Read the new PawSattva guide. #MediumDogs #DogCare #PetNutrition #DogTraining #PawSattva"
+    )
+    setBlogStatus("draft")
+    setEditingBlogId(null)
+    toast.success("Medium-Sized Dog Breeds template loaded. Review the SEO, choose category/author and publish when ready.")
+  }
+
   useEffect(() => {
-    if (initialTab !== "blog" || initialBlogPrefill?.template !== "soft-water-pets") return
-    loadSoftWaterPetsTemplate()
+    if (initialTab !== "blog" || !initialBlogPrefill?.template) return
+    if (initialBlogPrefill.template === "soft-water-pets") loadSoftWaterPetsTemplate()
+    else if (initialBlogPrefill.template === "medium-dog-breeds") loadMediumDogBreedsTemplate()
+    else return
 
     const title = initialBlogPrefill.title?.trim()
     const description = initialBlogPrefill.description?.trim()
