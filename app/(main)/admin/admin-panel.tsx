@@ -311,14 +311,15 @@ export default function AdminPanel({
   const saveDraft = useCallback(() => {
     if (!blogTitle && !blogContent && !blogKeywords && !blogCategories.length) return
     const draft = {
-      blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage,
+      blogTitle, blogSlug, blogKeywords, blogExcerpt,
+      blogSeoTitle, blogSeoDescription, blogSeoKeywords, blogImage,
       blogContent, blogCategories, blogAuthorId, blogStatus,
       instagramAutoPost, instagramCaption, editingBlogId,
       savedAt: new Date().toISOString(),
     }
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
     setSavedDraft({ savedAt: draft.savedAt })
-  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, editingBlogId])
+  }, [blogTitle, blogSlug, blogKeywords, blogExcerpt, blogSeoTitle, blogSeoDescription, blogSeoKeywords, blogImage, blogContent, blogCategories, blogAuthorId, blogStatus, instagramAutoPost, instagramCaption, editingBlogId])
 
   const clearDraft = useCallback(() => {
     localStorage.removeItem(DRAFT_KEY)
@@ -364,6 +365,10 @@ export default function AdminPanel({
       setBlogTitle(d.blogTitle || "")
       setBlogSlug(d.blogSlug || "")
       setBlogKeywords(d.blogKeywords || "")
+      setBlogExcerpt(d.blogExcerpt || "")
+      setBlogSeoTitle(d.blogSeoTitle || "")
+      setBlogSeoDescription(d.blogSeoDescription || "")
+      setBlogSeoKeywords(d.blogSeoKeywords || "")
       setBlogContent(d.blogContent || "")
       setBlogCategories(Array.isArray(d.blogCategories) ? d.blogCategories : d.blogCategory ? [d.blogCategory] : [])
       setBlogStatus(d.blogStatus || "draft")
