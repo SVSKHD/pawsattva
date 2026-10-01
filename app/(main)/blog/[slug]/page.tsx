@@ -26,6 +26,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { siteConfig } from '@/lib/metadata';
 import ReadingEnhancements from './reading-enhancements';
+import { BlogHeroParallax } from './blog-hero-parallax';
 import { ReadAloud } from './read-aloud';
 import { BlogReactions } from '@/components/blog-reactions';
 import { BlogViewTracker } from '@/components/blog-view-tracker';
@@ -217,8 +218,7 @@ export default async function BlogPostPage({
           }}
         />
       )}
-      {/* Scroll progress + back-to-top (client) */}
-      <ReadingEnhancements toc={toc} title={blog.title} />
+      <BlogHeroParallax />
       <BlogViewTracker blogId={blog.id} title={blog.title} />
       <div className="blog-atmosphere fixed inset-0 z-0 opacity-70" aria-hidden>
         <Image
@@ -232,7 +232,7 @@ export default async function BlogPostPage({
       </div>
 
       {/* Hero */}
-      <header className="relative z-10 w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
+      <header data-blog-hero className="relative z-10 w-full min-h-[420px] md:min-h-[460px] lg:h-[60vh] lg:min-h-[650px]">
         <Image
           src={(blog?.image || defaultImage) as string}
           alt={blog.title}
@@ -246,7 +246,7 @@ export default async function BlogPostPage({
         <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
         <div className="relative z-10 flex flex-col justify-end min-h-[inherit] pt-24 sm:pt-28">
-          <div className="container mx-auto px-3 sm:px-4 pb-6 sm:pb-14">
+          <div data-blog-hero-panel className="blog-hero-panel container mx-auto px-3 sm:px-4 pb-6 sm:pb-14">
             {/* Breadcrumbs */}
             <nav className="flex items-center text-white/70 text-xs sm:text-sm mb-3 sm:mb-6 gap-1.5 sm:gap-2">
               <Link href="/" className="hover:text-white inline-flex items-center gap-1">
@@ -331,7 +331,7 @@ export default async function BlogPostPage({
         </div>
       </header>
 
-      <div className="container relative z-10 mx-auto px-4 py-10 sm:py-16">
+      <div data-blog-reading-shell className="blog-reading-shell container relative z-10 mx-auto px-4 py-10 sm:py-16">
         <div className="flex flex-col lg:flex-row gap-12 xl:gap-16 relative">
           {/* Sticky share rail — desktop only */}
           <div className="hidden xl:flex flex-col items-center sticky top-28 h-fit">
@@ -345,7 +345,8 @@ export default async function BlogPostPage({
 
           {/* Main */}
           <main className="lg:w-2/3 min-w-0 w-full">
-            <Card className="blog-glass-card overflow-hidden border border-white/40 shadow-2xl shadow-black/10 rounded-[1.75rem] sm:rounded-[2rem]">
+            <Card data-reading-article className="blog-glass-card overflow-hidden border border-white/40 shadow-2xl shadow-black/10 rounded-[1.75rem] sm:rounded-[2rem]">
+              <ReadingEnhancements toc={toc} title={blog.title} />
               <CardContent
                 className={`min-w-0 p-4 sm:p-8 md:p-12 ${roboto.className}`}
               >
@@ -593,6 +594,32 @@ export default async function BlogPostPage({
         .blog-atmosphere {
           filter: blur(18px) saturate(1.18);
           transform: scale(1.05);
+        }
+        .blog-hero-panel,
+        .blog-reading-shell {
+          will-change: transform;
+        }
+        @media (min-width: 1024px) {
+          .blog-hero-panel {
+            transform: translate3d(
+              calc(var(--blog-hero-progress, 0) * -7vw),
+              calc(var(--blog-hero-progress, 0) * -18px),
+              0
+            );
+            opacity: calc(1 - (var(--blog-hero-progress, 0) * 0.08));
+            transition: transform 80ms linear, opacity 120ms linear;
+          }
+          .blog-reading-shell {
+            transform: translate3d(
+              0,
+              calc(var(--blog-hero-progress, 0) * -110px),
+              0
+            );
+            transition: transform 80ms linear;
+          }
+          [data-blog-hero][data-scrolled="true"] .blog-hero-panel {
+            filter: saturate(0.98);
+          }
         }
         .blog-glass-card {
           background:
