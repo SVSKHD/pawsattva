@@ -245,7 +245,17 @@ export default function AdminPanel({
     }
     if (description) setBlogExcerpt(description)
     if (keywords) setBlogKeywords(keywords)
-    if (content) setBlogContent(content)
+    if (content) {
+      setBlogContent(content)
+    } else if (description) {
+      const safeDescription = description
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+      setBlogContent(`<p>${safeDescription}</p>`)
+    }
     if (image) setBlogImage(image)
     setBlogStatus("draft")
     setEditingBlogId(null)
