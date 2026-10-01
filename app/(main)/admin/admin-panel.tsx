@@ -81,6 +81,7 @@ const DRAFT_KEY = "pawsattva_blog_draft"
 // ── Component ────────────────────────────────────────────────────────────────
 
 type BlogUrlPrefill = {
+  template?: string
   title?: string
   description?: string
   keywords?: string
@@ -591,6 +592,29 @@ export default function AdminPanel({
     setEditingBlogId(null)
     toast.success("Soft Water & Pets blog template loaded. Add a featured image, category and author, then publish.")
   }
+
+  useEffect(() => {
+    if (initialTab !== "blog" || initialBlogPrefill?.template !== "soft-water-pets") return
+    loadSoftWaterPetsTemplate()
+
+    const title = initialBlogPrefill.title?.trim()
+    const description = initialBlogPrefill.description?.trim()
+    const keywords = initialBlogPrefill.keywords?.trim()
+    const content = initialBlogPrefill.content?.trim()
+    const image = initialBlogPrefill.image?.trim()
+
+    if (title) {
+      setBlogTitle(title)
+      setBlogSlug(generateSlug(title))
+    }
+    if (description) setBlogExcerpt(description)
+    if (keywords) setBlogKeywords(keywords)
+    if (content) setBlogContent(content)
+    if (image) setBlogImage(image)
+
+    // URL template requests should only hydrate once per navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const resetBlogForm = () => {
     setBlogTitle(""); setBlogSlug(""); setBlogKeywords(""); setBlogExcerpt("")
