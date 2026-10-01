@@ -9,8 +9,7 @@ import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { siteConfig } from "@/lib/metadata"
-
-type Mascot = "dog" | "cat"
+import { PetMascot, type Mascot } from "@/components/pet-mascot"
 
 export function SocialPetGuide() {
   const pathname = usePathname()
@@ -147,21 +146,21 @@ export function SocialPetGuide() {
         }
         .pet-guide-paw {
           animation: pet-guide-paw 1.35s ease-in-out infinite;
-          transform-origin: 16px 38px;
+          transform-origin: 62px 64px;
           will-change: transform;
         }
         .pet-guide-tail {
           animation: pet-guide-tail 1.2s ease-in-out infinite;
-          transform-origin: 20px 50px;
+          transform-origin: 32px 74px;
           will-change: transform;
         }
         .pet-guide-leg-left {
           animation: pet-guide-leg-left 1s ease-in-out infinite;
-          transform-origin: 38px 82px;
+          transform-origin: 39px 78px;
         }
         .pet-guide-leg-right {
           animation: pet-guide-leg-right 1s ease-in-out infinite reverse;
-          transform-origin: 70px 82px;
+          transform-origin: 57px 78px;
         }
         .pet-guide-greeting {
           animation: pet-guide-bubble 9s ease-in-out both;
@@ -287,115 +286,12 @@ export function SocialPetGuide() {
 }
 
 function MascotCharacter({ mascot }: { mascot: Mascot }) {
-  const isCat = mascot === "cat"
-
   return (
-    <svg
-      width="88"
-      height="88"
-      viewBox="0 0 96 96"
-      role="img"
-      aria-label={`Animated ${mascot} mascot`}
+    <PetMascot
+      mascot={mascot}
+      size={88}
+      label={`Animated ${mascot} mascot`}
       className="pet-guide-shadow"
-    >
-      <ellipse cx="48" cy="84" rx="27" ry="6" fill="rgba(15,23,42,0.14)" />
-
-      <g className="pet-guide-tail">
-        {isCat ? (
-          <path
-            d="M27 65 C10 62 8 44 18 37 C28 30 35 40 29 48 C25 53 19 50 18 45"
-            fill="none"
-            stroke="#D97706"
-            strokeWidth="7"
-            strokeLinecap="round"
-          />
-        ) : (
-          <path
-            d="M69 65 C83 59 84 47 75 43"
-            fill="none"
-            stroke="#92400E"
-            strokeWidth="8"
-            strokeLinecap="round"
-          />
-        )}
-      </g>
-
-      <g className="pet-guide-body">
-        <ellipse
-          cx="48"
-          cy="64"
-          rx={isCat ? "23" : "25"}
-          ry={isCat ? "20" : "21"}
-          fill={isCat ? "#F59E0B" : "#D97706"}
-        />
-
-        <ellipse
-          cx="48"
-          cy="68"
-          rx="13"
-          ry="11"
-          fill={isCat ? "#FDE68A" : "#FED7AA"}
-          opacity="0.95"
-        />
-
-        <g className="pet-guide-leg-left">
-          <ellipse cx="34" cy="79" rx="7" ry="10" fill={isCat ? "#D97706" : "#B45309"} />
-        </g>
-        <g className="pet-guide-leg-right">
-          <ellipse cx="62" cy="79" rx="7" ry="10" fill={isCat ? "#D97706" : "#B45309"} />
-        </g>
-
-        {isCat ? (
-          <>
-            <path d="M28 31 L32 11 L43 29 Z" fill="#D97706" />
-            <path d="M68 31 L64 11 L53 29 Z" fill="#D97706" />
-            <path d="M32 28 L34 17 L39 29 Z" fill="#FDE68A" />
-            <path d="M64 28 L62 17 L57 29 Z" fill="#FDE68A" />
-          </>
-        ) : (
-          <>
-            <ellipse cx="28" cy="34" rx="8" ry="15" fill="#78350F" transform="rotate(20 28 34)" />
-            <ellipse cx="68" cy="34" rx="8" ry="15" fill="#78350F" transform="rotate(-20 68 34)" />
-          </>
-        )}
-
-        <circle cx="48" cy="39" r="22" fill={isCat ? "#F59E0B" : "#D97706"} />
-
-        {isCat ? (
-          <ellipse cx="48" cy="47" rx="11" ry="8" fill="#FFFBEB" />
-        ) : (
-          <ellipse cx="48" cy="48" rx="13" ry="9" fill="#FED7AA" />
-        )}
-
-        <ellipse cx="40" cy="37" rx="2.6" ry="3.2" fill="#1F2937" />
-        <ellipse cx="56" cy="37" rx="2.6" ry="3.2" fill="#1F2937" />
-        <circle cx="39.2" cy="36.2" r="0.8" fill="white" />
-        <circle cx="55.2" cy="36.2" r="0.8" fill="white" />
-
-        <path
-          d={isCat ? "M48 43 L44 47 L52 47 Z" : "M48 43 C45 43 44 45 44 47 C46 49 50 49 52 47 C52 45 51 43 48 43 Z"}
-          fill={isCat ? "#FB7185" : "#3F1F0F"}
-        />
-        <path d="M41 51 Q48 57 55 51" fill="none" stroke="#3F1F0F" strokeWidth="2.3" strokeLinecap="round" />
-
-        {isCat && (
-          <>
-            <path d="M35 47 H23 M36 51 H25 M61 47 H73 M60 51 H71" stroke="#92400E" strokeWidth="1.7" strokeLinecap="round" />
-          </>
-        )}
-
-        <g className="pet-guide-paw">
-          <ellipse
-            cx="71"
-            cy="61"
-            rx="7"
-            ry="11"
-            fill={isCat ? "#D97706" : "#B45309"}
-            transform="rotate(-18 71 61)"
-          />
-          <circle cx="73" cy="53" r="5" fill={isCat ? "#FDE68A" : "#FED7AA"} />
-        </g>
-      </g>
-    </svg>
+    />
   )
 }

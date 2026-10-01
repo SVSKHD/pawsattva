@@ -2,43 +2,103 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
+import { getBlogScroller, getScrollTop, getScrollViewport, onBlogScroll, scrollToTop } from './blog-scroller';
 
 type TocItem = { id: string; text: string; level: number };
 
-function ReadingEnhancements({ toc }: { toc: TocItem[]; title?: string }) {
+function ReadingEnhancements({ toc, readTime }: { toc: TocItem[]; readTime: number }) {
   const [progress, setProgress] = useState(0);
   const [showTop, setShowTop] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  // Progress UI is only shown while the reader is actively scrolling
+  const [scrolling, setScrolling] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => {
-      const article = document.querySelector<HTMLElement>('[data-reading-article]');
-      const scrollTop = window.scrollY;
-      setShowTop(scrollTop > 600);
+    let frame = 0;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+
+    const update = () => {
+      frame = 0;
+      const article = document.querySelector<HTMLElement>('[data-reading-content]');
+      setShowTop(getScrollTop() > 600);
 
       if (!article) {
         setProgress(0);
         return;
       }
 
+      // Measured against the visible reading area (right column on desktop, viewport on mobile)
       const rect = article.getBoundingClientRect();
-      const articleTop = scrollTop + rect.top;
-      const articleHeight = article.offsetHeight;
-      const viewport = window.innerHeight;
-      const travelled = scrollTop - articleTop;
-      const available = Math.max(1, articleHeight - viewport * 0.35);
-      const pct = Math.min(100, Math.max(0, (travelled / available) * 100));
-      setProgress(pct);
+      const view = getScrollViewport();
+      const travelled = view.top + view.height * 0.3 - rect.top;
+      const available = Math.max(1, rect.height - view.height * 0.4);
+      setProgress(Math.min(100, Math.max(0, (travelled / available) * 100)));
     };
 
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
+    const requestUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(update);
+    };
+
+    const onScroll = () => {
+      requestUpdate();
+      setScrolling(true);
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => setScrolling(false), 1200);
+    };
+
+    update();
+    const offScroll = onBlogScroll(onScroll);
+    window.addEventListener('resize', requestUpdate);
     return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+      clearTimeout(idleTimer);
+      offScroll();
+      window.removeEventListener('resize', requestUpdate);
     };
   }, []);
 
+  // Desktop: the window is locked, so route wheel and keyboard scrolling to the right column
+  useEffect(() => {
+    const left = document.querySelector<HTMLElement>('.blog-left');
+
+    const onWheel = (event: WheelEvent) => {
+      const scroller = getBlogScroller();
+      if (!scroller || !left) return;
+      // Let scrollable parts of the left panel (contents list, open comments) scroll themselves
+      for (let el = event.target as HTMLElement | null; el && el !== left; el = el.parentElement) {
+        const overflowY = window.getComputedStyle(el).overflowY;
+        if ((overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight) return;
+      }
+      const lineHeight = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? scroller.clientHeight : 1;
+      scroller.scrollBy({ top: event.deltaY * lineHeight });
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      const scroller = getBlogScroller();
+      const active = document.activeElement;
+      if (!scroller || (active && active !== document.body && active !== document.documentElement)) return;
+      const page = scroller.clientHeight * 0.85;
+      const amount: Record<string, number> = {
+        ArrowDown: 64, ArrowUp: -64, PageDown: page, PageUp: -page,
+        ' ': event.shiftKey ? -page : page,
+      };
+      if (event.key === 'Home') scroller.scrollTo({ top: 0, behavior: 'smooth' });
+      else if (event.key === 'End') scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+      else if (event.key in amount) scroller.scrollBy({ top: amount[event.key], behavior: 'smooth' });
+      else return;
+      event.preventDefault();
+    };
+
+    left?.addEventListener('wheel', onWheel, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      left?.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, []);
+
+  // Highlight the TOC entry for the section currently being read
   useEffect(() => {
     if (!toc.length) return;
     const links = Array.from(
@@ -46,11 +106,9 @@ function ReadingEnhancements({ toc }: { toc: TocItem[]; title?: string }) {
     );
     const setActive = (id: string) => {
       links.forEach((a) => {
-        const isActive = a.dataset.tocLink === id;
-        a.classList.toggle('text-orange-600', isActive);
-        a.classList.toggle('border-orange-500', isActive);
-        a.classList.toggle('font-medium', isActive);
+        a.dataset.active = a.dataset.tocLink === id ? 'true' : 'false';
       });
+      setActiveId(id);
     };
 
     const headings = toc
@@ -73,30 +131,70 @@ function ReadingEnhancements({ toc }: { toc: TocItem[]; title?: string }) {
     return () => observer.disconnect();
   }, [toc]);
 
+  const pct = Math.round(progress);
+  const minutesLeft = Math.ceil(readTime * (1 - progress / 100));
+  const activeSection = toc.find((t) => t.id === activeId)?.text;
+
   return (
     <>
-      <div className="sticky top-0 z-20 border-b border-orange-100/80 bg-white/88 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/88 sm:px-6">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">
-            Reading progress
-          </span>
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-orange-100 dark:bg-white/10">
+      {/* Desktop: progress card in the left panel, directly above the comments. It expands only while
+          scrolling; the contents list above absorbs the height, so the comments row never moves. */}
+      <div
+        aria-hidden={!scrolling}
+        className={`hidden shrink-0 transition-[grid-template-rows,opacity,margin] duration-300 ease-out motion-reduce:transition-none lg:grid ${
+          scrolling ? 'mt-4 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Reading progress
+              </span>
+              <span className="text-2xl font-extrabold tabular-nums text-orange-600">{pct}%</span>
+            </div>
             <div
-              className="h-full rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500 transition-[width] duration-100"
-              style={{ width: `${progress}%` }}
-            />
+              className="mt-3 h-2 overflow-hidden rounded-full bg-orange-100 dark:bg-white/10"
+              role="progressbar"
+              aria-label="Reading progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={pct}
+            >
+              <div
+                className="h-full origin-left rounded-full bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500"
+                style={{ transform: `scaleX(${progress / 100})` }}
+              />
+            </div>
+            <p className="mt-2.5 truncate text-xs text-muted-foreground">
+              {pct >= 100
+                ? 'Finished — thanks for reading! 🐾'
+                : activeSection
+                  ? <>Now reading: <span className="font-medium text-foreground">{activeSection}</span></>
+                  : `${minutesLeft} min left`}
+            </p>
           </div>
-          <span className="w-10 text-right text-xs font-black tabular-nums text-orange-600">
-            {Math.round(progress)}%
-          </span>
         </div>
+      </div>
+
+      {/* Mobile/tablet: thin bar pinned to the top of the screen */}
+      <div
+        className={`fixed inset-x-0 top-0 z-[60] h-1 bg-transparent transition-opacity duration-300 lg:hidden ${
+          scrolling ? 'opacity-100' : 'opacity-0'
+        }`}
+        aria-hidden
+      >
+        <div
+          className="h-full origin-left bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500"
+          style={{ transform: `scaleX(${progress / 100})` }}
+        />
       </div>
 
       <button
         type="button"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        onClick={scrollToTop}
         aria-label="Back to top"
-        className={`fixed bottom-6 right-6 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-white shadow-xl shadow-orange-500/30 transition-all duration-300 hover:bg-orange-600 ${
+        className={`fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-white shadow-xl shadow-orange-500/30 transition-all duration-300 hover:bg-orange-600 md:bottom-8 md:right-8 ${
           showTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         }`}
       >

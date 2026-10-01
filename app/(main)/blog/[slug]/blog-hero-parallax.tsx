@@ -1,33 +1,27 @@
 "use client";
 
 import { useEffect } from "react";
+import { getScrollViewport, onBlogScroll } from "./blog-scroller";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
+// Drives the cover image's scroll parallax: the photo drifts inside its frame as it
+// scrolls away (see .blog-hero-image in page.tsx).
 export function BlogHeroParallax() {
   useEffect(() => {
-    const hero = document.querySelector<HTMLElement>("[data-blog-hero]");
-    const heroPanel = document.querySelector<HTMLElement>("[data-blog-hero-panel]");
-    const readingShell = document.querySelector<HTMLElement>("[data-blog-reading-shell]");
-    if (!hero || !heroPanel || !readingShell) return;
+    const media = document.querySelector<HTMLElement>("[data-blog-hero-media]");
+    if (!media) return;
 
     let frame = 0;
 
     const update = () => {
       frame = 0;
-      const rect = hero.getBoundingClientRect();
-      const distance = Math.max(1, rect.height * 0.82);
-      const progress = clamp(-rect.top / distance, 0, 1);
-
-      hero.style.setProperty("--blog-hero-progress", progress.toFixed(3));
-      heroPanel.style.setProperty("--blog-hero-progress", progress.toFixed(3));
-      readingShell.style.setProperty("--blog-hero-progress", progress.toFixed(3));
-      document.documentElement.style.setProperty(
-        "--blog-hero-progress",
-        progress.toFixed(3),
-      );
-      hero.dataset.scrolled = progress > 0.08 ? "true" : "false";
+      const rect = media.getBoundingClientRect();
+      // 0 while the image sits at the top of the reading area, 1 once it has scrolled fully out of view
+      const viewTop = Math.max(getScrollViewport().top, 96);
+      const progress = clamp((viewTop - rect.top) / Math.max(1, rect.height), 0, 1);
+      media.style.setProperty("--blog-hero-progress", progress.toFixed(3));
     };
 
     const requestUpdate = () => {
@@ -36,14 +30,13 @@ export function BlogHeroParallax() {
     };
 
     update();
-    window.addEventListener("scroll", requestUpdate, { passive: true });
+    const offScroll = onBlogScroll(requestUpdate);
     window.addEventListener("resize", requestUpdate);
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", requestUpdate);
+      offScroll();
       window.removeEventListener("resize", requestUpdate);
-      document.documentElement.style.removeProperty("--blog-hero-progress");
     };
   }, []);
 

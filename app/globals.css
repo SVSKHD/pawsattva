@@ -145,7 +145,8 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     max-width: 100%;
-    overflow-x: hidden;
+    /* clip (not hidden): hidden would make body a scroll container and break position: sticky */
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -392,118 +393,6 @@ a {
   }
 }
 
-/* Branded loader: compositor-friendly transforms, no JavaScript interval. */
-.loader-orb {
-  position: absolute;
-  width: 18rem;
-  height: 18rem;
-  border-radius: 999px;
-  opacity: 0.24;
-  filter: blur(52px);
-  pointer-events: none;
-}
-
-.loader-orb-one {
-  top: -8rem;
-  left: -7rem;
-  background: rgb(251 146 60);
-}
-
-.loader-orb-two {
-  right: -8rem;
-  bottom: -8rem;
-  background: rgb(52 211 153);
-}
-
-.loader-logo-ring {
-  animation: loader-ring 8s linear infinite;
-}
-
-.loader-logo-ring::before,
-.loader-logo-ring::after {
-  content: "";
-  position: absolute;
-  border-radius: 999px;
-  background: rgb(249 115 22);
-}
-
-.loader-logo-ring::before {
-  top: -0.2rem;
-  left: 50%;
-  width: 0.5rem;
-  height: 0.5rem;
-}
-
-.loader-logo-ring::after {
-  right: 0.25rem;
-  bottom: 0.65rem;
-  width: 0.35rem;
-  height: 0.35rem;
-  background: rgb(16 185 129);
-}
-
-.loader-logo {
-  animation: loader-logo-float 2.8s ease-in-out infinite;
-}
-
-.loader-logo-ring-secondary {
-  animation: loader-ring-reverse 6.5s linear infinite;
-}
-
-.loader-runner-track {
-  opacity: 0.8;
-}
-
-.loader-dog-run {
-  animation: loader-dog-run 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-.loader-cat-run {
-  animation: loader-cat-run 2.7s cubic-bezier(0.22, 1, 0.36, 1) infinite 180ms;
-}
-
-.loader-progress {
-  animation: loader-progress 1.65s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-@keyframes loader-ring {
-  to { transform: rotate(360deg); }
-}
-
-@keyframes loader-ring-reverse {
-  to { transform: rotate(-360deg); }
-}
-
-@keyframes loader-dog-run {
-  0% { transform: translateX(-2.5rem) translateY(2px) scale(0.94); opacity: 0; }
-  12% { opacity: 1; }
-  48% { transform: translateX(5.2rem) translateY(-3px) scale(1); opacity: 1; }
-  76% { transform: translateX(10.4rem) translateY(1px) scale(0.98); opacity: 0.95; }
-  100% { transform: translateX(13rem) translateY(2px) scale(0.94); opacity: 0; }
-}
-
-@keyframes loader-cat-run {
-  0% { transform: translateX(2.8rem) translateY(1px) scale(0.94); opacity: 0; }
-  14% { opacity: 1; }
-  50% { transform: translateX(-4.4rem) translateY(-3px) scale(1); opacity: 1; }
-  78% { transform: translateX(-9rem) translateY(1px) scale(0.98); opacity: 0.95; }
-  100% { transform: translateX(-12rem) translateY(2px) scale(0.94); opacity: 0; }
-}
-
-@keyframes loader-logo-float {
-  50% { transform: translateY(-4px) scale(1.025); }
-}
-
-@keyframes loader-step {
-  0%, 100% { transform: translateY(2px) scale(0.9); opacity: 0.35; }
-  45% { transform: translateY(-5px) scale(1.05); opacity: 1; }
-}
-
-@keyframes loader-progress {
-  from { transform: translateX(-115%); }
-  to { transform: translateX(290%); }
-}
-
 @media (max-width: 767px) {
   /* Large backdrop filters repaint during scroll on mobile GPUs. */
   .backdrop-blur-xl,
@@ -529,11 +418,6 @@ a {
   footer {
     content-visibility: auto;
     contain-intrinsic-size: auto 760px;
-  }
-
-  .loader-orb {
-    filter: blur(36px);
-    opacity: 0.17;
   }
 
   .mobile-ambient-orb {

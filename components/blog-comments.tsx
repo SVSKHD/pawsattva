@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import type { User } from "firebase/auth";
-import { AlertCircle, Loader2, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { AlertCircle, ChevronDown, Loader2, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { useAuth } from "@/components/auth-provider";
 import { addBlogComment, onBlogCommentsSnapshot } from "@/firebase/firestore";
@@ -24,7 +24,40 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
   const [loadingComments, setLoadingComments] = useState(true);
   const [commentsError, setCommentsError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const savingRef = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Expand when the reader follows any "#comments" link (share rail, end-of-article button)
+  useEffect(() => {
+    const openAndReveal = () => {
+      setOpen(true);
+      // Wait for the expand animation to start, then bring the section into view
+      // (it may live inside the blog page's independently scrolling left panel)
+      window.setTimeout(() => {
+        sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 60);
+    };
+    const openIfTargeted = () => {
+      if (window.location.hash === "#comments") openAndReveal();
+    };
+    const onClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.('a[href="#comments"]');
+      if (!link) return;
+      event.preventDefault();
+      if (window.location.hash !== "#comments") {
+        window.history.replaceState(null, "", "#comments");
+      }
+      openAndReveal();
+    };
+    openIfTargeted();
+    window.addEventListener("hashchange", openIfTargeted);
+    document.addEventListener("click", onClick);
+    return () => {
+      window.removeEventListener("hashchange", openIfTargeted);
+      document.removeEventListener("click", onClick);
+    };
+  }, []);
 
   useEffect(() => {
     setLoadingComments(true);
@@ -113,113 +146,150 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
 
   return (
     <section
+      ref={sectionRef}
       id="comments"
+      data-open={open}
       aria-labelledby="comments-heading"
-      className="scroll-mt-28 rounded-[1.75rem] border border-orange-100/80 bg-card/90 p-4 shadow-lg shadow-orange-950/5 sm:p-6"
+      className={`scroll-mt-28 overflow-hidden rounded-2xl border bg-card/90 shadow-sm transition-[border-color,box-shadow] duration-300 ${
+        open ? "border-orange-200 shadow-lg shadow-orange-950/5 dark:border-orange-900/60" : "border-border/70 hover:border-orange-200"
+      }`}
     >
-      <div className="flex items-center justify-between gap-3 border-b border-orange-100/80 pb-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600">Community</p>
-          <h3 id="comments-heading" className="mt-1 flex items-center gap-2 text-2xl font-black">
-            <MessageCircle className="h-6 w-6 text-orange-500" />
-            Comments
-          </h3>
-        </div>
-        <span
-          aria-live="polite"
-          className="inline-flex min-w-10 items-center justify-center rounded-full bg-orange-50 px-3 py-1.5 text-sm font-black text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
-        >
-          {commentCount}
-        </span>
-      </div>
-
-      <form onSubmit={submitComment} className="mt-5 rounded-2xl border border-border/80 bg-background/80 p-3 sm:p-4">
-        <label htmlFor="blog-comment" className="text-sm font-bold text-foreground">
-          Add a comment
-        </label>
-        <textarea
-          id="blog-comment"
-          name="comment"
-          value={newComment}
-          onChange={(event) => {
-            setNewComment(event.target.value);
-            if (submitError) setSubmitError(null);
-          }}
-          placeholder="Share something helpful about this article…"
-          className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-base leading-relaxed shadow-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:opacity-70"
-          maxLength={500}
-          minLength={3}
-          disabled={saving}
-          aria-invalid={Boolean(submitError)}
-          aria-describedby={submitError ? "comment-help comment-error" : "comment-help"}
-        />
-
-        <div id="comment-help" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-            {user
-              ? "Respectful comments only. Profanity is blocked."
-              : "Write first—we’ll ask you to sign in only when you post."}
-          </span>
-          <span className={newComment.length >= 450 ? "font-bold text-orange-600" : ""}>
-            {newComment.length}/500
-          </span>
-        </div>
-
-        {submitError && (
-          <div
-            id="comment-error"
-            role="alert"
-            className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
-          >
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{submitError}</span>
-          </div>
-        )}
-
+      <h3 id="comments-heading">
         <button
-          type="submit"
-          disabled={!canSubmit}
-          className="mt-4 inline-flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls="comments-panel"
+          className="flex w-full items-center gap-3 px-4 py-3.5 text-left outline-none transition-colors hover:bg-orange-50/50 focus-visible:bg-orange-50/60 dark:hover:bg-orange-950/20 sm:px-5"
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          {saving ? "Posting..." : user ? "Post Comment" : "Sign in & Post"}
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
+            <MessageCircle className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-base font-bold text-foreground">Comments</span>
+            <span className="block truncate text-xs text-muted-foreground">
+              {loadingComments
+                ? "Loading…"
+                : commentCount > 0
+                  ? "Join the conversation"
+                  : "Be the first to share a thought"}
+            </span>
+          </span>
+          <span
+            aria-live="polite"
+            className="inline-flex min-w-8 items-center justify-center rounded-full bg-orange-50 px-2.5 py-1 text-xs font-black tabular-nums text-orange-700 dark:bg-orange-950/40 dark:text-orange-300"
+          >
+            {commentCount}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          />
         </button>
-      </form>
+      </h3>
 
-      <div className="mt-6 space-y-3" aria-live="polite" aria-busy={loadingComments}>
-        {loadingComments ? (
-          <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
-            Loading comments…
-          </div>
-        ) : commentsError ? (
-          <div role="status" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>{commentsError}</span>
-          </div>
-        ) : comments.length === 0 ? (
-          <div className="rounded-2xl border border-dashed bg-muted/20 p-5 text-sm leading-relaxed text-muted-foreground">
-            No comments yet. Be the first to share a helpful thought.
-          </div>
-        ) : (
-          comments.map((comment) => (
-            <article key={comment.id} className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-sm">
-              <div className="mb-3 flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-50 text-sm font-black text-orange-700 ring-1 ring-orange-200 dark:from-orange-950 dark:to-amber-950 dark:text-orange-300 dark:ring-orange-900">
-                  {getCommentInitial(comment.userName)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-foreground">{comment.userName || "Paw Sattva reader"}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{formatCommentDate(comment.createdAt)}</p>
-                </div>
+      <div
+        id="comments-panel"
+        role="region"
+        aria-labelledby="comments-heading"
+        inert={!open}
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out motion-reduce:transition-none ${
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+        }`}
+      >
+        {/* Scrolls internally when its container caps the height (pinned blog side panel) */}
+        <div className={`min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${open ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
+          <div className="border-t border-border/70 px-4 pb-4 sm:px-5 sm:pb-5">
+            <form onSubmit={submitComment} className="mt-4 rounded-2xl border border-border/80 bg-background/80 p-3 sm:p-4">
+              <label htmlFor="blog-comment" className="text-sm font-bold text-foreground">
+                Add a comment
+              </label>
+              <textarea
+                id="blog-comment"
+                name="comment"
+                value={newComment}
+                onChange={(event) => {
+                  setNewComment(event.target.value);
+                  if (submitError) setSubmitError(null);
+                }}
+                placeholder="Share something helpful about this article…"
+                className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-input bg-background px-4 py-3 text-base leading-relaxed shadow-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10 disabled:cursor-not-allowed disabled:opacity-70"
+                maxLength={500}
+                minLength={3}
+                disabled={saving}
+                aria-invalid={Boolean(submitError)}
+                aria-describedby={submitError ? "comment-help comment-error" : "comment-help"}
+              />
+
+              <div id="comment-help" className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5">
+                  <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  {user
+                    ? "Respectful comments only. Profanity is blocked."
+                    : "Write first—we’ll ask you to sign in only when you post."}
+                </span>
+                <span className={newComment.length >= 450 ? "font-bold text-orange-600" : ""}>
+                  {newComment.length}/500
+                </span>
               </div>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">
-                {comment.content}
-              </p>
-            </article>
-          ))
-        )}
+
+              {submitError && (
+                <div
+                  id="comment-error"
+                  role="alert"
+                  className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className="mt-4 inline-flex min-h-11 w-full touch-manipulation items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-bold text-white shadow-md shadow-orange-500/20 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {saving ? "Posting..." : user ? "Post Comment" : "Sign in & Post"}
+              </button>
+            </form>
+
+            <div className="mt-6 space-y-3" aria-live="polite" aria-busy={loadingComments}>
+              {loadingComments ? (
+                <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                  Loading comments…
+                </div>
+              ) : commentsError ? (
+                <div role="status" className="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>{commentsError}</span>
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="rounded-2xl border border-dashed bg-muted/20 p-5 text-sm leading-relaxed text-muted-foreground">
+                  No comments yet. Be the first to share a helpful thought.
+                </div>
+              ) : (
+                comments.map((comment) => (
+                  <article key={comment.id} className="rounded-2xl border border-border/70 bg-background/75 p-4 shadow-sm">
+                    <div className="mb-3 flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-50 text-sm font-black text-orange-700 ring-1 ring-orange-200 dark:from-orange-950 dark:to-amber-950 dark:text-orange-300 dark:ring-orange-900">
+                        {getCommentInitial(comment.userName)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-bold text-foreground">{comment.userName || "Paw Sattva reader"}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">{formatCommentDate(comment.createdAt)}</p>
+                      </div>
+                    </div>
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/85 [overflow-wrap:anywhere]">
+                      {comment.content}
+                    </p>
+                  </article>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
