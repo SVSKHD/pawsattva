@@ -8,7 +8,7 @@ import { Settings2, ChevronRight, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import AdminLoader from "@/components/loader"
 import { useAuth } from "@/components/auth-provider"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 import {
   addBlog, updateBlog, deleteBlog,
@@ -80,9 +80,10 @@ const DRAFT_KEY = "pawsattva_blog_draft"
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function AdminPanel() {
+export default function AdminPanel({ initialTab = "blog-list" }: { initialTab?: string }) {
   const { user, loading: authLoading, isAdmin, role } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [, startTransition] = useTransition()
   const isFullAdmin = role === "admin"
   const isAuthor = role === "author"
@@ -106,7 +107,7 @@ export default function AdminPanel() {
   }, [authLoading, isAdmin, router])
 
   // ── Navigation state ──────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState("blog-list")
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   const handleTabChange = (tab: string) => {
     startTransition(() => setActiveTab(allowedTabs.has(tab) ? tab : "blog-list"))
@@ -206,6 +207,36 @@ export default function AdminPanel() {
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
   const [isSavingBlog, setIsSavingBlog] = useState(false)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
+  const urlPrefillAppliedRef = useRef(false)
+
+  useEffect(() => {
+    if (initialTab !== "blog" || urlPrefillAppliedRef.current) return
+
+    const title = searchParams.get("title")?.trim() || ""
+    const description =
+      searchParams.get("description")?.trim() ||
+      searchParams.get("excerpt")?.trim() ||
+      ""
+    const keywords = searchParams.get("keywords")?.trim() || ""
+    const content = searchParams.get("content")?.trim() || ""
+    const image = searchParams.get("image")?.trim() || ""
+
+    if (!title && !description && !keywords && !content && !image) return
+
+    urlPrefillAppliedRef.current = true
+    if (title) {
+      setBlogTitle(title)
+      setBlogSlug(generateSlug(title))
+    }
+    if (description) setBlogExcerpt(description)
+    if (keywords) setBlogKeywords(keywords)
+    if (content) setBlogContent(content)
+    if (image) setBlogImage(image)
+    setBlogStatus("draft")
+    setEditingBlogId(null)
+
+    toast.success("Blog fields prefilled from the URL. Review them before publishing.")
+  }, [initialTab, searchParams])
 
   // ── Category form state ───────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState("")
