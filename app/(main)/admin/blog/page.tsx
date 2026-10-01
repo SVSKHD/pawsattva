@@ -14,12 +14,14 @@ export default async function AdminBlogRedirect({
   const next = new URLSearchParams();
   next.set("tab", "blog");
 
+  const template = first(params.template);
   const title = first(params.title);
   const description = first(params.description || params.excerpt);
   const keywords = first(params.keywords);
   const content = first(params.content);
   const image = first(params.image);
 
+  if (template) next.set("template", template);
   if (title) next.set("title", title);
   if (description) next.set("description", description);
   if (keywords) next.set("keywords", keywords);
