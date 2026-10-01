@@ -17,8 +17,9 @@ export function BlogHeroParallax() {
     const update = () => {
       frame = 0;
       const rect = hero.getBoundingClientRect();
+      const heroTop = hero.offsetTop;
       const distance = Math.max(1, rect.height * 0.82);
-      const progress = clamp(-rect.top / distance, 0, 1);
+      const progress = clamp((window.scrollY - heroTop) / distance, 0, 1);
 
       hero.style.setProperty("--blog-hero-progress", progress.toFixed(3));
       heroPanel.style.setProperty("--blog-hero-progress", progress.toFixed(3));
