@@ -29,9 +29,14 @@ export default async function AdminPage({
       initialBlogPrefill={
         initialTab === "blog"
           ? {
+              template: first(params.template),
               title: first(params.title),
-              description: first(params.description || params.excerpt),
+              description: first(params.description),
+              excerpt: first(params.excerpt),
               keywords: first(params.keywords),
+              seoTitle: first(params.seoTitle),
+              seoDescription: first(params.seoDescription || params.description),
+              seoKeywords: first(params.seoKeywords),
               content: first(params.content),
               image: first(params.image),
             }

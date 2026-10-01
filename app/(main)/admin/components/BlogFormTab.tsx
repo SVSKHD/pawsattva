@@ -33,6 +33,12 @@ interface BlogFormTabProps {
   setBlogKeywords: (v: string) => void
   blogExcerpt: string
   setBlogExcerpt: (v: string) => void
+  blogSeoTitle: string
+  setBlogSeoTitle: (v: string) => void
+  blogSeoDescription: string
+  setBlogSeoDescription: (v: string) => void
+  blogSeoKeywords: string
+  setBlogSeoKeywords: (v: string) => void
   blogImage: string
   setBlogImage: (v: string) => void
   handleFeaturedImageUpload: (file: File) => Promise<void>
@@ -69,6 +75,9 @@ export function BlogFormTab({
   blogSlug, setBlogSlug,
   blogKeywords, setBlogKeywords,
   blogExcerpt, setBlogExcerpt,
+  blogSeoTitle, setBlogSeoTitle,
+  blogSeoDescription, setBlogSeoDescription,
+  blogSeoKeywords, setBlogSeoKeywords,
   blogImage, setBlogImage,
   handleFeaturedImageUpload, uploadingFeaturedImage,
   blogContent, setBlogContent,
@@ -255,6 +264,55 @@ export function BlogFormTab({
                     value={blogExcerpt}
                     onChange={(e) => setBlogExcerpt(e.target.value)}
                   />
+                </div>
+
+                <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/40 p-4 sm:p-5 dark:border-emerald-500/20 dark:bg-emerald-500/5">
+                  <div className="mb-4">
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Search metadata</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      These values control the blog's search title, meta description and SEO keyword phrases. They are saved with the post and can still be refined in the SEO Command Center.
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="seo-title" className="text-sm font-semibold flex items-center justify-between">
+                        SEO Title
+                        <span className="text-xs font-medium text-muted-foreground">{blogSeoTitle.trim().length}/60</span>
+                      </Label>
+                      <Input
+                        id="seo-title"
+                        placeholder="Search-friendly title..."
+                        value={blogSeoTitle}
+                        onChange={(e) => setBlogSeoTitle(e.target.value)}
+                        maxLength={70}
+                        className="h-11 bg-white/70 dark:bg-black/40 rounded-xl"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="seo-description" className="text-sm font-semibold flex items-center justify-between">
+                        SEO Description
+                        <span className="text-xs font-medium text-muted-foreground">{blogSeoDescription.trim().length}/160</span>
+                      </Label>
+                      <Textarea
+                        id="seo-description"
+                        placeholder="Human-written meta description, ideally 120–160 characters..."
+                        value={blogSeoDescription}
+                        onChange={(e) => setBlogSeoDescription(e.target.value)}
+                        maxLength={180}
+                        className="min-h-[96px] resize-y bg-white/70 dark:bg-black/40 rounded-xl p-4"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="seo-keywords" className="text-sm font-semibold">SEO Keywords / Keyphrases</Label>
+                      <Textarea
+                        id="seo-keywords"
+                        placeholder="hard water and pets, soft water for dogs, soft water for cats..."
+                        value={blogSeoKeywords}
+                        onChange={(e) => setBlogSeoKeywords(e.target.value)}
+                        className="min-h-[88px] resize-y bg-white/70 dark:bg-black/40 rounded-xl p-4"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
