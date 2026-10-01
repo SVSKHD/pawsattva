@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Paw from "../app/pawsattva.png"
+import { imageUrlProblem } from "@/lib/image-hosts"
 
 const navLinks = [
   { href: "/", label: "Home" },
@@ -97,20 +98,20 @@ export function Header() {
       >
         <header className="pointer-events-auto mx-auto w-full max-w-7xl rounded-4xl border border-white/50 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-shadow duration-300 dark:border-white/10 dark:bg-zinc-950/95 md:bg-white/70 md:backdrop-blur-xl dark:md:bg-zinc-950/75">
           <div className="flex h-16 items-center px-6 md:px-10">
-            <Link href="/" className="flex items-center gap-2.5 group transition-transform hover:scale-105 duration-300">
-              {/* Logo Wrapper to ensure perfect centering */}
-              <div className="relative w-10 h-10 md:w-15 md:h-15 sm:h-15 sm:w-15 flex items-center justify-center">
+            <Link href="/" aria-label="Paw Sattva home" className="group flex shrink-0 items-center gap-2.5">
+              {/* Logo: fixed 44/48px badge so it never touches the 64px bar, even on hover */}
+              <span className="relative block size-11 shrink-0 rounded-full drop-shadow-sm transition-transform duration-300 group-hover:scale-105 md:size-12">
                 <Image
                   src={Paw}
-                  alt="Logo"
+                  alt=""
                   fill
                   className="object-contain"
                   priority
-                  sizes="(max-width: 768px) 40px, (max-width: 1200px) 60px, 60px"
+                  sizes="48px"
                 />
-              </div>
+              </span>
               {/* Logo Text with baseline adjustment for Pacifico font */}
-              <span className="text-xl md:text-[1.2rem] tracking-tight bg-gradient-to-r from-primary to-orange-600 bg-clip-text text-transparent font-[family-name:var(--font-pacifico)] leading-none p-1 group-hover:from-orange-500 group-hover:to-primary transition-colors duration-500">
+              <span className="text-lg md:text-xl tracking-tight bg-gradient-to-r from-primary to-orange-600 bg-clip-text text-transparent font-[family-name:var(--font-pacifico)] leading-none p-1 group-hover:from-orange-500 group-hover:to-primary transition-colors duration-500">
                 Paw Sattva
               </span>
             </Link>
@@ -167,7 +168,7 @@ export function Header() {
                 <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-1 pr-1 py-1 rounded-full border border-white/10">
                   <Link href="/dashboard" className="flex items-center gap-2 pl-2 pr-1 overflow-hidden hover:opacity-80 transition-opacity">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
-                      {user.photoURL ? (
+                      {user.photoURL && !imageUrlProblem(user.photoURL) ? (
                         <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
                       ) : (
                         <User className="w-3.5 h-3.5" />

@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import { safeImageSrc } from '@/lib/image-hosts';
 import Link from 'next/link';
 import { Source_Serif_4 } from 'next/font/google';
 import {
@@ -175,7 +176,7 @@ function PostNavCard({ post, direction }: { post: Blog; direction: 'prev' | 'nex
     >
       <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl">
         <Image
-          src={post.image || defaultImage}
+          src={safeImageSrc(post.image, defaultImage)}
           alt=""
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -368,7 +369,7 @@ export default async function BlogPostPage({
               className="blog-hero-media relative aspect-[4/3] overflow-hidden rounded-[1.5rem] shadow-2xl shadow-orange-950/10 sm:aspect-[16/10] sm:rounded-[2rem]"
             >
               <Image
-                src={(blog.image || defaultImage) as string}
+                src={safeImageSrc(blog.image, defaultImage)}
                 alt={blog.title}
                 fill
                 priority
@@ -506,7 +507,7 @@ export default async function BlogPostPage({
                     >
                       <div className="relative aspect-[16/10] overflow-hidden">
                         <Image
-                          src={post.image || defaultImage}
+                          src={safeImageSrc(post.image, defaultImage)}
                           alt=""
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-105"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getManagedPageMetadata } from '@/lib/page-seo';
 import { ManagedJsonLd } from "@/components/managed-json-ld";
 import Image from "next/image";
+import { safeImageSrc } from "@/lib/image-hosts";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -230,7 +231,7 @@ export default async function Home() {
                 <div className="liquid-card h-full flex flex-col overflow-hidden transition-all duration-500 group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] group-hover:-translate-y-1">
                   <div className="relative h-56 w-full overflow-hidden">
                     <Image
-                      src={blog.image || DEFAULT_BLOG_IMAGE}
+                      src={safeImageSrc(blog.image, DEFAULT_BLOG_IMAGE)}
                       alt={blog.title}
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"

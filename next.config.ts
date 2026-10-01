@@ -1,36 +1,12 @@
 import type { NextConfig } from "next";
+import { REMOTE_IMAGE_HOSTS } from "./lib/image-hosts";
 
 const nextConfig: NextConfig = {
   experimental: {
     viewTransition: true,
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'lh3.googleusercontent.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'firebasestorage.googleapis.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'i.pravatar.cc',
-      },
-      {
-        protocol: 'https',
-        hostname: 'media.istockphoto.com',
-      }
-    ],
+    remotePatterns: REMOTE_IMAGE_HOSTS.map((hostname) => ({ protocol: "https" as const, hostname })),
   },
 };
 

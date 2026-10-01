@@ -97,10 +97,10 @@ export default function AdminLoader({
           <div className="paw-loader-logo absolute inset-3 overflow-hidden rounded-full bg-white shadow-[0_10px_30px_rgba(249,115,22,0.16)] dark:bg-zinc-900">
             <NextImage
               src={img}
-              alt=""
+              alt="pawsattva logo"
               fill
               priority
-              sizes="88px"
+              sizes="120px"
               className="object-contain p-2"
             />
           </div>

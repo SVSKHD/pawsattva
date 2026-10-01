@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
+import { safeImageSrc } from '@/lib/image-hosts';
 import Link from 'next/link';
 import { Search, Calendar, Clock, ChevronRight, ArrowUpRight, ThumbsUp, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -175,7 +176,7 @@ export default function BlogPage() {
             <Link href={`/blog/${featuredPost.slug}`} className="group block">
               <div className="relative h-[500px] rounded-[2.5rem] overflow-hidden shadow-2xl transition-transform duration-700 group-hover:scale-[1.01]">
                 <Image
-                  src={featuredPost.image || defaultImage}
+                  src={safeImageSrc(featuredPost.image, defaultImage)}
                   alt={featuredPost.title}
                   fill
                   className="object-cover transition-transform duration-1000 group-hover:scale-105"
@@ -294,7 +295,7 @@ export default function BlogPage() {
                 {/* Image Wrap */}
                 <div className="relative h-64 w-full overflow-hidden">
                   <Image
-                    src={blog.image || defaultImage}
+                    src={safeImageSrc(blog.image, defaultImage)}
                     alt={blog.title}
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-110"

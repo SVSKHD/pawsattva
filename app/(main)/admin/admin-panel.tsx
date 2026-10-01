@@ -27,6 +27,11 @@ import { Button } from "@/components/ui/button"
 
 import { AdminNav } from "./components/AdminNav"
 import { BlogListTab } from "./components/BlogListTab"
+import { BlogUrlGuide } from "./components/BlogUrlGuide"
+import { BlogToolbar } from "./components/BlogToolbar"
+import { BlogJsonDialog, type BlogJsonDialogMode } from "./components/BlogJsonDialog"
+import type { BlogImportData } from "@/lib/blog-json"
+import { imageUrlProblem } from "@/lib/image-hosts"
 
 function TabLoading() {
   return (
@@ -126,6 +131,13 @@ export default function AdminPanel({
 
   // ── Navigation state ──────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState(initialTab)
+  const [blogTipsOpen, setBlogTipsOpen] = useState(false)
+  const [blogJsonOpen, setBlogJsonOpen] = useState(false)
+  const [blogJsonMode, setBlogJsonMode] = useState<BlogJsonDialogMode>("import")
+  const openBlogJson = (mode: BlogJsonDialogMode) => {
+    setBlogJsonMode(mode)
+    setBlogJsonOpen(true)
+  }
 
   const handleTabChange = (tab: string) => {
     startTransition(() => setActiveTab(allowedTabs.has(tab) ? tab : "blog-list"))
@@ -387,6 +399,15 @@ export default function AdminPanel({
     (id: string) => categories.find(c => c.id === id)?.name || "Unknown",
     [categories]
   )
+
+  const categoryPostCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const blog of blogs) {
+      const ids = blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : []
+      for (const id of new Set(ids)) counts[id] = (counts[id] ?? 0) + 1
+    }
+    return counts
+  }, [blogs])
 
   const [blogSearchQuery, setBlogSearchQuery] = useState("")
   const filteredBlogsList = useMemo(() => {
@@ -847,6 +868,44 @@ export default function AdminPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // JSON import from the Tips panel: start a fresh draft, apply a template if named, then the JSON fields
+  const importBlogFromJson = (data: BlogImportData) => {
+    resetBlogForm()
+    if (data.template === "soft-water-pets") loadSoftWaterPetsTemplate()
+    else if (data.template === "medium-dog-breeds") loadMediumDogBreedsTemplate()
+
+    const description = data.description?.trim() || ""
+    const keywords = data.keywords?.trim() || ""
+    const title = data.title?.trim() || ""
+    if (title) {
+      setBlogTitle(title)
+      setBlogSlug(generateSlug(title))
+    }
+    if (data.excerpt || description) setBlogExcerpt(data.excerpt?.trim() || description)
+    if (keywords) setBlogKeywords(keywords)
+    if (data.seoTitle || title) setBlogSeoTitle(data.seoTitle?.trim() || title)
+    if (data.seoDescription || description) setBlogSeoDescription(data.seoDescription?.trim() || description)
+    if (data.seoKeywords || keywords) setBlogSeoKeywords(data.seoKeywords?.trim() || keywords)
+    if (data.content) setBlogContent(data.content.trim())
+    if (data.image) setBlogImage(data.image.trim())
+    setBlogStatus("draft")
+    setEditingBlogId(null)
+    handleTabChange("blog")
+    toast.success("Blog imported from JSON. Pick a category and author, then review before publishing.")
+  }
+
+  // Shared by the Tips panel (writing checks) and the JSON export
+  const blogFormValues = {
+    title: blogTitle,
+    excerpt: blogExcerpt,
+    keywords: blogKeywords,
+    seoTitle: blogSeoTitle,
+    seoDescription: blogSeoDescription,
+    seoKeywords: blogSeoKeywords,
+    content: blogContent,
+    image: blogImage,
+  }
+
   const resetBlogForm = () => {
     setBlogTitle(""); setBlogSlug(""); setBlogKeywords(""); setBlogExcerpt("")
     setBlogSeoTitle(""); setBlogSeoDescription(""); setBlogSeoKeywords("")
@@ -859,6 +918,11 @@ export default function AdminPanel({
     e.preventDefault()
     if (!blogTitle || !blogContent || blogCategories.length === 0) {
       toast.error("Please fill in all required fields and select at least one category.")
+      return
+    }
+    const imageProblem = imageUrlProblem(blogImage)
+    if (imageProblem) {
+      toast.error(`Featured image: ${imageProblem}`)
       return
     }
     try {
@@ -1122,18 +1186,18 @@ export default function AdminPanel({
   }
 
   return (
-    <div className="flex-1 w-full max-w-7xl mx-auto px-3 py-6 sm:px-4 sm:py-8 md:px-8 md:py-12">
+    <div className={`flex-1 w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-8 pt-24 ${activeTab === "blog" ? "pb-4" : "pb-6 md:pb-12"}`}>
 
-      {/* ── Page header ── */}
-      <div className="mt-20 sm:mt-20 mb-6 sm:mb-8 flex flex-col gap-2">
+      {/* ── Mobile page header (desktop shows it above the sidebar menu; hidden on the editor) ── */}
+      <div className={`mb-6 flex-col gap-2 md:hidden ${activeTab === "blog" ? "hidden" : "flex"}`}>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 w-fit border border-orange-500/20 text-xs font-semibold tracking-widest uppercase">
           <Settings2 className="w-3.5 h-3.5" />
           Administration
         </div>
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400">
+        <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400">
           Content Hub
         </h1>
-        <p className="text-muted-foreground text-sm sm:text-base max-w-xl">
+        <p className="text-muted-foreground text-sm max-w-xl">
           {isFullAdmin
             ? "Plan content goals, manage articles, categories, and view platform analytics."
             : "Create posts and categories. Publishing and deletion are sent to admin for approval."}
@@ -1148,7 +1212,27 @@ export default function AdminPanel({
       {/* ── Body: sidebar + content ── */}
       <div className="flex gap-4 sm:gap-6 md:gap-8 items-start">
         {/* Sidebar (desktop only) */}
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={isAuthor ? "author" : "admin"} />
+        <AdminNav
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          role={isAuthor ? "author" : "admin"}
+          header={
+            <>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-semibold tracking-widest uppercase">
+                <Settings2 className="w-3 h-3" />
+                Administration
+              </div>
+              <h1 className="mt-2 text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400">
+                Content Hub
+              </h1>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                {isFullAdmin
+                  ? "Plan goals, manage articles & categories, view analytics."
+                  : "Publishing and deletion are sent to admin for approval."}
+              </p>
+            </>
+          }
+        />
 
         {/* Tab content */}
         <div className="flex-1 min-w-0">
@@ -1159,6 +1243,34 @@ export default function AdminPanel({
             }
             .tab-panel { animation: tab-enter 0.25s ease-out; }
           `}</style>
+
+          {(activeTab === "blog-list" || activeTab === "blog") && (
+            <>
+              <BlogToolbar
+                activeTab={activeTab}
+                onNavigate={handleTabChange}
+                onOpenTips={() => setBlogTipsOpen(true)}
+                onOpenImport={() => openBlogJson("import")}
+                onOpenExport={() => openBlogJson("export")}
+              />
+              <BlogUrlGuide
+                open={blogTipsOpen}
+                onOpenChange={setBlogTipsOpen}
+                values={blogFormValues}
+                onOpenImport={() => openBlogJson("import")}
+                showDraftTools={activeTab === "blog"}
+              />
+              <BlogJsonDialog
+                open={blogJsonOpen}
+                onOpenChange={setBlogJsonOpen}
+                mode={activeTab === "blog" ? blogJsonMode : "import"}
+                onModeChange={setBlogJsonMode}
+                values={blogFormValues}
+                onImportJson={importBlogFromJson}
+                editorHasContent={hasDraftContent() || editingBlogId !== null}
+              />
+            </>
+          )}
 
           {activeTab === "blog-list" && (
             <div className="tab-panel space-y-4 sm:space-y-6">
@@ -1237,16 +1349,10 @@ export default function AdminPanel({
 
           {activeTab === "category-list" && (
             <div className="tab-panel space-y-4 sm:space-y-6">
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  onClick={() => { resetCategoryForm(); handleTabChange("category") }}
-                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm"
-                >
-                  + New Category
-                </Button>
-              </div>
               <CategoryListTab
                 categories={categories}
+                postCounts={categoryPostCounts}
+                onCreate={() => { resetCategoryForm(); handleTabChange("category") }}
                 onEdit={handleEditCategory}
                 onDelete={handleDeleteCategory}
               />
@@ -1275,17 +1381,10 @@ export default function AdminPanel({
 
           {activeTab === "sub-category-list" && (
             <div className="tab-panel space-y-4 sm:space-y-6">
-              <div className="flex items-center justify-end gap-3">
-                <Button
-                  onClick={() => { resetCategoryForm(); handleTabChange("sub-category") }}
-                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm"
-                >
-                  + New Sub-Category
-                </Button>
-              </div>
               <SubCategoryListTab
                 categories={categories}
-                getCategoryName={getCategoryName}
+                postCounts={categoryPostCounts}
+                onCreate={() => { resetCategoryForm(); handleTabChange("sub-category") }}
                 onEdit={handleEditCategory}
                 onDelete={handleDeleteCategory}
               />

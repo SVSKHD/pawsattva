@@ -1,5 +1,6 @@
 import React from "react";
 import Image from "next/image";
+import { imageUrlProblem, safeImageSrc } from "@/lib/image-hosts";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Calendar, Clock, ChevronRight, Home, BookOpen, Tag, ThumbsUp, Eye } from "lucide-react";
@@ -137,7 +138,7 @@ export default async function CategoryPage({
     <div className="bg-background min-h-screen pb-20">
       {/* Hero */}
       <section className="relative h-[360px] md:h-[420px] lg:h-[450px] pt-20 flex items-end overflow-hidden">
-        {category.imageUrl ? (
+        {category.imageUrl && !imageUrlProblem(category.imageUrl) ? (
           <>
             <Image
               src={category.imageUrl}
@@ -239,7 +240,7 @@ export default async function CategoryPage({
                     <div className="liquid-card h-full flex flex-col overflow-hidden transition-all duration-500 group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.1)] group-hover:-translate-y-2">
                       <div className="relative h-56 w-full overflow-hidden">
                         <Image
-                          src={blog.image || DEFAULT_IMAGE}
+                          src={safeImageSrc(blog.image, DEFAULT_IMAGE)}
                           alt={blog.title}
                           fill
                           className="object-cover transition-transform duration-700 group-hover:scale-110"

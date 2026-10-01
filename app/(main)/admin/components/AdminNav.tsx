@@ -3,6 +3,7 @@
 import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
+import type { ReactNode } from "react"
 
 type NavItem = {
   label: string
@@ -123,9 +124,11 @@ interface AdminNavProps {
   activeTab: string
   onTabChange: (tab: string) => void
   role?: "admin" | "author"
+  /** Rendered above the menu groups in the desktop sidebar */
+  header?: ReactNode
 }
 
-export function AdminNav({ activeTab, onTabChange, role = "admin" }: AdminNavProps) {
+export function AdminNav({ activeTab, onTabChange, role = "admin", header }: AdminNavProps) {
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => role === "admin" || !item.adminOnly),
@@ -151,6 +154,7 @@ export function AdminNav({ activeTab, onTabChange, role = "admin" }: AdminNavPro
 
       {/* ── Desktop sidebar ── */}
       <aside className="admin-nav-desktop-sidebar hidden md:flex flex-col w-52 shrink-0 gap-1 self-start sticky top-24">
+        {header && <div className="mb-4 px-1">{header}</div>}
         {visibleGroups.map((group) => (
           <div key={group.label} className="mb-3">
             <p className="px-3 mb-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 select-none">

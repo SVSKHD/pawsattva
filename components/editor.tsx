@@ -32,9 +32,11 @@ interface EditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Sizing for the whole editor (toolbar + body); the body scrolls inside it. */
+  className?: string;
 }
 
-const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
+const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder, className = "h-[560px]" }) => {
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [instagramUrl, setInstagramUrl] = useState("");
   const [showImageModal, setShowImageModal] = useState(false);
@@ -74,7 +76,7 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
     editorProps: {
       attributes: {
         class:
-          "prose prose-lg dark:prose-invert max-w-none min-h-[300px] p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
+          "prose prose-lg dark:prose-invert max-w-none min-h-full p-5 outline-none focus:outline-none prose-img:rounded-xl prose-img:max-w-full",
       },
       handlePaste: (_view, event) => {
         const items = event.clipboardData?.items;
@@ -208,13 +210,15 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
   };
 
   if (!editor) {
-    return <div className="h-[300px] w-full bg-muted animate-pulse rounded-2xl" />;
+    return <div className={`w-full bg-muted animate-pulse rounded-2xl ${className}`} />;
   }
 
+  const words = editor.getText().trim().split(/\s+/).filter(Boolean).length;
+
   return (
-    <div className="tiptap-editor-wrapper">
+    <div className={`tiptap-editor-wrapper flex flex-col ${className}`}>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-0.5 p-2 rounded-t-2xl border border-b-0 border-black/10 dark:border-white/10 bg-white/20 dark:bg-black/20 backdrop-blur-xl">
+      <div className="flex shrink-0 flex-wrap items-center gap-0.5 p-2 rounded-t-2xl border border-b-0 border-black/10 dark:border-white/10 bg-white/20 dark:bg-black/20 backdrop-blur-xl">
         <ToolbarBtn
           onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
           active={editor.isActive("heading", { level: 1 })}
@@ -275,6 +279,9 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         <ToolbarBtn onClick={() => setShowProductModal(true)} title="Insert Product">
           <ShoppingBag className="w-4 h-4" />
         </ToolbarBtn>
+        <ToolbarBtn onClick={() => setShowInstagramModal(true)} title="Embed Instagram post, reel or IGTV">
+          <FaInstagram className="w-4 h-4" />
+        </ToolbarBtn>
 
         <ToolbarSep />
 
@@ -289,34 +296,17 @@ const Editor: React.FC<EditorProps> = ({ value, onChange, placeholder }) => {
         </ToolbarBtn>
       </div>
 
-      {/* Editor body */}
-      <div className="border border-black/10 dark:border-white/10 rounded-b-2xl bg-white/50 dark:bg-black/50 overflow-hidden">
-        <EditorContent editor={editor} />
+      {/* Editor body: fixed height from the wrapper, scrolls internally */}
+      <div className="min-h-0 flex-1 overflow-y-auto border border-black/10 dark:border-white/10 bg-white/50 dark:bg-black/50">
+        <EditorContent editor={editor} className="h-full" />
       </div>
 
-      {/* Action buttons */}
-      <div className="mt-3 flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setShowInstagramModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
-            bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white
-            hover:from-purple-600 hover:via-pink-600 hover:to-orange-500
-            shadow-lg shadow-pink-500/20 hover:shadow-pink-500/30
-            hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <FaInstagram className="w-4 h-4" />
-          Insert Instagram
-        </button>
-        <span className="text-xs text-muted-foreground">Embed posts, reels & IGTV</span>
-        <button
-          type="button"
-          onClick={() => setShowProductModal(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-500 hover:text-white"
-        >
-          <ShoppingBag className="w-4 h-4" />
-          Insert Product
-        </button>
+      {/* Status bar */}
+      <div className="flex shrink-0 items-center justify-between gap-3 rounded-b-2xl border border-t-0 border-black/10 bg-white/30 px-3 py-1.5 text-[11px] text-muted-foreground dark:border-white/10 dark:bg-black/30">
+        <span className="tabular-nums">
+          {words.toLocaleString()} words · ~{Math.max(1, Math.round(words / 200))} min read
+        </span>
+        {isUploadingImage && <span className="font-semibold text-orange-600">Uploading image…</span>}
       </div>
 
       {/* Image URL modal */}

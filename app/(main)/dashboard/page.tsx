@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { imageUrlProblem } from "@/lib/image-hosts"
 import Link from "next/link"
 import { useAuth } from "@/components/auth-provider"
 import { useAuthDialog } from "@/components/auth-dialog-provider"
@@ -119,7 +120,7 @@ export default function DashboardPage() {
             {/* Avatar */}
             <div className="relative group">
               <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white shadow-2xl shadow-orange-500/30 overflow-hidden transition-transform group-hover:scale-105">
-                {user.photoURL ? (
+                {user.photoURL && !imageUrlProblem(user.photoURL) ? (
                   <Image src={user.photoURL} alt="Avatar" width={112} height={112} className="rounded-3xl object-cover" />
                 ) : (
                   <User className="w-14 h-14" />
