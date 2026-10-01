@@ -2,7 +2,7 @@
 
 import {
   PlusCircle, Edit, Save, CheckCircle2, CircleDashed, Trash2,
-  ChevronRight, UploadCloud, Settings2, History
+  ChevronRight, UploadCloud, Settings2, History, Droplets, Sparkles
 } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -60,6 +60,7 @@ interface BlogFormTabProps {
   handleBlogSubmit: (e: React.FormEvent<HTMLFormElement>) => void
   isSavingBlog: boolean
   handleTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onLoadSoftWaterPetsTemplate: () => void
   onCancel: () => void
 }
 
@@ -80,12 +81,37 @@ export function BlogFormTab({
   categories, authors,
   savedDraft, hasDraftContent,
   restoreDraft, discardDraft, formatDraftTime,
-  handleBlogSubmit, isSavingBlog, handleTitleChange, onCancel,
+  handleBlogSubmit, isSavingBlog, handleTitleChange, onLoadSoftWaterPetsTemplate, onCancel,
 }: BlogFormTabProps) {
   const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
 
   return (
     <div className="space-y-4">
+      {!editingBlogId && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-cyan-200/70 bg-gradient-to-r from-cyan-50 via-white to-emerald-50 p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-cyan-500/10 p-2 text-cyan-700">
+              <Droplets className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold text-slate-900">Soft Water & Pets blog template</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                Prefills a PawSattva educational article covering bathing, grooming, coat care, home cleaning and AquaKart softener guidance.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onLoadSoftWaterPetsTemplate}
+            className="shrink-0 rounded-xl border-cyan-200 bg-white text-cyan-800 hover:bg-cyan-50"
+          >
+            <Sparkles className="mr-2 h-4 w-4" />
+            Load template
+          </Button>
+        </div>
+      )}
+
       {/* Draft restore banner */}
       {savedDraft && !hasDraftContent() && (
         <div className="flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 backdrop-blur-sm">
