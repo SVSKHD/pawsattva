@@ -262,17 +262,7 @@ export default function AdminPanel({
     else if (title) setBlogSeoTitle(title)
     if (seoDescription) setBlogSeoDescription(seoDescription)
     if (seoKeywords) setBlogSeoKeywords(seoKeywords)
-    if (content) {
-      setBlogContent(content)
-    } else if (description) {
-      const safeDescription = description
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;")
-      setBlogContent(`<p>${safeDescription}</p>`)
-    }
+    if (content) setBlogContent(content)
     if (image) setBlogImage(image)
     setBlogStatus("draft")
     setEditingBlogId(null)
@@ -447,7 +437,7 @@ export default function AdminPanel({
     setBlogTitle(title)
     setBlogSlug("water-softeners-and-pets-how-softer-water-helps-at-home")
     setBlogKeywords(
-      "water softener for pets, soft water for dogs, soft water for cats, hard water pet bathing, pet grooming water quality, pet friendly home water, AquaKart water softener"
+      "hard water and pets, soft water for dogs, soft water for cats, hard water dog bathing, pet grooming hard water, water softener for pets, hard water dog coat, hard water cat coat, soft water for pet bathing, is soft water good for dogs, is softened water safe for pets, hard water effects on dog skin and coat"
     )
     setBlogExcerpt(
       "A practical PawSattva guide to how household water softening can support easier pet bathing, grooming, laundry and home care—while keeping drinking-water decisions separate."
