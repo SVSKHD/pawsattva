@@ -80,7 +80,21 @@ const DRAFT_KEY = "pawsattva_blog_draft"
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function AdminPanel() {
+type BlogUrlPrefill = {
+  title?: string
+  description?: string
+  keywords?: string
+  content?: string
+  image?: string
+}
+
+export default function AdminPanel({
+  initialTab = "blog-list",
+  initialBlogPrefill,
+}: {
+  initialTab?: string
+  initialBlogPrefill?: BlogUrlPrefill
+}) {
   const { user, loading: authLoading, isAdmin, role } = useAuth()
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -106,7 +120,7 @@ export default function AdminPanel() {
   }, [authLoading, isAdmin, router])
 
   // ── Navigation state ──────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState("blog-list")
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   const handleTabChange = (tab: string) => {
     startTransition(() => setActiveTab(allowedTabs.has(tab) ? tab : "blog-list"))
@@ -206,6 +220,38 @@ export default function AdminPanel() {
   const [editingBlogId, setEditingBlogId] = useState<string | null>(null)
   const [isSavingBlog, setIsSavingBlog] = useState(false)
   const [uploadingFeaturedImage, setUploadingFeaturedImage] = useState(false)
+  const urlPrefillAppliedRef = useRef(false)
+
+  useEffect(() => {
+    if (initialTab !== "blog" || urlPrefillAppliedRef.current || !initialBlogPrefill) return
+
+    const title = initialBlogPrefill.title?.trim() || ""
+    const description = initialBlogPrefill.description?.trim() || ""
+    const keywords = initialBlogPrefill.keywords?.trim() || ""
+    const content = initialBlogPrefill.content?.trim() || ""
+    const image = initialBlogPrefill.image?.trim() || ""
+
+    if (!title && !description && !keywords && !content && !image) return
+
+    urlPrefillAppliedRef.current = true
+    if (title) {
+      setBlogTitle(title)
+      setBlogSlug(
+        title.toLowerCase().trim()
+          .replace(/[^\w\s-]/g, "")
+          .replace(/[\s_-]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+      )
+    }
+    if (description) setBlogExcerpt(description)
+    if (keywords) setBlogKeywords(keywords)
+    if (content) setBlogContent(content)
+    if (image) setBlogImage(image)
+    setBlogStatus("draft")
+    setEditingBlogId(null)
+
+    toast.success("Blog fields prefilled from the URL. Review them before publishing.")
+  }, [initialBlogPrefill, initialTab])
 
   // ── Category form state ───────────────────────────────────────────────────
   const [categoryName, setCategoryName] = useState("")
