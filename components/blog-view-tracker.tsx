@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { logEvent } from "@/firebase/analytics";
+import { trackEvent } from "@/firebase/analytics";
 
 const SESSION_KEY = "pawsattva_viewed_";
 
@@ -19,8 +19,8 @@ export function BlogViewTracker({ blogId, title }: { blogId: string; title: stri
       body: JSON.stringify({ blogId }),
     }).catch(() => {});
 
-    // Also log to Firebase Analytics
-    logEvent("blog_view", { blog_id: blogId, blog_title: title });
+    // Also log to Google Analytics
+    void trackEvent("blog_view", { blog_id: blogId, blog_title: title });
   }, [blogId, title]);
 
   return null;

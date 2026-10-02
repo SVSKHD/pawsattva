@@ -75,7 +75,8 @@ export default function AdminLoader({
       role="status"
       aria-live="polite"
       aria-label={`${title}. ${subtitle}`}
-      className="paw-loader fixed inset-0 z-[70] flex min-h-dvh items-center justify-center overflow-hidden bg-[#fffaf4] px-6 pb-36 dark:bg-zinc-950"
+      // z-[90]: above the header (z-50), mobile bottom nav (z-[80]) and pet guide (z-[70]) so only the loader shows
+      className="paw-loader fixed inset-0 z-[90] flex min-h-dvh items-center justify-center overflow-hidden bg-[#fffaf4] px-6 pb-36 dark:bg-zinc-950"
     >
       <div aria-hidden="true" className="paw-loader-glow pointer-events-none absolute inset-0" />
 

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Category } from "@/firebase/firestore"
+import { TablePagination, usePagination } from "./TablePagination"
 
 type StatusFilter = "all" | "published" | "draft"
 
@@ -69,7 +70,8 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
   }, [items, allCategories, query, status, parentFilter, isSub])
 
   const filtersActive = query.trim() !== "" || status !== "all" || parentFilter !== "all"
-  const clearFilters = () => { setQuery(""); setStatus("all"); setParentFilter("all") }
+  const pagination = usePagination(rows)
+  const clearFilters = () => { setQuery(""); setStatus("all"); setParentFilter("all"); pagination.reset() }
 
   return (
     <div className="space-y-4">
@@ -97,7 +99,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => { setQuery(e.target.value); pagination.reset() }}
               placeholder={`Search ${nounPlural}…`}
               aria-label={`Search ${nounPlural}`}
               className="h-9 w-full rounded-xl border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/30 pl-9 pr-8 text-sm outline-none transition focus:border-orange-400 focus:ring-4 focus:ring-orange-500/10"
@@ -105,7 +107,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
             {query && (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => { setQuery(""); pagination.reset() }}
                 aria-label="Clear search"
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground"
               >
@@ -115,7 +117,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
           </div>
 
           {isSub && (
-            <Select value={parentFilter} onValueChange={setParentFilter}>
+            <Select value={parentFilter} onValueChange={(value) => { setParentFilter(value); pagination.reset() }}>
               <SelectTrigger className="h-9 w-[180px] rounded-xl bg-white/70 dark:bg-black/30 text-sm" aria-label="Filter by parent">
                 <SelectValue />
               </SelectTrigger>
@@ -135,7 +137,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
                 type="button"
                 role="tab"
                 aria-selected={status === value}
-                onClick={() => setStatus(value)}
+                onClick={() => { setStatus(value); pagination.reset() }}
                 className={`inline-flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold capitalize transition ${
                   status === value ? "bg-white text-foreground shadow-sm dark:bg-zinc-900" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -162,7 +164,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {rows.map((cat) => {
+                {pagination.rows.map((cat) => {
                   const published = statusOf(cat) === "published"
                   return (
                     <tr
@@ -272,11 +274,7 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
           </div>
         )}
 
-        {rows.length > 0 && (
-          <div className="border-t border-border/50 px-4 py-2 text-[11px] text-muted-foreground">
-            Showing {rows.length} of {items.length} {items.length === 1 ? noun : nounPlural} · click a row to edit
-          </div>
-        )}
+        <TablePagination pagination={pagination} noun={rows.length === 1 ? noun : nounPlural} />
       </div>
 
       <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>

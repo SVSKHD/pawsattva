@@ -9,20 +9,29 @@ import Image from "next/image";
 import Paw from "../app/pawsattva.png"
 import { imageUrlProblem } from "@/lib/image-hosts"
 
+// `secondary` links fold into the "More" menu until there's room for all of them (xl)
 const navLinks = [
   { href: "/", label: "Home" },
   { href: "/blog", label: "Blog" },
   { href: "/walks", label: "Walks" },
   { href: "/pet-feed", label: "Pet Feed" },
-  { href: "/logger", label: "Logger" },
-  { href: "/consultation", label: "Consultation" },
+  { href: "/logger", label: "Logger", secondary: true },
+  { href: "/consultation", label: "Consultation", secondary: true },
 ];
 
 import { useAuth } from "@/components/auth-provider";
 import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, LayoutDashboard, User, Loader2, Menu, Home, BookOpen, PawPrint } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Menu, Home, BookOpen, PawPrint, ChevronDown, CalendarDays } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import { useEffect, useState } from "react";
 
@@ -48,6 +57,7 @@ export function Header() {
   const { requestSignIn } = useAuthDialog();
   const [isVisible, setIsVisible] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const isRouteActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -58,6 +68,7 @@ export function Header() {
 
     const handleScroll = () => {
       const y = window.scrollY;
+      setIsScrolled(y > 12);
 
       // Always visible near the top
       if (y < 20) {
@@ -96,9 +107,15 @@ export function Header() {
         className={`fixed top-0 left-0 right-0 z-50 px-3 pt-3 transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:pt-4 ${isVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-32 opacity-0"
           }`}
       >
-        <header className="pointer-events-auto mx-auto w-full max-w-7xl rounded-4xl border border-white/50 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-sm transition-shadow duration-300 dark:border-white/10 dark:bg-zinc-950/95 md:bg-white/70 md:backdrop-blur-xl dark:md:bg-zinc-950/75">
-          <div className="flex h-16 items-center px-6 md:px-10">
-            <Link href="/" aria-label="Paw Sattva home" className="group flex shrink-0 items-center gap-2.5">
+        <header
+          className={`pointer-events-auto mx-auto w-full max-w-7xl rounded-[1.75rem] border bg-white/90 backdrop-blur-xl transition-[box-shadow,background-color,border-color] duration-300 dark:bg-zinc-950/85 ${
+            isScrolled
+              ? "border-black/[0.06] shadow-[0_8px_30px_rgba(24,24,27,0.12)] dark:border-white/10"
+              : "border-white/70 shadow-[0_2px_12px_rgba(24,24,27,0.06)] dark:border-white/5"
+          }`}
+        >
+          <div className="flex h-16 items-center gap-3 pl-3 pr-3 sm:pl-4 md:pr-4">
+            <Link href="/" aria-label="Paw Sattva home" className="group flex shrink-0 items-center gap-2 rounded-full pr-2">
               {/* Logo: fixed 44/48px badge so it never touches the 64px bar, even on hover */}
               <span className="relative block size-11 shrink-0 rounded-full drop-shadow-sm transition-transform duration-300 group-hover:scale-105 md:size-12">
                 <Image
@@ -116,85 +133,112 @@ export function Header() {
               </span>
             </Link>
 
-            <nav className="ml-10 hidden md:flex items-center gap-8">
+            {/* Desktop nav: pill tabs, the active pill slides between links */}
+            <nav aria-label="Primary" className="mx-auto hidden items-center gap-0.5 rounded-full bg-muted/60 p-1 md:flex dark:bg-white/5">
               {navLinks.map((link) => {
                 const isActive = isRouteActive(link.href);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative py-2 text-sm font-medium transition-all duration-300 ${isActive
-                      ? "text-primary drop-shadow-[0_0_8px_rgba(234,88,12,0.3)]"
-                      : "text-muted-foreground hover:text-foreground"
-                      }`}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`relative rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors duration-200 lg:px-4 ${
+                      link.secondary ? "hidden xl:inline-flex" : "inline-flex"
+                    } ${isActive ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground hover:text-foreground"}`}
                   >
-                    {link.label}
-                    {/* Liquid Underline Effect for Active Link */}
                     {isActive && (
-                      <ViewTransition name="active-nav-underline">
+                      <ViewTransition name="active-nav-pill">
                         <span
-                          className="absolute left-0 bottom-0 h-[2px] w-full rounded-full bg-primary"
-                          style={{
-                            boxShadow: "0 0 10px 1px rgba(234, 88, 12, 0.6)"
-                          }}
+                          aria-hidden
+                          className="absolute inset-0 rounded-full bg-white shadow-sm ring-1 ring-orange-500/15 dark:bg-zinc-800 dark:ring-orange-400/20"
                         />
                       </ViewTransition>
                     )}
+                    <span className="relative">{link.label}</span>
                   </Link>
                 );
               })}
+
+              {/* Secondary links when there isn't room for all of them */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors xl:hidden ${
+                      navLinks.some((l) => l.secondary && isRouteActive(l.href))
+                        ? "bg-white text-orange-700 shadow-sm dark:bg-zinc-800 dark:text-orange-300"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    More <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" sideOffset={10} className="w-48 rounded-xl p-1.5">
+                  {navLinks.filter((l) => l.secondary).map((link) => (
+                    <DropdownMenuItem key={link.href} asChild className="rounded-lg px-2.5 py-2 font-medium">
+                      <Link href={link.href} aria-current={isRouteActive(link.href) ? "page" : undefined}>
+                        {link.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
 
-            <div className="ml-auto flex items-center gap-2 md:gap-4">
-              {isAdmin && (
-                <Link href="/admin" className="hidden sm:flex">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full text-muted-foreground hover:text-orange-600 transition-colors items-center gap-2"
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    Admin
-                  </Button>
-                </Link>
-              )}
-
+            <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
               {loading ? (
-                <div className="flex items-center gap-2 bg-white/5 dark:bg-white/5 pl-3 pr-4 py-1.5 rounded-full border border-white/10 animate-pulse">
-                  <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50">Syncing</span>
-                </div>
+                <span aria-label="Checking your account" className="h-9 w-9 animate-pulse rounded-full bg-muted" />
               ) : user ? (
-                <div className="flex items-center gap-3 bg-white/10 dark:bg-white/5 pl-1 pr-1 py-1 rounded-full border border-white/10">
-                  <Link href="/dashboard" className="flex items-center gap-2 pl-2 pr-1 overflow-hidden hover:opacity-80 transition-opacity">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-primary flex items-center justify-center text-[10px] text-white font-bold shrink-0">
-                      {user.photoURL && !imageUrlProblem(user.photoURL) ? (
-                        <Image src={user.photoURL} alt="Avatar" width={24} height={24} className="rounded-full" />
-                      ) : (
-                        <User className="w-3.5 h-3.5" />
-                      )}
-                    </div>
-                    <span className="text-xs font-semibold text-foreground truncate max-w-[80px] hidden lg:block">
-                      {user.displayName || user.email?.split('@')[0]}
-                    </span>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleSignOut}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </Button>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Account menu"
+                      className="flex items-center gap-2 rounded-full border border-black/[0.06] bg-white/80 py-1 pl-1 pr-2.5 transition hover:border-orange-300 hover:shadow-sm dark:border-white/10 dark:bg-white/5"
+                    >
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-primary text-white">
+                        {user.photoURL && !imageUrlProblem(user.photoURL) ? (
+                          <Image src={user.photoURL} alt="" width={32} height={32} className="h-full w-full object-cover" />
+                        ) : (
+                          <User className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="hidden max-w-[110px] truncate text-sm font-semibold lg:block">
+                        {user.displayName?.split(" ")[0] || user.email?.split("@")[0]}
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-xl p-1.5">
+                    <DropdownMenuLabel className="px-2.5 py-2">
+                      <p className="truncate text-sm font-semibold">{user.displayName || "Your account"}</p>
+                      {user.email && <p className="truncate text-xs font-normal text-muted-foreground">{user.email}</p>}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
+                      <Link href="/dashboard"><User /> Dashboard</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
+                      <Link href="/logger"><CalendarDays /> Food logger</Link>
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
+                        <Link href="/admin"><LayoutDashboard /> Content Hub</Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem variant="destructive" onSelect={() => void handleSignOut()} className="rounded-lg px-2.5 py-2">
+                      <LogOut /> Sign out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <Button
                   type="button"
-                  variant="ghost"
                   onClick={() => requestSignIn()}
-                  className="hidden rounded-full text-muted-foreground transition-colors hover:bg-white/20 hover:text-foreground dark:hover:bg-white/10 sm:inline-flex font-semibold"
+                  className="h-9 rounded-full bg-orange-500 px-4 text-sm font-bold text-white shadow-sm shadow-orange-500/25 hover:bg-orange-600"
                 >
-                  Sign In
+                  Sign in
                 </Button>
               )}
             </div>

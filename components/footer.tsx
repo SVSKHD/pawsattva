@@ -3,14 +3,50 @@
 import React, { useEffect, useState } from 'react';
 import Image from "next/image";
 import Link from "next/link";
-import { FaInstagram, FaFacebook, FaTwitter, FaYoutube } from "react-icons/fa";
+import { ArrowRight } from "lucide-react";
+import { FaInstagram } from "react-icons/fa";
 import Paw from "../app/pawsattva.png";
 import type { Category } from "@/firebase/firestore";
+import { categoryHref } from "@/lib/category-slug";
 
-const CATEGORY_CACHE_KEY = "pawsattva-footer-categories";
+const CATEGORY_CACHE_KEY = "pawsattva-footer-categories-v2";
+const MAX_TOPICS = 6;
+
+type FooterTopic = Pick<Category, "id" | "name">;
+
+// Only real pages — no placeholder "#" links
+const LINK_GROUPS: { title: string; links: { href: string; label: string }[] }[] = [
+  {
+    title: "Explore",
+    links: [
+      { href: "/blog", label: "Blog" },
+      { href: "/walks", label: "Walks & places" },
+      { href: "/consultation", label: "Consultation" },
+    ],
+  },
+  {
+    title: "Tools",
+    links: [
+      { href: "/pet-feed", label: "Pet feed plan" },
+      { href: "/logger", label: "Food logger" },
+      { href: "/dashboard", label: "My dashboard" },
+    ],
+  },
+];
+
+const SOCIALS = [
+  { icon: FaInstagram, href: "https://instagram.com/pawsattva", label: "Paw Sattva on Instagram" },
+];
+
+/** Published, top-level categories only — sub-categories and drafts don't belong in the footer */
+const toTopics = (categories: Category[]): FooterTopic[] =>
+  categories
+    .filter((category) => !category.parentId && category.status !== "draft")
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(({ id, name }) => ({ id, name }));
 
 export function Footer() {
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [topics, setTopics] = useState<FooterTopic[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -18,7 +54,7 @@ export function Footer() {
     try {
       const cached = window.sessionStorage.getItem(CATEGORY_CACHE_KEY);
       if (cached) {
-        setCategories(JSON.parse(cached) as Category[]);
+        setTopics(JSON.parse(cached) as FooterTopic[]);
         return;
       }
     } catch {
@@ -28,16 +64,17 @@ export function Footer() {
     const loadCategories = async () => {
       try {
         const { getCategories } = await import("@/firebase/firestore");
-        const data = await getCategories();
+        const next = toTopics(await getCategories());
         if (cancelled) return;
-        setCategories(data);
+        setTopics(next);
         try {
-          window.sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(data));
+          window.sessionStorage.setItem(CATEGORY_CACHE_KEY, JSON.stringify(next));
         } catch {
           // Caching is a performance enhancement, not a requirement.
         }
       } catch (error) {
         console.error("Unable to load footer categories:", error);
+        if (!cancelled) setTopics([]);
       }
     };
 
@@ -57,82 +94,85 @@ export function Footer() {
   }, []);
 
   return (
-    <footer className="bg-background px-4 py-20 border-t border-muted relative overflow-hidden">
-      <div className="container mx-auto grid md:grid-cols-5 gap-16 relative z-10">
-        <div className="md:col-span-1 space-y-6">
-          <Link href="/" className="flex items-center gap-2 group">
-            <Image src={Paw} alt="Logo" width={48} height={48} className="object-contain" />
-            <span className="text-2xl font-[family-name:var(--font-pacifico)] text-primary">Paw Sattva</span>
-          </Link>
-          <p className="text-muted-foreground font-medium text-sm leading-relaxed">
-            Empowering pet parents with Sattva—a state of balance, health, and harmony for every furry family member.
-          </p>
-        </div>
-
-        <div>
-          <h4 className="font-bold text-lg mb-8 tracking-tight">Ecosystem</h4>
-          <ul className="space-y-4 text-sm font-medium text-muted-foreground">
-            <li><Link href="/blog" className="hover:text-primary transition-colors">Journal</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Nutrition Plans</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Expert Directory</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Community Forum</Link></li>
-          </ul>
-        </div>
-
-        {categories.length > 0 && (
-          <div>
-            <h4 className="font-bold text-lg mb-8 tracking-tight">Categories</h4>
-            <ul className="space-y-4 text-sm font-medium text-muted-foreground">
-              {categories.map((cat) => (
-                <li key={cat.id}>
-                  <Link href="/blog" className="hover:text-primary transition-colors">
-                    {cat.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div>
-          <h4 className="font-bold text-lg mb-8 tracking-tight">Support</h4>
-          <ul className="space-y-4 text-sm font-medium text-muted-foreground">
-            <li><Link href="#" className="hover:text-primary transition-colors">Help Center</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Safety Guides</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Terms of Care</Link></li>
-            <li><Link href="#" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-bold text-lg mb-8 tracking-tight">Connect</h4>
-          <p className="text-sm font-medium text-muted-foreground mb-6">Stay updated on our journey to 1M happy tails.</p>
-          <div className="flex gap-4">
-            {[
-              { icon: FaInstagram, href: "https://instagram.com/pawsattva", label: "Instagram" },
-              { icon: FaFacebook, href: "#", label: "Facebook" },
-              { icon: FaTwitter, href: "#", label: "Twitter" },
-              { icon: FaYoutube, href: "#", label: "Youtube" },
-            ].map((social, i) => {
-              const Icon = social.icon;
-              return (
-                <Link
-                  key={i}
-                  href={social.href}
+    // Extra bottom padding on mobile so the fixed bottom navigation never covers the last line
+    <footer className="relative border-t border-border/60 bg-background px-4 pb-32 pt-16 md:pb-10">
+      <div className="container mx-auto max-w-7xl">
+        <div className="grid gap-12 lg:grid-cols-[1.3fr_2fr]">
+          {/* Brand */}
+          <div className="max-w-sm space-y-5">
+            <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Paw Sattva home">
+              <Image src={Paw} alt="" width={44} height={44} className="object-contain" />
+              <span className="text-2xl text-primary font-[family-name:var(--font-pacifico)]">Paw Sattva</span>
+            </Link>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Empowering pet parents with Sattva — a state of balance, health and harmony for every furry family member.
+            </p>
+            <div className="flex gap-2">
+              {SOCIALS.map(({ icon: Icon, href, label }) => (
+                <a
+                  key={href}
+                  href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-10 h-10 rounded-xl bg-white dark:bg-zinc-800 flex items-center justify-center border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:border-primary hover:text-primary transition-all overflow-hidden"
-                  aria-label={social.label}
+                  aria-label={label}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-orange-400 hover:text-orange-600"
                 >
-                  <Icon className="w-4 h-4" />
-                </Link>
-              );
-            })}
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {/* Link columns — Topics always reserves its space so the footer never shifts when it loads */}
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-[1fr_1fr_1.4fr]">
+            {LINK_GROUPS.map((group) => (
+              <nav key={group.title} aria-label={group.title}>
+                <h4 className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-foreground">{group.title}</h4>
+                <ul className="space-y-3 text-sm text-muted-foreground">
+                  {group.links.map((link) => (
+                    <li key={link.href}>
+                      <Link href={link.href} className="transition-colors hover:text-orange-600">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+
+            <nav aria-label="Blog topics" className="col-span-2 sm:col-span-1">
+              <h4 className="mb-4 text-xs font-bold uppercase tracking-[0.16em] text-foreground">Topics</h4>
+              {topics === null ? (
+                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-1" aria-hidden>
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <li key={i} className="h-4 w-24 animate-pulse rounded bg-muted" />
+                  ))}
+                </ul>
+              ) : (
+                <ul className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm text-muted-foreground sm:grid-cols-1">
+                  {topics.slice(0, MAX_TOPICS).map((topic) => (
+                    <li key={topic.id}>
+                      <Link href={categoryHref(topic.name)} className="transition-colors hover:text-orange-600">
+                        {topic.name}
+                      </Link>
+                    </li>
+                  ))}
+                  <li className="col-span-2 sm:col-span-1">
+                    <Link href="/blog" className="inline-flex items-center gap-1 font-semibold text-orange-600 hover:underline">
+                      {topics.length > MAX_TOPICS ? `All ${topics.length} topics` : "All articles"}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </li>
+                </ul>
+              )}
+            </nav>
           </div>
         </div>
-      </div>
-      <div className="container mx-auto mt-20 pt-8 border-t border-muted-foreground/10 text-center text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-        &copy; 2026 Paw Sattva &bull; Made with 🐾 for wonderful pets
+
+        <div className="mt-14 flex flex-col items-center justify-between gap-3 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row">
+          <p>&copy; {new Date().getFullYear()} Paw Sattva. All rights reserved.</p>
+          <p>Made with 🐾 for wonderful pets</p>
+        </div>
       </div>
     </footer>
   );

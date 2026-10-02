@@ -7,19 +7,13 @@ import { Calendar, Clock, ChevronRight, Home, BookOpen, Tag, ThumbsUp, Eye } fro
 import { Badge } from "@/components/ui/badge";
 import { SubscriptionForm } from "@/components/subscription-form";
 import { getCategories, getBlogs, Blog, Category } from "@/firebase/firestore";
+import { categorySlug } from "@/lib/category-slug";
 import { siteConfig } from "@/lib/metadata";
 import type { Metadata } from "next";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/[\s_]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+const slugify = categorySlug;
 
 function findCategoryBySlug(categories: Category[], slug: string) {
   return categories.find((c) => slugify(c.name) === slug) ?? null;

@@ -13,13 +13,15 @@ import {
   Home,
   MessageCircle,
   Tag,
+  ThumbsDown,
   ThumbsUp,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { SocialShare } from '@/components/social-share';
 import { SubscriptionForm } from '@/components/subscription-form';
 import { BlogContentWithEmbeds } from '@/components/instagram-embed';
-import { getBlogBySlug, getBlogs, getCategory, Blog } from '@/firebase/firestore';
+import { getBlogBySlug, getBlogs, getCategories, Blog } from '@/firebase/firestore';
+import { categoryHref } from '@/lib/category-slug';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { siteConfig } from '@/lib/metadata';
@@ -202,9 +204,15 @@ export default async function BlogPostPage({
 }) {
   const { slug } = await params;
   const blog = await getBlogBySlug(slug);
-  const category = blog ? await getCategory(blog.categoryId) : null;
-
   if (!blog) notFound();
+
+  // Every category the post is filed under (multi-category posts use categoryIds; older posts only categoryId)
+  const allCategories = await getCategories();
+  const postCategoryIds = blog.categoryIds?.length ? blog.categoryIds : blog.categoryId ? [blog.categoryId] : [];
+  const postCategories = postCategoryIds
+    .map((id) => allCategories.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => Boolean(c));
+  const category = postCategories[0] ?? null;
 
   let managedBlogSchema: Record<string, unknown> | null = null;
   if (blog.seo?.schemaJson?.trim()) {
@@ -276,15 +284,23 @@ export default async function BlogPostPage({
                 {category?.name && (
                   <>
                     <ChevronRight className="h-3.5 w-3.5 opacity-60" />
-                    <span className="truncate text-foreground/80">{category.name}</span>
+                    <Link href={categoryHref(category.name)} className="truncate text-foreground/80 hover:text-orange-600">
+                      {category.name}
+                    </Link>
                   </>
                 )}
               </nav>
 
               <div>
-                <Badge className="mb-4 rounded-full bg-orange-500 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white hover:bg-orange-600">
-                  {category?.name || 'Uncategorized'}
-                </Badge>
+                {category ? (
+                  <Badge asChild className="mb-4 rounded-full bg-orange-500 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white hover:bg-orange-600">
+                    <Link href={categoryHref(category.name)}>{category.name}</Link>
+                  </Badge>
+                ) : (
+                  <Badge className="mb-4 rounded-full bg-orange-500 px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-white">
+                    Uncategorized
+                  </Badge>
+                )}
               </div>
 
               <h1 className="text-balance text-3xl font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-4xl xl:text-[2.6rem]">
@@ -309,6 +325,14 @@ export default async function BlogPostPage({
                 {(blog.views ?? 0) > 0 && (
                   <span className="flex items-center gap-1.5"><Eye className="h-4 w-4" />{(blog.views ?? 0).toLocaleString()}</span>
                 )}
+                {/* Live counts; stays in sync with the "Was this helpful?" buttons at the end */}
+                <BlogReactions
+                  blogId={blog.id}
+                  initialLikes={blog.likes ?? 0}
+                  initialDislikes={blog.dislikes ?? 0}
+                  variant="compact"
+                  live
+                />
               </div>
 
               <div className="mt-5">
@@ -434,8 +458,24 @@ export default async function BlogPostPage({
                 />
               </div>
 
+              {postCategories.length > 0 && (
+                <div className="mt-6 flex flex-wrap items-center justify-center gap-2 border-t border-border/70 pt-6 sm:justify-start">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filed under</span>
+                  {postCategories.map((cat) => (
+                    <Link
+                      key={cat.id}
+                      href={categoryHref(cat.name)}
+                      className="group inline-flex items-center gap-1 rounded-full border border-orange-500/25 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-700 transition hover:border-orange-500 hover:bg-orange-500 hover:text-white dark:text-orange-300"
+                    >
+                      {cat.name}
+                      <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                    </Link>
+                  ))}
+                </div>
+              )}
+
               {tags.length > 0 && (
-                <div className="mt-6 flex flex-wrap justify-center gap-2 border-t border-border/70 pt-6 sm:justify-start">
+                <div className={`flex flex-wrap justify-center gap-2 sm:justify-start ${postCategories.length > 0 ? 'mt-3' : 'mt-6 border-t border-border/70 pt-6'}`}>
                   {tags.map((tag) => (
                     <Badge key={tag} variant="secondary" className="rounded-full px-3 py-1 font-medium">
                       <Tag className="mr-1.5 h-3 w-3" />
@@ -521,9 +561,10 @@ export default async function BlogPostPage({
                         <div className="mt-auto flex items-center gap-3 pt-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{post.date}</span>
                           <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{readTimeFor(post.content)} min</span>
-                          {(post.likes ?? 0) > 0 && (
+                          <span className="ml-auto flex items-center gap-2.5" aria-label={`${post.likes ?? 0} likes, ${post.dislikes ?? 0} dislikes`}>
                             <span className="flex items-center gap-1 text-emerald-600"><ThumbsUp className="h-3.5 w-3.5" />{(post.likes ?? 0).toLocaleString()}</span>
-                          )}
+                            <span className="flex items-center gap-1 text-rose-500"><ThumbsDown className="h-3.5 w-3.5" />{(post.dislikes ?? 0).toLocaleString()}</span>
+                          </span>
                         </div>
                       </div>
                     </Link>

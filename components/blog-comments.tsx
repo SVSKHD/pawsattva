@@ -97,6 +97,7 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
       });
       setNewComment((current) => current.trim() === raw ? "" : current);
       toast.success("Your comment is live.");
+      void import("@/firebase/analytics").then(({ trackEvent }) => trackEvent("comment_posted", { blog_id: blogId }));
     } catch (error) {
       console.error("Unable to post blog comment.", error);
       const code = getErrorCode(error);

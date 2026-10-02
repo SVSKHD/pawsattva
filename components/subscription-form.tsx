@@ -28,6 +28,10 @@ export function SubscriptionForm() {
     try {
       await addSubscription(formData);
       toast.success("Thank you for joining our community!");
+      // Never send the email itself to analytics — only where the sign-up happened
+      void import("@/firebase/analytics").then(({ trackEvent }) =>
+        trackEvent("newsletter_signup", { page_path: window.location.pathname })
+      );
       setFormData({ email: '', name: '', phone: '', petBreed: '' });
     } catch (error) {
       console.error("Subscription error:", error);

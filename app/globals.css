@@ -137,6 +137,21 @@
     font-family: var(--font-montserrat, sans-serif);
     max-width: 100%;
     overflow-x: clip;
+    /* Always reserve the scrollbar's space so the page never shifts sideways */
+    scrollbar-gutter: stable;
+  }
+
+  /*
+   * Radix dialogs/selects/sheets lock scroll by marking <body> and adding a right margin
+   * equal to the scrollbar width. With the gutter reserved above that margin would shove
+   * the whole layout left on every open — cancel it and lock scrolling on <html> instead
+   * (body overflow can't lock the page here because html has overflow-x: clip).
+   */
+  html:has(body[data-scroll-locked]) {
+    overflow-y: hidden;
+  }
+  body[data-scroll-locked] {
+    margin-right: 0 !important;
   }
 
   body {

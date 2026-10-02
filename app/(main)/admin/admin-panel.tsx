@@ -1238,8 +1238,8 @@ export default function AdminPanel({
         <div className="flex-1 min-w-0">
           <style>{`
             @keyframes tab-enter {
-              from { opacity: 0; transform: translateY(6px); }
-              to   { opacity: 1; transform: translateY(0); }
+              from { opacity: 0; }
+              to   { opacity: 1; }
             }
             .tab-panel { animation: tab-enter 0.25s ease-out; }
           `}</style>
@@ -1273,25 +1273,10 @@ export default function AdminPanel({
           )}
 
           {activeTab === "blog-list" && (
-            <div className="tab-panel space-y-4 sm:space-y-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-xl sm:text-2xl font-bold">Blog Posts</h2>
-                  <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                    <span className="font-semibold text-emerald-600">{blogs.filter(b => b.status === "published").length} published</span>
-                    {" · "}
-                    <span className="font-semibold text-amber-600">{blogs.filter(b => b.status === "draft").length} drafts</span>
-                  </p>
-                </div>
-                <Button
-                  onClick={() => handleTabChange("blog")}
-                  className="h-9 sm:h-10 px-3 sm:px-5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold border-0 shadow-lg shadow-orange-500/20 text-xs sm:text-sm shrink-0"
-                >
-                  + New Post
-                </Button>
-              </div>
+            <div className="tab-panel">
               <BlogListTab
                 blogs={blogs}
+                onCreate={() => handleTabChange("blog")}
                 filteredBlogs={filteredBlogsList}
                 searchQuery={blogSearchQuery}
                 setSearchQuery={setBlogSearchQuery}
