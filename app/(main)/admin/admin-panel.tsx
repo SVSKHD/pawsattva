@@ -15,7 +15,7 @@ import {
   approveBlog, requestBlogDelete, rejectBlogDeleteRequest,
   getCategories, addCategory, updateCategory, deleteCategory,
   getAdminUsers, getSubscriptions,
-  onUsersSnapshot, onBlogsSnapshot, updateUserRole, updateUser, deleteUser,
+  onUsersSnapshot, onBlogsSnapshot, updateUserRole, updateUser, deleteUser, setUserBlacklisted,
   Blog, Category, UserProfile, Subscription
 } from "@/firebase/firestore"
 
@@ -1174,6 +1174,17 @@ export default function AdminPanel({
     }
   }
 
+  const handleToggleUserBlacklist = async (profile: UserProfile, blacklisted: boolean) => {
+    if (profile.id === user?.uid) { toast.error("You cannot blacklist your own account."); return }
+    try {
+      await setUserBlacklisted(profile, blacklisted)
+      toast.success(blacklisted ? "User blacklisted." : "User removed from blacklist.")
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to update blacklist: ${msg}`)
+    }
+  }
+
   const handleDeleteUserAccount = async (userId: string) => {
     try {
       await deleteUser(userId); toast.success("User deleted.")
@@ -1438,6 +1449,8 @@ export default function AdminPanel({
                 setEditingUserId={setEditingUserId}
                 handleChangeUserRole={handleChangeUserRole}
                 handleDeleteUserAccount={handleDeleteUserAccount}
+                handleToggleUserBlacklist={handleToggleUserBlacklist}
+                currentUserEmail={user?.email ?? undefined}
               />
             </div>
           )}

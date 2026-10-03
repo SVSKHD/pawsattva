@@ -28,7 +28,7 @@ const isValidPhone = (value: string) => {
 }
 
 export function ProfileOnboardingGate() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, isBlacklisted } = useAuth()
   const pathname = usePathname()
   const [checkedUserId, setCheckedUserId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -114,7 +114,7 @@ export function ProfileOnboardingGate() {
     }
   }
 
-  if (!user || pathname === "/login") return null
+  if (!user || isBlacklisted || pathname === "/login") return null
 
   return (
     <Dialog open={open}>

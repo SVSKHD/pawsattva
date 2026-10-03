@@ -17,9 +17,15 @@ import {
   arrayUnion,
   increment,
   setDoc,
-  deleteField
+  deleteField,
+  writeBatch
 } from "firebase/firestore";
 import { db } from "./db";
+import {
+  RESTRICTED_EMAILS_COLLECTION,
+  normalizeEmail,
+  restrictedEmailKey,
+} from "./restricted-email";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -94,6 +100,8 @@ export interface UserProfile {
   receiveUpdates?: boolean;
   admin: boolean;
   role?: "user" | "author" | "admin";
+  blacklisted?: boolean;
+  blacklistedAt?: any;
   petFeeds?: PetFeedEntry[];
   createdAt?: any;
 }
@@ -290,6 +298,73 @@ export const updateUserRole = async (userId: string, role: NonNullable<UserProfi
 export const updateUser = async (userId: string, data: Partial<UserProfile>) => {
   const docRef = doc(db, "users", userId);
   return await updateDoc(docRef, data);
+};
+
+export interface RestrictedEmail {
+  id: string;
+  email: string;
+  userId?: string;
+  displayName?: string;
+  createdAt?: Timestamp;
+  lastLoginAt?: Timestamp;
+  loginAttempts?: number;
+}
+
+export const onRestrictedEmailsSnapshot = (callback: (emails: RestrictedEmail[]) => void) => {
+  return onSnapshot(collection(db, RESTRICTED_EMAILS_COLLECTION), (snapshot) => {
+    callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as RestrictedEmail)));
+  });
+};
+
+export const restrictEmail = async (
+  email: string,
+  details: { userId?: string; displayName?: string } = {}
+) => {
+  return await setDoc(
+    doc(db, RESTRICTED_EMAILS_COLLECTION, restrictedEmailKey(email)),
+    withoutUndefined({ email: normalizeEmail(email), ...details, createdAt: serverTimestamp() }),
+    { merge: true }
+  );
+};
+
+export const unrestrictEmail = async (email: string) => {
+  return await deleteDoc(doc(db, RESTRICTED_EMAILS_COLLECTION, restrictedEmailKey(email)));
+};
+
+// Blacklists both the profile and the email, so the restriction survives a recreated profile.
+export const setUserBlacklisted = async (
+  profile: Pick<UserProfile, "id" | "email" | "displayName">,
+  blacklisted: boolean
+) => {
+  const batch = writeBatch(db);
+  const userRef = doc(db, "users", profile.id);
+  const emailRef = profile.email
+    ? doc(db, RESTRICTED_EMAILS_COLLECTION, restrictedEmailKey(profile.email))
+    : null;
+
+  // The profile document may not exist when unblocking an email-only restriction.
+  const userSnapshot = await getDoc(userRef);
+  if (userSnapshot.exists()) {
+    batch.update(userRef, {
+      blacklisted,
+      blacklistedAt: blacklisted ? serverTimestamp() : deleteField(),
+    });
+  }
+
+  if (emailRef) {
+    if (blacklisted) {
+      batch.set(emailRef, withoutUndefined({
+        email: normalizeEmail(profile.email),
+        userId: profile.id,
+        displayName: profile.displayName,
+        createdAt: serverTimestamp(),
+      }), { merge: true });
+    } else {
+      batch.delete(emailRef);
+    }
+  }
+
+  return await batch.commit();
 };
 
 export const deleteUser = async (userId: string) => {

@@ -5,6 +5,7 @@ import { ThumbsUp, ThumbsDown } from "lucide-react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebase/db";
 import { trackEvent } from "@/firebase/analytics";
+import { useAuth } from "@/components/auth-provider";
 
 const STORAGE_KEY = "pawsattva_reaction_";
 const SYNC_EVENT = "pawsattva:reaction";
@@ -50,6 +51,7 @@ export function BlogReactions({
   const [userReaction, setUserReaction] = useState<Reaction | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const instanceId = useId();
+  const { isBlacklisted } = useAuth();
 
   // Restore this browser's earlier reaction, and keep other copies of the same post in sync
   useEffect(() => {
@@ -97,7 +99,7 @@ export function BlogReactions({
     // Cards sit inside a clickable area; never let a reaction open the post
     event?.preventDefault();
     event?.stopPropagation();
-    if (userReaction || submitting) return;
+    if (userReaction || submitting || isBlacklisted) return;
     setSubmitting(true);
 
     const delta = action === "like" ? { likes: 1, dislikes: 0 } : { likes: 0, dislikes: 1 };
@@ -137,7 +139,7 @@ export function BlogReactions({
         <button
           type="button"
           onClick={(e) => handleReaction("like", e)}
-          disabled={!!userReaction || submitting}
+          disabled={!!userReaction || submitting || isBlacklisted}
           aria-pressed={userReaction === "like"}
           aria-label={`Like (${likes})`}
           title={userReaction ? "Thanks for your feedback" : "Helpful"}
@@ -149,7 +151,7 @@ export function BlogReactions({
         <button
           type="button"
           onClick={(e) => handleReaction("dislike", e)}
-          disabled={!!userReaction || submitting}
+          disabled={!!userReaction || submitting || isBlacklisted}
           aria-pressed={userReaction === "dislike"}
           aria-label={`Dislike (${dislikes})`}
           title={userReaction ? "Thanks for your feedback" : "Not helpful"}
@@ -167,7 +169,7 @@ export function BlogReactions({
       <button
         type="button"
         onClick={() => handleReaction("like")}
-        disabled={!!userReaction || submitting}
+        disabled={!!userReaction || submitting || isBlacklisted}
         aria-pressed={userReaction === "like"}
         className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border-2
           ${userReaction === "like"
@@ -184,7 +186,7 @@ export function BlogReactions({
       <button
         type="button"
         onClick={() => handleReaction("dislike")}
-        disabled={!!userReaction || submitting}
+        disabled={!!userReaction || submitting || isBlacklisted}
         aria-pressed={userReaction === "dislike"}
         className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all border-2
           ${userReaction === "dislike"

@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import NextImage from "next/image"
 import {
+  Ban,
   CalendarDays,
   Cat,
   ChevronLeft,
@@ -57,7 +58,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import type { PetFeedEntry, UserProfile } from "@/firebase/firestore"
+import { toast } from "sonner"
+import {
+  onRestrictedEmailsSnapshot,
+  restrictEmail,
+  setUserBlacklisted,
+  unrestrictEmail,
+} from "@/firebase/firestore"
+import type { PetFeedEntry, RestrictedEmail, UserProfile } from "@/firebase/firestore"
+import { normalizeEmail } from "@/firebase/restricted-email"
 
 type UserAgeFilter = "all" | "new" | "old"
 
@@ -85,6 +94,8 @@ interface UsersTabProps {
     role: NonNullable<UserProfile["role"]>
   ) => void
   handleDeleteUserAccount: (userId: string) => void
+  handleToggleUserBlacklist: (profile: UserProfile, blacklisted: boolean) => void
+  currentUserEmail?: string
 }
 
 const PAGE_SIZE = 5
@@ -185,8 +196,90 @@ export function UsersTab({
   setEditingUserId,
   handleChangeUserRole,
   handleDeleteUserAccount,
+  handleToggleUserBlacklist,
+  currentUserEmail,
 }: UsersTabProps) {
   void totalPetFeeds
+
+  const [restrictedEmails, setRestrictedEmails] = useState<RestrictedEmail[]>([])
+  const [newRestrictedEmail, setNewRestrictedEmail] = useState("")
+  const [restrictingEmail, setRestrictingEmail] = useState(false)
+
+  useEffect(() => onRestrictedEmailsSnapshot(setRestrictedEmails), [])
+
+  const restrictedEmailSet = useMemo(
+    () => new Set(restrictedEmails.map((entry) => normalizeEmail(entry.email))),
+    [restrictedEmails]
+  )
+
+  // A user counts as restricted if their profile is blacklisted or their email is on the list.
+  const isRestricted = useCallback(
+    ({ blacklisted, email }: UserProfile) =>
+      blacklisted === true ||
+      (Boolean(email) && restrictedEmailSet.has(normalizeEmail(email))),
+    [restrictedEmailSet]
+  )
+
+  const sortedRestrictedEmails = useMemo(
+    () =>
+      [...restrictedEmails].sort(
+        (a, b) =>
+          (toDate(b.lastLoginAt)?.getTime() ?? 0) - (toDate(a.lastLoginAt)?.getTime() ?? 0) ||
+          (toDate(b.createdAt)?.getTime() ?? 0) - (toDate(a.createdAt)?.getTime() ?? 0)
+      ),
+    [restrictedEmails]
+  )
+
+  const handleRestrictEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const email = normalizeEmail(newRestrictedEmail)
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Enter a valid email address.")
+      return
+    }
+    if (currentUserEmail && normalizeEmail(currentUserEmail) === email) {
+      toast.error("You cannot restrict your own email.")
+      return
+    }
+    if (admins.some((admin) => admin.email && normalizeEmail(admin.email) === email)) {
+      toast.error("Remove the admin role before restricting this email.")
+      return
+    }
+
+    setRestrictingEmail(true)
+    try {
+      const profile = users.find((entry) => entry.email && normalizeEmail(entry.email) === email)
+      if (profile) {
+        await setUserBlacklisted(profile, true)
+      } else {
+        await restrictEmail(email)
+      }
+      setNewRestrictedEmail("")
+      toast.success(`${email} is now restricted.`)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to restrict email: ${msg}`)
+    } finally {
+      setRestrictingEmail(false)
+    }
+  }
+
+  const handleUnrestrictEmail = async (entry: RestrictedEmail) => {
+    try {
+      const profile = users.find(
+        (user) => user.email && normalizeEmail(user.email) === normalizeEmail(entry.email)
+      )
+      if (profile) {
+        await setUserBlacklisted(profile, false)
+      } else {
+        await unrestrictEmail(entry.email)
+      }
+      toast.success(`${entry.email} is no longer restricted.`)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      toast.error(`Failed to remove restriction: ${msg}`)
+    }
+  }
 
   const [ageFilter, setAgeFilter] = useState<UserAgeFilter>("all")
   const [breedFilter, setBreedFilter] = useState("all")
@@ -212,6 +305,11 @@ export function UsersTab({
   const nonAdminFilteredUsers = useMemo(
     () => filteredUsers.filter((profile) => getRole(profile) !== "admin"),
     [filteredUsers]
+  )
+
+  const blacklistedCount = useMemo(
+    () => nonAdminUsers.filter(isRestricted).length,
+    [isRestricted, nonAdminUsers]
   )
 
   const userPetCount = useMemo(
@@ -333,6 +431,12 @@ export function UsersTab({
                   <PawPrint className="h-3.5 w-3.5" />
                   {userPetCount} user pets
                 </span>
+                {blacklistedCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-600">
+                    <Ban className="h-3.5 w-3.5" />
+                    {blacklistedCount} blacklisted
+                  </span>
+                )}
               </div>
             </div>
 
@@ -438,6 +542,85 @@ export function UsersTab({
           </div>
         )}
 
+        <div className="border-b border-border/40 bg-red-500/[0.03] px-4 py-4 sm:px-8">
+          <div className="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-start">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-red-600">
+                <Ban className="h-4 w-4" />
+                Restricted emails
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Anyone who signs in with these emails is restricted instantly, even if their
+                account is new. Updates live, no refresh needed.
+              </p>
+            </div>
+            <form onSubmit={handleRestrictEmail} className="flex w-full gap-2 md:w-auto">
+              <Input
+                type="email"
+                value={newRestrictedEmail}
+                onChange={(event) => setNewRestrictedEmail(event.target.value)}
+                placeholder="email@example.com"
+                className="h-9 rounded-lg bg-white/50 text-sm dark:bg-black/50 md:w-64"
+              />
+              <Button
+                type="submit"
+                size="sm"
+                disabled={restrictingEmail || !newRestrictedEmail.trim()}
+                className="h-9 rounded-lg bg-red-600 text-white hover:bg-red-600/90"
+              >
+                <Ban className="mr-1.5 h-4 w-4" />
+                Restrict
+              </Button>
+            </form>
+          </div>
+
+          {sortedRestrictedEmails.length ? (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {sortedRestrictedEmails.map((entry) => {
+                const linkedUser = users.find(
+                  (profile) =>
+                    profile.email && normalizeEmail(profile.email) === normalizeEmail(entry.email)
+                )
+                const attempts = entry.loginAttempts ?? 0
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center gap-3 rounded-2xl border border-red-500/15 bg-background/70 p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black">{entry.email}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {linkedUser?.displayName || entry.displayName || "No account yet"}
+                      </p>
+                      <p
+                        className={`mt-0.5 text-[10px] font-semibold ${
+                          entry.lastLoginAt ? "text-red-600" : "text-muted-foreground"
+                        }`}
+                      >
+                        {entry.lastLoginAt
+                          ? `Signed in ${formatDate(entry.lastLoginAt)} · ${attempts} ${attempts === 1 ? "session" : "sessions"}`
+                          : `Restricted ${formatDate(entry.createdAt, "recently")} · no sign-ins since`}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleUnrestrictEmail(entry)}
+                      className="h-8 shrink-0 rounded-lg text-xs text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                    >
+                      Unblock
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-xs italic text-muted-foreground">No restricted emails.</p>
+          )}
+        </div>
+
         <CardContent className="overflow-hidden p-0">
           <div className="min-h-[430px] overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
@@ -525,6 +708,11 @@ export function UsersTab({
                                 {isNewUser(profile) && (
                                   <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-600">
                                     New
+                                  </span>
+                                )}
+                                {isRestricted(profile) && (
+                                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-600">
+                                    Blacklisted
                                   </span>
                                 )}
                               </div>
@@ -680,6 +868,65 @@ export function UsersTab({
                                     variant="outline"
                                     size="sm"
                                     disabled={profile.id === currentUserId}
+                                    title={isRestricted(profile) ? "Remove from blacklist" : "Blacklist user"}
+                                    className={
+                                      isRestricted(profile)
+                                        ? "h-9 rounded-lg border-red-500/30 bg-red-500/10 text-red-600 hover:bg-emerald-600 hover:text-white"
+                                        : "h-9 rounded-lg bg-white/50 text-red-600 hover:bg-red-600 hover:text-white dark:bg-black/50"
+                                    }
+                                  >
+                                    {isRestricted(profile) ? (
+                                      <>
+                                        <ShieldCheck className="mr-1.5 h-4 w-4" />
+                                        Unblock
+                                      </>
+                                    ) : (
+                                      <Ban className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="rounded-[2rem] border-white/30 bg-white/95 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-black/95">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      {isRestricted(profile)
+                                        ? "Remove from Blacklist?"
+                                        : "Blacklist User?"}
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      {isRestricted(profile)
+                                        ? `“${profile.displayName || profile.email}” will regain normal access to the web app.`
+                                        : `“${profile.displayName || profile.email}” will stay signed in but lose all access except reading blogs. Their email is restricted too, so a new login with it stays blocked.`}
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>
+                                      Cancel
+                                    </AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className={
+                                        isRestricted(profile)
+                                          ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
+                                          : "bg-destructive text-white hover:bg-destructive/90"
+                                      }
+                                      onClick={() =>
+                                        handleToggleUserBlacklist(
+                                          profile,
+                                          !isRestricted(profile)
+                                        )
+                                      }
+                                    >
+                                      {isRestricted(profile) ? "Unblock User" : "Blacklist User"}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={profile.id === currentUserId}
                                     className="h-9 rounded-lg bg-white/50 text-destructive hover:bg-destructive hover:text-white dark:bg-black/50"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -826,6 +1073,11 @@ export function UsersTab({
                         {isNewUser(selectedUser) && (
                           <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600">
                             New user
+                          </span>
+                        )}
+                        {isRestricted(selectedUser) && (
+                          <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-red-600">
+                            Blacklisted
                           </span>
                         )}
                       </div>

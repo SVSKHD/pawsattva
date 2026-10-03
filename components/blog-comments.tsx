@@ -16,7 +16,7 @@ interface BlogCommentsProps {
 }
 
 export function BlogComments({ blogId }: BlogCommentsProps) {
-  const { user } = useAuth();
+  const { user, isBlacklisted } = useAuth();
   const { requestSignIn } = useAuthDialog();
   const [comments, setComments] = useState<BlogComment[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -201,6 +201,12 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         {/* Scrolls internally when its container caps the height (pinned blog side panel) */}
         <div className={`min-h-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${open ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
           <div className="border-t border-border/70 px-4 pb-4 sm:px-5 sm:pb-5">
+            {isBlacklisted ? (
+              <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50/70 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-300">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>Your account is restricted. You can read comments but cannot post.</span>
+              </div>
+            ) : (
             <form onSubmit={submitComment} className="mt-4 rounded-2xl border border-border/80 bg-background/80 p-3 sm:p-4">
               <label htmlFor="blog-comment" className="text-sm font-bold text-foreground">
                 Add a comment
@@ -254,6 +260,7 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
                 {saving ? "Posting..." : user ? "Post Comment" : "Sign in & Post"}
               </button>
             </form>
+            )}
 
             <div className="mt-6 space-y-3" aria-live="polite" aria-busy={loadingComments}>
               {loadingComments ? (
