@@ -199,6 +199,44 @@
     inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
+/* ── Image loading shimmer (components/shimmer-image.tsx) ── */
+@keyframes image-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+
+.image-shimmer {
+  background-color: #fdf1e6;
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.75) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: image-shimmer 1.4s ease-in-out infinite;
+}
+
+.dark .image-shimmer {
+  background-color: #2a201a;
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.07) 50%,
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-shimmer {
+    animation: none;
+  }
+}
+
 /* ── Tab content entrance animation ── */
 @keyframes tab-enter {
   from {

@@ -74,6 +74,10 @@ const SubscribersTab = dynamic(
   () => import("./components/SubscribersTab").then((mod) => mod.SubscribersTab),
   { loading: TabLoading }
 )
+const VetHospitalsTab = dynamic(
+  () => import("./components/VetHospitalsTab").then((mod) => mod.VetHospitalsTab),
+  { loading: TabLoading }
+)
 const UsersTab = dynamic(
   () => import("./components/UsersTab").then((mod) => mod.UsersTab),
   { loading: TabLoading }
@@ -116,6 +120,7 @@ export default function AdminPanel({
       ? new Set([
         "content-goals", "page-seo", "blog-list", "blog", "category-list",
         "category", "sub-category-list", "sub-category", "users", "subscribers", "analytics",
+        "vet-hospitals",
       ])
       : new Set(["blog-list", "blog", "category-list", "category", "sub-category-list", "sub-category"]),
     [isFullAdmin]
@@ -1427,6 +1432,12 @@ export default function AdminPanel({
           {isFullAdmin && activeTab === "subscribers" && (
             <div className="tab-panel">
               <SubscribersTab subscribers={subscribers} />
+            </div>
+          )}
+
+          {isFullAdmin && activeTab === "vet-hospitals" && (
+            <div className="tab-panel">
+              <VetHospitalsTab />
             </div>
           )}
 

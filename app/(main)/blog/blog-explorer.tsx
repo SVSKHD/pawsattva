@@ -1,9 +1,9 @@
 "use client"
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useTransition } from "react"
-import Image from "next/image"
+import { ShimmerImage } from "@/components/shimmer-image"
 import Link from "next/link"
-import { ArrowRight, ArrowUpRight, Clock, Eye, Loader2, MessageCircle, Search, X } from "lucide-react"
+import { ArrowRight, ArrowUpRight, Clock, Eye, MessageCircle, Search, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { BlogReactions } from "@/components/blog-reactions"
@@ -18,7 +18,8 @@ export interface BlogCategoryOption {
 
 type SortKey = "latest" | "popular"
 
-const BATCH = 9
+// Cards rendered per step: small enough for a fast first paint, refilled before the reader reaches the end
+const BATCH = 6
 
 interface BlogExplorerProps {
   posts: BlogSummary[]
@@ -268,23 +269,47 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
         </div>
       ) : null}
 
-      {/* Infinite scroll sentinel + manual fallback */}
+      {/* Infinite scroll sentinel: placeholder cards in the shape of the next row, plus a manual fallback */}
       {hasMore && (
-        <div ref={sentinelRef} className="mt-10 flex flex-col items-center gap-3">
-          <Loader2 className="h-5 w-5 animate-spin text-orange-500" aria-hidden />
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-full px-6"
-            onClick={() => setVisible((count) => count + BATCH)}
-          >
-            Show more ({gridPosts.length - visible} left)
-          </Button>
+        <div ref={sentinelRef} className="mt-6">
+          <div aria-hidden className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard className="hidden sm:flex" />
+            <SkeletonCard className="hidden lg:flex" />
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-full px-6"
+              onClick={() => setVisible((count) => count + BATCH)}
+            >
+              Show more ({gridPosts.length - visible} left)
+            </Button>
+          </div>
         </div>
       )}
       {!hasMore && gridPosts.length > BATCH && (
         <p className="mt-10 text-center text-sm text-muted-foreground">You&apos;ve reached the end — that&apos;s every article.</p>
       )}
+    </div>
+  )
+}
+
+/** Same footprint as PostCard, so the grid doesn't jump when the real cards replace it */
+function SkeletonCard({ className = "" }: { className?: string }) {
+  return (
+    <div className={`flex flex-col overflow-hidden rounded-[1.75rem] border bg-card ${className}`}>
+      <div className="image-shimmer aspect-[16/10]" />
+      <div className="space-y-3 p-5">
+        <div className="image-shimmer h-5 w-4/5 rounded-full" />
+        <div className="image-shimmer h-3.5 w-full rounded-full" />
+        <div className="image-shimmer h-3.5 w-2/3 rounded-full" />
+        <div className="flex gap-2 border-t pt-4">
+          <div className="image-shimmer h-6 w-14 rounded-full" />
+          <div className="image-shimmer h-6 w-14 rounded-full" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -361,7 +386,7 @@ const STRETCHED_LINK = "after:absolute after:inset-0 after:z-0 after:content-[''
 function FeaturedCard({ post, categoryName }: { post: BlogSummary; categoryName?: string }) {
   return (
     <article className="group relative min-h-[380px] overflow-hidden rounded-[2rem] bg-zinc-900 focus-within:ring-4 focus-within:ring-orange-500/30 lg:min-h-[460px]">
-      <Image
+      <ShimmerImage
         src={post.image}
         alt=""
         fill
@@ -399,7 +424,7 @@ function CompactCard({ post, categoryName }: { post: BlogSummary; categoryName?:
   return (
     <article className="group relative flex gap-4 rounded-[1.5rem] border bg-card p-3 transition focus-within:ring-4 focus-within:ring-orange-500/20 hover:border-orange-200 hover:shadow-lg hover:shadow-orange-950/5 dark:hover:border-orange-900 lg:h-full">
       <div className="relative aspect-square w-28 shrink-0 overflow-hidden rounded-2xl sm:w-32 lg:w-36">
-        <Image src={post.image} alt="" fill sizes="144px" priority className="object-cover transition-transform duration-500 group-hover:scale-105" />
+        <ShimmerImage src={post.image} alt="" fill sizes="144px" priority className="object-cover transition-transform duration-500 group-hover:scale-105" />
       </div>
       <div className="flex min-w-0 flex-col py-1">
         <CategoryTag name={categoryName} />
@@ -419,9 +444,10 @@ function PostCard({ post, categoryName, eager }: { post: BlogSummary; categoryNa
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card transition duration-300 focus-within:ring-4 focus-within:ring-orange-500/20 hover:-translate-y-1 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-950/5 dark:hover:border-orange-900">
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
-        <Image
+        <ShimmerImage
           src={post.image}
           alt=""
+          caption={post.title}
           fill
           loading={eager ? "eager" : "lazy"}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

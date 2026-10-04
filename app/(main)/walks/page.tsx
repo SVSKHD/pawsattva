@@ -10,6 +10,38 @@ import {
   PLACE_CATEGORIES, WALK_CITIES, mapsSearchUrl, mapsUrl, placeCount,
   type PlaceCategory, type PlaceType, type WalkCity, type WalkSpot,
 } from "@/lib/walks";
+import { getApprovedVetHospitals } from "@/firebase/firestore";
+
+// Approved hospitals are added from the admin panel, so refresh the page periodically.
+export const revalidate = 300;
+
+/** Static city data plus admin-approved vet hospitals from Firestore */
+async function loadCities(): Promise<WalkCity[]> {
+  try {
+    const hospitals = await getApprovedVetHospitals();
+    return WALK_CITIES.map((city) => {
+      const extra: WalkSpot[] = hospitals
+        .filter((hospital) => hospital.cityId === city.id)
+        .map((hospital) => ({
+          id: `vet-${hospital.id}`,
+          name: hospital.name,
+          area: hospital.area,
+          zone: hospital.zone,
+          type: hospital.type,
+          summary: hospital.summary,
+          phone: hospital.phone,
+          open24h: hospital.open24h,
+          verifiedOn: hospital.verifiedOn,
+          mapsQuery: hospital.mapsQuery,
+        }))
+        .sort((a, b) => a.zone.localeCompare(b.zone) || a.name.localeCompare(b.name));
+      return extra.length ? { ...city, hospitals: [...city.hospitals, ...extra] } : city;
+    });
+  } catch (error) {
+    console.error("Unable to load approved vet hospitals:", error);
+    return WALK_CITIES;
+  }
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   return getManagedPageMetadata("walks", {
@@ -228,7 +260,9 @@ function CityPlaces({ city }: { city: WalkCity }) {
   );
 }
 
-export default function WalksPage() {
+export default async function WalksPage() {
+  const cities = await loadCities();
+
   return (
     <div className="min-h-screen bg-background">
       <ManagedJsonLd pageKey="walks" />
@@ -250,10 +284,10 @@ export default function WalksPage() {
             </p>
           </div>
 
-          <Tabs defaultValue={WALK_CITIES[0].id} className="mt-10 sm:mt-14">
+          <Tabs defaultValue={cities[0].id} className="mt-10 sm:mt-14">
             <div className="-mx-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <TabsList className="mx-auto flex h-auto w-max min-w-full justify-start gap-2 rounded-2xl bg-muted/70 p-2 sm:min-w-0 sm:justify-center">
-                {WALK_CITIES.map((city) => {
+                {cities.map((city) => {
                   const total = placeCount(city);
                   return (
                     <TabsTrigger
@@ -276,7 +310,7 @@ export default function WalksPage() {
             </div>
 
             <div className="mt-8">
-              {WALK_CITIES.map((city) => (
+              {cities.map((city) => (
                 <TabsContent key={city.id} value={city.id} className="mt-0">
                   <CityPlaces city={city} />
                 </TabsContent>

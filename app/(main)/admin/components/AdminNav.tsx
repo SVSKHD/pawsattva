@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck } from "lucide-react"
+import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck, Stethoscope } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
@@ -88,6 +88,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
         activeBg: "bg-blue-500/10",
         activeBorder: "border-blue-500/20",
         dot: "bg-blue-500",
+      },
+      {
+        label: "Vet Hospitals",
+        primaryValue: "vet-hospitals",
+        adminOnly: true,
+        relatedValues: [],
+        icon: Stethoscope,
+        activeColor: "text-rose-600 dark:text-rose-400",
+        activeBg: "bg-rose-500/10",
+        activeBorder: "border-rose-500/20",
+        dot: "bg-rose-500",
       },
       {
         label: "Subscribers",

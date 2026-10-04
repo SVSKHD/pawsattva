@@ -26,6 +26,7 @@ import {
   normalizeEmail,
   restrictedEmailKey,
 } from "./restricted-email";
+import type { HospitalType } from "@/lib/walks";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -370,6 +371,66 @@ export const setUserBlacklisted = async (
 export const deleteUser = async (userId: string) => {
   const docRef = doc(db, "users", userId);
   return await deleteDoc(docRef);
+};
+
+// ── VET HOSPITAL OPERATIONS ──────────────────────────────────────────────────
+// Admin-managed hospitals for /walks. Only "approved" entries are shown publicly.
+
+export type VetHospitalStatus = "approved" | "pending";
+
+export interface VetHospital {
+  id: string;
+  cityId: string;
+  name: string;
+  area: string;
+  zone: string;
+  type: HospitalType;
+  summary: string;
+  phone?: string;
+  open24h?: boolean;
+  /** YYYY-MM-DD, set once the team has confirmed the details with the hospital */
+  verifiedOn?: string;
+  mapsQuery?: string;
+  status: VetHospitalStatus;
+  createdBy?: string;
+  createdByName?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export type VetHospitalInput = Omit<VetHospital, "id" | "createdAt" | "updatedAt">;
+
+export const getApprovedVetHospitals = async (): Promise<VetHospital[]> => {
+  const snapshot = await getDocs(
+    query(collection(db, "vetHospitals"), where("status", "==", "approved"))
+  );
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VetHospital));
+};
+
+export const onVetHospitalsSnapshot = (callback: (hospitals: VetHospital[]) => void) => {
+  return onSnapshot(collection(db, "vetHospitals"), (snapshot) => {
+    callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VetHospital)));
+  });
+};
+
+export const addVetHospital = async (data: VetHospitalInput) => {
+  return await addDoc(collection(db, "vetHospitals"), {
+    ...withoutUndefined(data),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const updateVetHospital = async (id: string, data: Partial<VetHospitalInput>) => {
+  // Empty optional fields are removed rather than stored as blanks.
+  const payload = Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [key, value === undefined ? deleteField() : value])
+  );
+  return await updateDoc(doc(db, "vetHospitals", id), { ...payload, updatedAt: serverTimestamp() });
+};
+
+export const deleteVetHospital = async (id: string) => {
+  return await deleteDoc(doc(db, "vetHospitals", id));
 };
 
 // ── PAGE SEO OPERATIONS ──────────────────────────────────────────────────────

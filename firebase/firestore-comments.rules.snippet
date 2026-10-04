@@ -2,8 +2,28 @@
 // match /databases/{database}/documents { ... }
 // section of the Paw Sattva Firestore rules, then deploy the rules.
 //
-// It intentionally grants access only to blog comment documents. It does not
-// change permissions on the parent blog, users, analytics, or admin content.
+// Both blocks are additive (Firestore ORs every matching `allow`), so they
+// do not loosen any existing admin rules for blogs, users or analytics.
+
+// Likes, dislikes, views and the comment count on a published post.
+// /api/blog/react and /api/blog/view write these without a signed-in user,
+// so only these four counters may change, and only by exactly +1.
+function counterSteppedByOne(field) {
+  return request.resource.data.get(field, 0) == resource.data.get(field, 0)
+    || request.resource.data.get(field, 0) == resource.data.get(field, 0) + 1;
+}
+
+match /blogs/{blogId} {
+  allow update: if resource.data.status == "published"
+    && request.resource.data.diff(resource.data).affectedKeys()
+      .hasOnly(["likes", "dislikes", "views", "commentsCount"])
+    && counterSteppedByOne("likes")
+    && counterSteppedByOne("dislikes")
+    && counterSteppedByOne("views")
+    && counterSteppedByOne("commentsCount");
+}
+
+// Comments: anyone may read on a published post; signed-in users may post.
 match /blogs/{blogId}/comments/{commentId} {
   allow read: if exists(/databases/$(database)/documents/blogs/$(blogId))
     && get(/databases/$(database)/documents/blogs/$(blogId)).data.status == "published";

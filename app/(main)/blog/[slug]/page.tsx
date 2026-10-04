@@ -1,5 +1,5 @@
 import React from 'react';
-import Image from 'next/image';
+import { ShimmerImage } from '@/components/shimmer-image';
 import { safeImageSrc } from '@/lib/image-hosts';
 import Link from 'next/link';
 import { Source_Serif_4 } from 'next/font/google';
@@ -177,7 +177,7 @@ function PostNavCard({ post, direction }: { post: Blog; direction: 'prev' | 'nex
       className={`group flex items-center gap-4 rounded-2xl border border-border/70 bg-card p-3 pr-5 transition-all hover:-translate-y-0.5 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-950/5 ${isNext ? 'flex-row-reverse text-right' : ''}`}
     >
       <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl">
-        <Image
+        <ShimmerImage
           src={safeImageSrc(post.image, defaultImage)}
           alt=""
           fill
@@ -392,9 +392,11 @@ export default async function BlogPostPage({
               data-blog-hero-media
               className="blog-hero-media relative aspect-[4/3] overflow-hidden rounded-[1.5rem] shadow-2xl shadow-orange-950/10 sm:aspect-[16/10] sm:rounded-[2rem]"
             >
-              <Image
+              <ShimmerImage
                 src={safeImageSrc(blog.image, defaultImage)}
                 alt={blog.title}
+                caption={blog.title}
+                captionSize="lg"
                 fill
                 priority
                 className="blog-hero-image object-cover"
@@ -546,9 +548,10 @@ export default async function BlogPostPage({
                       className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-950/5"
                     >
                       <div className="relative aspect-[16/10] overflow-hidden">
-                        <Image
+                        <ShimmerImage
                           src={safeImageSrc(post.image, defaultImage)}
                           alt=""
+                          caption={post.title}
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-105"
                           sizes="(min-width: 1280px) 240px, (min-width: 640px) 50vw, 100vw"

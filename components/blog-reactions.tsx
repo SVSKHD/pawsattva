@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useId } from "react";
 import { ThumbsUp, ThumbsDown } from "lucide-react";
-import { doc, onSnapshot } from "firebase/firestore";
-import { db } from "@/firebase/db";
-import { trackEvent } from "@/firebase/analytics";
+import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 
 const STORAGE_KEY = "pawsattva_reaction_";
@@ -70,14 +68,31 @@ export function BlogReactions({
     return () => window.removeEventListener(SYNC_EVENT, onSync);
   }, [blogId, live, instanceId]);
 
+  // Firestore is loaded only for live counters (the article page), never for list cards,
+  // so the blog list doesn't download the SDK just to render like buttons.
   useEffect(() => {
     if (!live) return;
-    return onSnapshot(doc(db, "blogs", blogId), (snapshot) => {
-      if (!snapshot.exists()) return;
-      const data = snapshot.data();
-      setLikes(data.likes ?? 0);
-      setDislikes(data.dislikes ?? 0);
-    });
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+    void Promise.all([import("firebase/firestore"), import("@/firebase/db")]).then(
+      ([{ doc, onSnapshot }, { db }]) => {
+        if (!active) return;
+        unsubscribe = onSnapshot(
+          doc(db, "blogs", blogId),
+          (snapshot) => {
+            if (!snapshot.exists()) return;
+            const data = snapshot.data();
+            setLikes(data.likes ?? 0);
+            setDislikes(data.dislikes ?? 0);
+          },
+          (error) => console.error("Unable to watch reaction counts:", error)
+        );
+      }
+    );
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, [blogId, live]);
 
   const apply = (reaction: Reaction | null, delta: ReactionEventDetail["delta"]) => {
@@ -112,9 +127,12 @@ export function BlogReactions({
         body: JSON.stringify({ blogId, action }),
       });
       if (!res.ok) throw new Error(`Reaction failed: ${res.status}`);
-      void trackEvent("blog_reaction", { blog_id: blogId, reaction: action, placement: variant === "compact" ? "card" : "article" });
+      void import("@/firebase/analytics").then(({ trackEvent }) =>
+        trackEvent("blog_reaction", { blog_id: blogId, reaction: action, placement: variant === "compact" ? "card" : "article" })
+      );
     } catch {
       apply(null, { likes: -delta.likes, dislikes: -delta.dislikes });
+      toast.error("Couldn't save your reaction. Please try again.");
     } finally {
       setSubmitting(false);
     }
