@@ -23,6 +23,7 @@ import {
 import { db } from "./db";
 import {
   RESTRICTED_EMAILS_COLLECTION,
+  legacyRestrictedEmailKey,
   normalizeEmail,
   restrictedEmailKey,
 } from "./restricted-email";
@@ -328,8 +329,18 @@ export const restrictEmail = async (
   );
 };
 
+// Deletes under both the current and the legacy (URL-encoded) id.
+const deleteRestrictedEmail = (batch: ReturnType<typeof writeBatch>, email: string) => {
+  batch.delete(doc(db, RESTRICTED_EMAILS_COLLECTION, restrictedEmailKey(email)));
+  if (legacyRestrictedEmailKey(email) !== restrictedEmailKey(email)) {
+    batch.delete(doc(db, RESTRICTED_EMAILS_COLLECTION, legacyRestrictedEmailKey(email)));
+  }
+};
+
 export const unrestrictEmail = async (email: string) => {
-  return await deleteDoc(doc(db, RESTRICTED_EMAILS_COLLECTION, restrictedEmailKey(email)));
+  const batch = writeBatch(db);
+  deleteRestrictedEmail(batch, email);
+  return await batch.commit();
 };
 
 // Blacklists both the profile and the email, so the restriction survives a recreated profile.
@@ -361,7 +372,7 @@ export const setUserBlacklisted = async (
         createdAt: serverTimestamp(),
       }), { merge: true });
     } else {
-      batch.delete(emailRef);
+      deleteRestrictedEmail(batch, profile.email);
     }
   }
 

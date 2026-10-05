@@ -1,0 +1,332 @@
+rules_version = '2';
+
+// Paw Sattva Firestore security rules.
+// Publish: Firebase console → Firestore Database → Rules → paste this file → Publish
+// (or `firebase deploy --only firestore:rules`, which reads firebase.json).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() &&
+             request.auth.uid == userId;
+    }
+
+    function userDoc(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    // Admins and authors (both are stored with admin == true).
+    // A blacklisted account loses admin access even if its admin flag is still set.
+    function isAdmin() {
+      return isSignedIn() &&
+             exists(userDoc(request.auth.uid)) &&
+             get(userDoc(request.auth.uid)).data.get('admin', false) == true &&
+             get(userDoc(request.auth.uid)).data.get('blacklisted', false) != true;
+    }
+
+    // Full admins only: authors also have admin == true but role == "author".
+    function isFullAdmin() {
+      return isAdmin() &&
+             get(userDoc(request.auth.uid)).data.get('role', '') != 'author';
+    }
+
+    // Lower-cased email of the signed-in user ('' when the token has none).
+    function signedInEmail() {
+      return request.auth.token.get('email', '').lower();
+    }
+
+    // Blacklisted profile, or an email on the restricted list
+    // (restrictedEmails ids are the plain lower-cased email).
+    function isRestricted() {
+      return isSignedIn() && (
+        (
+          exists(userDoc(request.auth.uid)) &&
+          get(userDoc(request.auth.uid)).data.get('blacklisted', false) == true
+        ) ||
+        (
+          signedInEmail() != '' &&
+          exists(/databases/$(database)/documents/restrictedEmails/$(signedInEmail()))
+        )
+      );
+    }
+
+    // Profile fields only a full admin may change.
+    function changesPrivilegedFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasAny(['admin', 'role', 'blacklisted', 'blacklistedAt']);
+    }
+
+    // The Google account sync done on every sign-in.
+    function changesOnlyIdentityFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['email', 'displayName', 'photoURL']);
+    }
+
+    // Public engagement counters may only stay the same or go up by exactly 1.
+    function counterSteppedByOne(field) {
+      return request.resource.data.get(field, 0) == resource.data.get(field, 0) ||
+             request.resource.data.get(field, 0) == resource.data.get(field, 0) + 1;
+    }
+
+
+    // ─────────────────────────────────────────
+    // USERS
+    // ─────────────────────────────────────────
+
+    match /users/{userId} {
+
+      // Users read their own profile; admins and authors read all
+      // (the admin panel and the blog author picker).
+      allow read: if isOwner(userId) || isAdmin();
+
+      // New profiles always start as plain, unrestricted users.
+      allow create: if isOwner(userId) &&
+        request.resource.data.get('admin', false) == false &&
+        request.resource.data.get('role', 'user') == 'user' &&
+        !request.resource.data.keys().hasAny(['blacklisted', 'blacklistedAt']);
+
+      // Users edit their own profile but never admin, role or blacklist fields.
+      // A restricted user can only receive the Google account sync.
+      // Full admins can update any profile.
+      allow update: if (
+        isOwner(userId) &&
+        !changesPrivilegedFields() &&
+        (!isRestricted() || changesOnlyIdentityFields())
+      ) || isFullAdmin();
+
+      allow delete: if isFullAdmin();
+
+
+      // ───────────────────────────────────────
+      // LOGGER — MEAL ENTRIES
+      // users/{uid}/petLoggerEntries/{entryId}
+      // ───────────────────────────────────────
+
+      match /petLoggerEntries/{entryId} {
+
+        // Logger is private to the logged-in owner.
+        allow read, delete: if isOwner(userId);
+
+        // Restricted accounts cannot add or edit entries.
+        allow create, update: if isOwner(userId) && !isRestricted();
+      }
+
+
+      // ───────────────────────────────────────
+      // LOGGER — WEEKLY WEIGHT
+      // users/{uid}/petWeightEntries/{weightId}
+      // ───────────────────────────────────────
+
+      match /petWeightEntries/{weightId} {
+
+        allow read, delete: if isOwner(userId);
+
+        allow create, update: if isOwner(userId) && !isRestricted();
+      }
+    }
+
+
+    // ─────────────────────────────────────────
+    // RESTRICTED EMAILS
+    // restrictedEmails/{lower-cased email}
+    // ─────────────────────────────────────────
+
+    match /restrictedEmails/{email} {
+
+      // A signed-in user may look up only their own email (so the app can
+      // restrict them live); full admins see the whole list.
+      allow get: if (isSignedIn() && email == signedInEmail()) || isFullAdmin();
+      allow list: if isFullAdmin();
+
+      allow create, delete: if isFullAdmin();
+
+      // The restricted user's own sign-in is recorded on their entry.
+      allow update: if isFullAdmin() || (
+        isSignedIn() &&
+        email == signedInEmail() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['lastLoginAt', 'lastLoginUid', 'loginAttempts'])
+      );
+    }
+
+
+    // ─────────────────────────────────────────
+    // BLOGS
+    // ─────────────────────────────────────────
+
+    match /blogs/{blogId} {
+
+      allow read: if true;
+
+      allow create, update, delete: if isAdmin();
+
+      // Likes, dislikes, views and the comment count on a published post.
+      // /api/blog/react and /api/blog/view write these without a signed-in user,
+      // so only these four counters may change, and only by +1.
+      allow update: if resource.data.get('status', '') == 'published' &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['likes', 'dislikes', 'views', 'commentsCount']) &&
+        counterSteppedByOne('likes') &&
+        counterSteppedByOne('dislikes') &&
+        counterSteppedByOne('views') &&
+        counterSteppedByOne('commentsCount');
+
+
+      // ───────────────────────────────────────
+      // COMMENTS
+      // blogs/{blogId}/comments/{commentId}
+      // ───────────────────────────────────────
+
+      match /comments/{commentId} {
+
+        // Anyone can read comments on a published post.
+        allow read: if exists(/databases/$(database)/documents/blogs/$(blogId)) &&
+          get(/databases/$(database)/documents/blogs/$(blogId)).data.get('status', '') == 'published';
+
+        // Signed-in, unrestricted users may post their own comment.
+        allow create: if isSignedIn() &&
+          !isRestricted() &&
+          exists(/databases/$(database)/documents/blogs/$(blogId)) &&
+          get(/databases/$(database)/documents/blogs/$(blogId)).data.get('status', '') == 'published' &&
+          request.resource.data.keys().hasOnly([
+            'blogId', 'userId', 'userName', 'userEmail', 'content', 'createdAt'
+          ]) &&
+          request.resource.data.keys().hasAll([
+            'blogId', 'userId', 'userName', 'content', 'createdAt'
+          ]) &&
+          request.resource.data.blogId == blogId &&
+          request.resource.data.userId == request.auth.uid &&
+          request.resource.data.userName is string &&
+          request.resource.data.userName.size() >= 1 &&
+          request.resource.data.userName.size() <= 80 &&
+          (
+            !request.resource.data.keys().hasAny(['userEmail']) ||
+            (
+              request.resource.data.userEmail is string &&
+              request.resource.data.userEmail.size() <= 254
+            )
+          ) &&
+          request.resource.data.content is string &&
+          request.resource.data.content.size() >= 3 &&
+          request.resource.data.content.size() <= 500 &&
+          request.resource.data.createdAt == request.time;
+
+        // Stored comments cannot be edited; admins can remove them.
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+    }
+
+
+    // ─────────────────────────────────────────
+    // CATEGORIES
+    // ─────────────────────────────────────────
+
+    match /categories/{categoryId} {
+
+      allow read: if true;
+
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // SUBCATEGORIES
+    // ─────────────────────────────────────────
+
+    match /subcategories/{subcategoryId} {
+
+      allow read: if true;
+
+      allow create, update, delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // PAGE SEO
+    // Read by every page's metadata; edited in the SEO Command Center.
+    // ─────────────────────────────────────────
+
+    match /pageSeo/{pageKey} {
+
+      allow read: if true;
+
+      allow create, update, delete: if isFullAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // VET HOSPITALS
+    // Only approved listings are public (the /walks query filters on status).
+    // ─────────────────────────────────────────
+
+    match /vetHospitals/{hospitalId} {
+
+      allow read: if resource.data.status == 'approved' || isFullAdmin();
+
+      allow create, update, delete: if isFullAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // CONTENT GOALS
+    // ─────────────────────────────────────────
+
+    match /contentGoals/{goalId} {
+
+      allow read, create, update, delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // SUBSCRIPTIONS
+    // ─────────────────────────────────────────
+
+    match /subscriptions/{subscriptionId} {
+
+      // Public subscription form
+      allow create: if true;
+
+      allow read, update, delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // PET FEEDS
+    // ─────────────────────────────────────────
+
+    match /petFeeds/{feedId} {
+
+      // Guests may generate a pet plan; restricted accounts may not.
+      allow create: if !isRestricted();
+
+      // Admins can access all.
+      // User can access their own plan.
+      allow read: if isAdmin() || (
+        isSignedIn() &&
+        resource.data.userId == request.auth.uid
+      );
+
+      allow update, delete: if isAdmin();
+    }
+
+
+    // ─────────────────────────────────────────
+    // DEFAULT SECURITY
+    // Everything not matched above is closed.
+    // ─────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

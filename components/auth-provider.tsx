@@ -85,23 +85,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           emailDocRef ? getDoc(emailDocRef).catch(() => null) : Promise.resolve(null),
         ]);
 
-        if (userDoc.exists()) {
-          // Google/Firebase Auth is the source of truth for account identity.
-          // Keep the Firestore profile aligned without touching user-entered fields such as phone.
-          await setDoc(userDocRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-          }, { merge: true });
-        } else {
-          await setDoc(userDocRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            admin: false,
-            role: "user",
-            createdAt: new Date(),
-          });
+        // A failed profile sync must not skip the blacklist checks below, so it is caught here.
+        try {
+          if (userDoc.exists()) {
+            // Google/Firebase Auth is the source of truth for account identity.
+            // Keep the Firestore profile aligned without touching user-entered fields such as phone.
+            await setDoc(userDocRef, {
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+            }, { merge: true });
+          } else {
+            await setDoc(userDocRef, {
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              admin: false,
+              role: "user",
+              createdAt: new Date(),
+            });
+          }
+        } catch (error) {
+          console.error("Unable to sync the user profile:", error);
         }
 
         if (!active || sequence !== authSequence) return;
