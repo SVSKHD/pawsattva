@@ -120,7 +120,8 @@ export function ProfileOnboardingGate() {
     <Dialog open={open}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-md rounded-[2rem] border-orange-100 bg-background/98 p-6 shadow-2xl backdrop-blur-xl sm:p-7"
+        overlayClassName="z-[100]"
+        className="z-[100] max-w-md rounded-[2rem] border-orange-100 bg-background/98 p-6 shadow-2xl backdrop-blur-xl sm:p-7"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onPointerDownOutside={(event) => event.preventDefault()}
       >

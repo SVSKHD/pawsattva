@@ -91,7 +91,9 @@ export default async function Home() {
         <div className="mobile-ambient-orb absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/20 rounded-full blur-[120px] animate-pulse pointer-events-none" />
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          {/* grid-cols-1 pins the mobile column to the screen width, so the carousel's
+              changing captions can't widen (and therefore resize) the slides */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Hero Text */}
             <div className="mt-5 space-y-8 text-center lg:text-left animate-in fade-in slide-in-from-left-8 duration-700">
               <Badge className="bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-none px-4 py-2 rounded-full text-sm font-bold tracking-wide uppercase inline-flex items-center gap-2">

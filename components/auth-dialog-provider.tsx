@@ -12,9 +12,11 @@ import {
 import type { ReactNode } from "react"
 import { signInWithPopup } from "firebase/auth"
 import type { User } from "firebase/auth"
-import { Loader2, PawPrint, RotateCcw } from "lucide-react"
+import Image from "next/image"
+import { CalendarHeart, Heart, Loader2, MessageCircle, PawPrint, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
+import PawLogo from "@/app/pawsattva.png"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -53,6 +55,12 @@ const defaultDialogState: SignInDialogState = {
   successMessage: "Signed in with Google. Resuming your activity…",
   dismissible: true,
 }
+
+const SIGN_IN_PERKS = [
+  { icon: Heart, text: "Save your pet's feed plan and progress" },
+  { icon: CalendarHeart, text: "Track meals and weight in the logger" },
+  { icon: MessageCircle, text: "Comment and react on every guide" },
+]
 
 const AuthDialogContext = createContext<AuthDialogContextValue | null>(null)
 
@@ -165,7 +173,9 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
           showCloseButton={dialogState.dismissible && !signingIn}
-          className="max-w-md rounded-[2rem] border-orange-100 bg-background/95 p-7 shadow-2xl backdrop-blur-xl"
+          // Above the fixed mobile nav (z-80) and pet guide (z-70), so nothing floats over the dialog
+          overlayClassName="z-[100] bg-black/35"
+          className="z-[100] max-h-[calc(100dvh-2rem)] max-w-[calc(100%-2rem)] gap-0 overflow-y-auto overflow-x-hidden rounded-[2rem] border-0 bg-background p-0 shadow-2xl shadow-orange-950/20 ring-0 sm:max-w-[25rem]"
           onEscapeKeyDown={(event) => {
             if (signingIn || !dialogState.dismissible) event.preventDefault()
           }}
@@ -173,40 +183,62 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
             if (signingIn || !dialogState.dismissible) event.preventDefault()
           }}
         >
-          <DialogHeader className="items-center text-center">
-            <span className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950/50 dark:text-orange-300">
-              <PawPrint className="h-7 w-7" />
-            </span>
-            <DialogTitle className="text-2xl font-black">{dialogState.title}</DialogTitle>
-            <DialogDescription className="max-w-sm text-balance leading-relaxed">
-              {dialogState.description}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-2 flex items-center justify-center gap-2 rounded-xl bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-800 dark:bg-orange-950/30 dark:text-orange-200">
-            <RotateCcw className="h-3.5 w-3.5" />
-            Your current page and activity will be preserved.
+          {/* Brand band */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-orange-400 to-amber-300 px-6 pb-12 pt-8 dark:from-orange-700 dark:via-orange-600 dark:to-amber-500">
+            <PawPrint aria-hidden className="absolute -left-3 top-4 h-16 w-16 -rotate-12 text-white/15" />
+            <PawPrint aria-hidden className="absolute right-6 top-14 h-10 w-10 rotate-12 text-white/20" />
+            <PawPrint aria-hidden className="absolute -bottom-2 left-1/3 h-12 w-12 rotate-[24deg] text-white/10" />
+            <div className="relative mx-auto flex h-20 w-20 items-center justify-center rounded-[1.6rem] bg-white shadow-xl shadow-orange-900/20 ring-4 ring-white/40">
+              <Image src={PawLogo} alt="" width={60} height={60} className="h-15 w-15 object-contain" priority />
+            </div>
           </div>
 
-          <div className="mt-1 space-y-3">
+          {/* Body lifts over the band */}
+          <div className="relative -mt-6 rounded-t-[1.75rem] bg-background px-6 pb-6 pt-7 sm:px-7">
+            <DialogHeader className="items-center gap-2 pr-0 text-center sm:pr-0">
+              <DialogTitle className="text-balance text-2xl font-black leading-tight tracking-tight">
+                {dialogState.title}
+              </DialogTitle>
+              <DialogDescription className="text-balance text-sm leading-relaxed">
+                {dialogState.description}
+              </DialogDescription>
+            </DialogHeader>
+
+            <ul className="mt-5 space-y-2.5">
+              {SIGN_IN_PERKS.map(({ icon: Icon, text }) => (
+                <li key={text} className="flex items-center gap-3 text-sm font-medium">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-300">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {text}
+                </li>
+              ))}
+            </ul>
+
             <Button
               type="button"
               variant="outline"
-              className="h-12 w-full gap-3 rounded-xl bg-background font-semibold shadow-sm"
+              className="mt-6 h-12 w-full gap-3 rounded-2xl border-2 bg-background text-base font-bold shadow-sm transition-[transform,box-shadow,border-color] hover:-translate-y-0.5 hover:border-orange-300 hover:bg-background hover:shadow-md active:translate-y-0"
               onClick={handleGoogleSignIn}
               disabled={signingIn}
             >
-              {signingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : <GoogleIcon />}
-              {signingIn ? "Signing in…" : "Continue with Google"}
+              {signingIn ? <Loader2 className="h-5 w-5 animate-spin text-orange-500" /> : <GoogleIcon />}
+              {signingIn ? "Finish in the Google window…" : "Continue with Google"}
             </Button>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button asChild type="button" variant="ghost" className="rounded-xl">
-                <Link href="/" onClick={closeDialog}>Back to Home</Link>
-              </Button>
-              <Button asChild type="button" variant="ghost" className="rounded-xl">
-                <Link href="/blog" onClick={closeDialog}>Browse Blogs</Link>
-              </Button>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+              <RotateCcw className="h-3.5 w-3.5 shrink-0" />
+              You&apos;ll come straight back to this page.
+            </p>
+
+            <div className="mt-5 flex items-center justify-center gap-3 border-t pt-4 text-sm font-semibold">
+              <Link href="/blog" onClick={closeDialog} className="rounded-lg px-2 py-1 text-muted-foreground transition-colors hover:text-orange-600">
+                Browse blogs
+              </Link>
+              <span aria-hidden className="h-1 w-1 rounded-full bg-border" />
+              <Link href="/" onClick={closeDialog} className="rounded-lg px-2 py-1 text-muted-foreground transition-colors hover:text-orange-600">
+                Back to home
+              </Link>
             </div>
           </div>
         </DialogContent>

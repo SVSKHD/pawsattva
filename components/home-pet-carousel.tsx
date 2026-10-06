@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import * as React from "react";
+import { ShimmerImage } from "@/components/shimmer-image";
 import { Cat, CheckCircle2, Dog, Heart, PawPrint } from "lucide-react";
 import {
   type CarouselApi,
@@ -83,7 +84,7 @@ export function HomePetCarousel() {
 
   return (
     <div
-      className="relative animate-in fade-in zoom-in-95 duration-1000"
+      className="relative min-w-0 animate-in fade-in zoom-in-95 duration-1000"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -116,7 +117,7 @@ export function HomePetCarousel() {
             {petSlides.map((pet, index) => (
               <CarouselItem key={pet.label} className="pl-0">
                 <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[1.6rem] sm:aspect-square sm:rounded-[2rem] lg:h-[560px] lg:aspect-auto">
-                  <Image
+                  <ShimmerImage
                     src={pet.src}
                     alt={pet.alt}
                     fill
