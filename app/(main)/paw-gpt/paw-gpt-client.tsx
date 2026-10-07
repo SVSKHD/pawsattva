@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, RotateCcw, Square } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, SquarePen, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import { getUserPetFeeds, getUserProfile, type UserProfile } from "@/firebase/firestore"
@@ -24,13 +24,16 @@ import { getPetLoggerEntries, getPetWeightEntries, type PetLoggerEntry, type Pet
 import { PAW_GPT_LIMITS, type PawGptMessage } from "@/lib/paw-gpt"
 
 import { toDateKey } from "../logger/components/shared"
-import { ChatMessage, type ChatItem } from "./components/chat-message"
+import { ChatMessage, HistoryTicker, type ChatItem } from "./components/chat-message"
 import { phaseCopy, useDayPhase, type DayPhase } from "@/components/pet-scene/day-phase"
 import { PetFriendsArt, SkyArt } from "@/components/pet-scene/scene-art"
-import { buildPetContext, isCatPet, mergePets, petSubtitle, reportPrompts, type GptPet } from "./components/pet-data"
-import { ProfileDock } from "./components/profile-dock"
+import { buildPetContext, isCatPet, mergePets, petSubtitle, reportPrompts, weightStatusOf, type GptPet } from "./components/pet-data"
+import { ProfileDock, type HistoryEntry } from "./components/profile-dock"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
+
+const THREADS_KEY = "paw-gpt-threads"
+const MAX_SAVED_PER_PET = 40
 
 const petIcon = (pet: GptPet | null) => (isCatPet(pet) ? Cat : pet?.profile || pet?.report ? Dog : PawPrint)
 
@@ -54,6 +57,34 @@ export function PawGptClient() {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [threadsOwner, setThreadsOwner] = useState<string | null>(null)
+
+  // Restore this account's earlier chats from the browser
+  useEffect(() => {
+    if (!user) return
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(`${THREADS_KEY}:${user.uid}`) ?? "null") as Record<string, ChatItem[]> | null
+      setThreads(saved && typeof saved === "object" ? saved : {})
+    } catch {
+      setThreads({})
+    }
+    setThreadsOwner(user.uid)
+  }, [user])
+
+  // Save finished turns only, so a reload never shows a half-written answer
+  useEffect(() => {
+    if (!user || threadsOwner !== user.uid || streaming) return
+    const finished = Object.fromEntries(
+      Object.entries(threads)
+        .map(([name, items]) => [name, items.filter((item) => !item.pending).slice(-MAX_SAVED_PER_PET)] as const)
+        .filter(([, items]) => items.length > 0)
+    )
+    try {
+      window.localStorage.setItem(`${THREADS_KEY}:${user.uid}`, JSON.stringify(finished))
+    } catch {
+      // storage unavailable; history just lasts for this visit
+    }
+  }, [streaming, threads, threadsOwner, user])
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?returnTo=/paw-gpt")
@@ -156,7 +187,7 @@ export function PawGptClient() {
       ),
     }))
 
-  const send = async (text: string) => {
+  const send = async (text: string, base?: ChatItem[]) => {
     const question = text.trim()
     if (!user || streaming || !question) return
     if (!pet) {
@@ -170,13 +201,13 @@ export function PawGptClient() {
     }
 
     const petName = pet.name
-    const userItem: ChatItem = { id: newId(), role: "user", content: question }
+    const userItem: ChatItem = { id: newId(), role: "user", content: question, createdAt: Date.now() }
     const answerId = newId()
-    const previous = threads[petName] ?? []
+    const previous = base ?? threads[petName] ?? []
 
     setThreads((current) => ({
       ...current,
-      [petName]: [...previous, userItem, { id: answerId, role: "assistant", content: "", pending: true }],
+      [petName]: [...previous, userItem, { id: answerId, role: "assistant", content: "", pending: true, createdAt: Date.now() }],
     }))
     setInput("")
     setStreaming(true)
@@ -260,6 +291,15 @@ export function PawGptClient() {
     }
   }
 
+  // Ask the failed question again in place of the failed turn
+  const retry = (answerId: string) => {
+    const thread = threads[selectedPet] ?? []
+    const index = thread.findIndex((item) => item.id === answerId)
+    const question = thread[index - 1]
+    if (index < 1 || question?.role !== "user") return
+    void send(question.content, thread.slice(0, index - 1))
+  }
+
   const resetThread = () => {
     if (streaming) abortRef.current?.abort()
     setThreads((current) => ({ ...current, [selectedPet]: [] }))
@@ -271,6 +311,46 @@ export function PawGptClient() {
 
   const firstName = (profile?.displayName || user.displayName || "").split(" ")[0]
   const PetIcon = petIcon(pet)
+
+  // What drifts by in the moving banner while an answer is on its way:
+  // earlier questions in this chat, then the record Paw GPT is reading.
+  const ticker = (() => {
+    if (!pet) return []
+    const asked = messages
+      .filter((item) => item.role === "user")
+      .slice(0, -1)
+      .reverse()
+      .slice(0, 6)
+      .map((item) => `You asked: ${item.content}`)
+    const meals = entries.filter((entry) => entry.petName === pet.name).length
+    const weighIns = weightsByPet[pet.name]?.length ?? 0
+    const status = weightStatusOf(pet)
+    return [
+      ...asked,
+      petSubtitle(pet),
+      `${meals} meal${meals === 1 ? "" : "s"} logged in ${PAW_GPT_LIMITS.mealLogDays} days`,
+      weighIns ? `${weighIns} weigh-in${weighIns === 1 ? "" : "s"} on record` : "No weigh-ins yet",
+      status ? `Weight status: ${status}` : "",
+    ].filter(Boolean)
+  })()
+
+  // Every question asked, newest first, across all pets
+  const history: HistoryEntry[] = Object.entries(threads)
+    .flatMap(([petName, items]) =>
+      items
+        .filter((item) => item.role === "user")
+        .map((item) => ({ id: item.id, petName, question: item.content, askedAt: item.createdAt }))
+    )
+    .sort((a, b) => (b.askedAt ?? 0) - (a.askedAt ?? 0))
+    .slice(0, 12)
+
+  // Before the first words arrive the thinking card carries the banner; after that, the header does
+  const writing = streaming && Boolean(messages.at(-1)?.content)
+
+  const openHistory = (entry: HistoryEntry) => {
+    if (entry.petName !== selectedPet) selectPet(entry.petName)
+    window.setTimeout(() => document.getElementById(`msg-${entry.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80)
+  }
 
   return (
     <div className="relative flex h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] flex-col md:h-[100dvh]">
@@ -288,6 +368,9 @@ export function PawGptClient() {
         mealsLogged={entries.length}
         selectedPet={selectedPet}
         onSelectPet={selectPet}
+        history={history}
+        streaming={streaming}
+        onOpenHistory={openHistory}
       />
 
       {/* Greeting or conversation */}
@@ -304,24 +387,54 @@ export function PawGptClient() {
           />
         ) : (
           <div className="mx-auto max-w-3xl pb-6">
-            <div className="sticky top-0 z-10 -mx-2 mb-4 flex items-center justify-between gap-2 bg-gradient-to-b from-background via-background/90 to-transparent px-2 pb-3 pt-1">
-              <p className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <PetIcon className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-                <span className="truncate">
-                  Chatting about <strong className="text-foreground">{pet?.name}</strong>
-                </span>
-              </p>
-              <button
-                type="button"
-                onClick={resetThread}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-muted-foreground transition hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            {/* Live header: a glass capsule that grows into a moving banner while Paw GPT works */}
+            <div className="sticky top-0 z-10 mb-6 flex justify-center pt-1">
+              <div
+                className={`paw-glass w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  streaming ? "max-w-xl rounded-[1.6rem]" : "max-w-md rounded-full"
+                }`}
               >
-                <RotateCcw className="h-3.5 w-3.5" /> New chat
-              </button>
+                <div className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-1.5">
+                  <span
+                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] ${
+                      streaming ? "paw-gpt-anim-breathe" : ""
+                    }`}
+                  >
+                    <PetIcon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1 leading-tight">
+                    <span className="block truncate text-sm font-semibold tracking-tight">{pet?.name}</span>
+                    <span className={`block truncate text-[11px] ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
+                      {streaming ? "Paw GPT is answering…" : petSubtitle(pet ?? { name: "" }) || "Paw GPT"}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={resetThread}
+                    aria-label="New chat"
+                    title="New chat"
+                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-xs font-semibold text-foreground/80 transition hover:bg-black/[0.08] active:scale-95 dark:bg-white/10 dark:hover:bg-white/15"
+                  >
+                    <SquarePen className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">New chat</span>
+                  </button>
+                </div>
+                <div className={`grid transition-[grid-template-rows,opacity] duration-500 ${writing && ticker.length ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+                  <div className="min-h-0 overflow-hidden">
+                    <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-5">
               {messages.map((item) => (
-                <ChatMessage key={item.id} item={item} />
+                <ChatMessage
+                  key={item.id}
+                  item={item}
+                  petName={pet?.name}
+                  ticker={ticker}
+                  onRetry={item.error && !streaming ? () => retry(item.id) : undefined}
+                />
               ))}
             </div>
           </div>
@@ -330,7 +443,7 @@ export function PawGptClient() {
 
       {/* Composer */}
       <form onSubmit={handleSubmit} className="relative px-3 pb-3 pt-2 sm:px-6 md:pb-5">
-        <div className="mx-auto max-w-3xl rounded-[1.75rem] border border-black/[0.06] bg-background/90 p-2 shadow-[0_10px_36px_rgba(24,24,27,0.12)] backdrop-blur-xl transition focus-within:border-orange-300 focus-within:ring-4 focus-within:ring-orange-500/10 dark:border-white/10">
+        <div className="paw-glass mx-auto max-w-3xl rounded-[1.75rem] p-2 transition focus-within:ring-4 focus-within:ring-orange-500/15">
           <textarea
             ref={inputRef}
             rows={1}
@@ -340,7 +453,7 @@ export function PawGptClient() {
             maxLength={PAW_GPT_LIMITS.maxMessageChars}
             placeholder={pet ? `Ask anything about ${pet.name}…` : "Select your pet, then ask a question…"}
             aria-label="Ask Paw GPT"
-            className="block max-h-40 w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted-foreground"
+            className="block max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground"
           />
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
             <DropdownMenu open={pickerOpen} onOpenChange={setPickerOpen}>

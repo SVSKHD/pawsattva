@@ -4,7 +4,8 @@ import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, ty
 import Image from "next/image"
 import Link from "next/link"
 import type { User as FirebaseUser } from "firebase/auth"
-import { CalendarDays, Cat, Check, ChevronDown, Dog, GripVertical, Mail, PawPrint, Phone, Plus, User } from "lucide-react"
+import { formatDistanceToNowStrict } from "date-fns"
+import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, MessageCircle, PawPrint, Phone, Plus, User } from "lucide-react"
 
 import type { UserProfile } from "@/firebase/firestore"
 import { imageUrlProblem } from "@/lib/image-hosts"
@@ -32,6 +33,13 @@ function clampToViewport(next: Position, width = 300, handleHeight = 64): Positi
   }
 }
 
+export interface HistoryEntry {
+  id: string
+  petName: string
+  question: string
+  askedAt?: number
+}
+
 interface ProfileDockProps {
   user: FirebaseUser
   profile: UserProfile | null
@@ -40,10 +48,24 @@ interface ProfileDockProps {
   mealsLogged: number
   selectedPet: string
   onSelectPet: (name: string) => void
+  history: HistoryEntry[]
+  streaming: boolean
+  onOpenHistory: (entry: HistoryEntry) => void
 }
 
 /** The owner's profile and pets as an accordion that can be dragged anywhere on screen. */
-export function ProfileDock({ user, profile, pets, loading, mealsLogged, selectedPet, onSelectPet }: ProfileDockProps) {
+export function ProfileDock({
+  user,
+  profile,
+  pets,
+  loading,
+  mealsLogged,
+  selectedPet,
+  onSelectPet,
+  history,
+  streaming,
+  onOpenHistory,
+}: ProfileDockProps) {
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLButtonElement>(null)
@@ -148,7 +170,7 @@ export function ProfileDock({ user, profile, pets, loading, mealsLogged, selecte
   return (
     <div
       ref={rootRef}
-      className="fixed z-[60] w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/85 shadow-[0_12px_40px_rgba(24,24,27,0.16)] backdrop-blur-xl transition-opacity dark:border-white/10 dark:bg-zinc-900/85"
+      className="paw-glass fixed z-[60] w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem]"
       style={{ left: position.x, top: position.y }}
     >
       {/* Accordion header doubles as the drag handle */}
@@ -176,9 +198,19 @@ export function ProfileDock({ user, profile, pets, loading, mealsLogged, selecte
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-bold">{name}</span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {selectedPet ? `Asking about ${selectedPet}` : loading ? "Loading your pets…" : "Tap to choose a pet"}
-          </span>
+          {streaming ? (
+            <span className="flex items-center gap-1.5 text-xs">
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-orange-500" />
+              </span>
+              <span className="paw-gpt-anim-shimmer truncate font-medium text-foreground/60">Answering about {selectedPet}…</span>
+            </span>
+          ) : (
+            <span className="block truncate text-xs text-muted-foreground">
+              {selectedPet ? `Asking about ${selectedPet}` : loading ? "Loading your pets…" : "Tap to choose a pet"}
+            </span>
+          )}
         </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} />
       </button>
@@ -268,6 +300,35 @@ export function ProfileDock({ user, profile, pets, loading, mealsLogged, selecte
                   )
                 })}
               </div>
+            )}
+
+            {history.length > 0 && (
+              <>
+                <p className="mb-1.5 mt-4 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Recent questions</p>
+                <ul className="space-y-0.5">
+                  {history.map((entry) => (
+                    <li key={entry.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenHistory(entry)}
+                        className="group flex w-full items-center gap-2.5 rounded-2xl px-2 py-1.5 text-left transition hover:bg-black/5 active:scale-[0.98] dark:hover:bg-white/5"
+                      >
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-300">
+                          <MessageCircle className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xs font-medium text-foreground">{entry.question}</span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {entry.petName}
+                            {entry.askedAt ? ` · ${formatDistanceToNowStrict(entry.askedAt, { addSuffix: true })}` : ""}
+                          </span>
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-muted-foreground">

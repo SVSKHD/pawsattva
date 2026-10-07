@@ -578,9 +578,74 @@ a {
 .paw-gpt-anim-zzz { transform-box: fill-box; animation: paw-gpt-zzz 2.8s ease-out infinite; }
 .paw-gpt-anim-rise { animation: paw-gpt-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* Paw GPT liquid glass: translucent material with a lit top edge, like iOS 26 surfaces. */
+.paw-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.5));
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 -1px 0 rgba(24, 24, 27, 0.04) inset,
+    0 10px 30px -10px rgba(24, 24, 27, 0.18),
+    0 2px 6px -2px rgba(24, 24, 27, 0.06);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+.dark .paw-glass {
+  background: linear-gradient(180deg, rgba(39, 39, 42, 0.72), rgba(24, 24, 27, 0.55));
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 10px 30px -10px rgba(0, 0, 0, 0.6);
+}
+
+/* Moving banner: the track holds its chips twice and slides by half its width. */
+@keyframes paw-gpt-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+.paw-gpt-anim-marquee {
+  display: flex;
+  width: max-content;
+  animation: paw-gpt-marquee var(--marquee-duration, 24s) linear infinite;
+  will-change: transform;
+}
+.paw-gpt-marquee-mask {
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+/* Light sweeping across "Thinking…" text */
+@keyframes paw-gpt-shimmer {
+  from { background-position: 150% 0; }
+  to { background-position: -50% 0; }
+}
+.paw-gpt-anim-shimmer {
+  background-image: linear-gradient(90deg, currentColor 35%, rgba(251, 146, 60, 1) 50%, currentColor 65%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: paw-gpt-shimmer 2.2s linear infinite;
+}
+
+@keyframes paw-gpt-breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.35); }
+  50% { transform: scale(1.06); box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+}
+.paw-gpt-anim-breathe { animation: paw-gpt-breathe 1.8s ease-in-out infinite; }
+
+@keyframes paw-gpt-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.paw-gpt-anim-pop { animation: paw-gpt-pop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 @media (prefers-reduced-motion: reduce) {
   [class*="paw-gpt-anim-"] {
     animation: none !important;
+  }
+  .paw-gpt-anim-shimmer {
+    -webkit-text-fill-color: currentColor;
   }
 }
 
