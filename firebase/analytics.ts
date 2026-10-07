@@ -23,6 +23,7 @@ export type AnalyticsEvent =
   | "search"
   | "meal_logged"
   | "weight_logged"
+  | "paw_gpt_question"
   | "place_maps_click";
 
 type EventParams = Record<string, string | number | boolean | undefined>;

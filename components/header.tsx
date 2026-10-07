@@ -15,6 +15,7 @@ const navLinks = [
   { href: "/blog", label: "Blog" },
   { href: "/walks", label: "Walks" },
   { href: "/pet-feed", label: "Pet Feed" },
+  { href: "/paw-gpt", label: "Paw GPT", secondary: true },
   { href: "/logger", label: "Logger", secondary: true },
   { href: "/consultation", label: "Consultation", secondary: true },
 ];
@@ -23,7 +24,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
-import { LogOut, LayoutDashboard, User, Menu, Home, BookOpen, PawPrint, ChevronDown, CalendarDays } from "lucide-react";
+import { LogOut, LayoutDashboard, User, Menu, Home, BookOpen, PawPrint, ChevronDown, CalendarDays, Sparkles } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -220,6 +221,9 @@ export function Header() {
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
                       <Link href="/logger"><CalendarDays /> Food logger</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
+                      <Link href="/paw-gpt"><Sparkles /> Paw GPT</Link>
                     </DropdownMenuItem>
                     {isAdmin && (
                       <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">

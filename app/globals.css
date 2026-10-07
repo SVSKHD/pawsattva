@@ -528,3 +528,82 @@ a {
     animation: none;
   }
 }
+
+
+/* Paw GPT greeting scene: wagging tails, blinking eyes, sun rays, twinkling stars. */
+@keyframes paw-gpt-wag {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(16deg); }
+}
+@keyframes paw-gpt-sway {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-12deg); }
+}
+@keyframes paw-gpt-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.1); }
+}
+@keyframes paw-gpt-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes paw-gpt-twinkle {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@keyframes paw-gpt-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes paw-gpt-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+@keyframes paw-gpt-zzz {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.8); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(10px, -26px) scale(1.15); }
+}
+@keyframes paw-gpt-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.paw-gpt-anim-wag { transform-box: fill-box; animation: paw-gpt-wag 0.9s ease-in-out infinite; }
+.paw-gpt-anim-sway { transform-box: fill-box; animation: paw-gpt-sway 3.2s ease-in-out infinite; }
+.paw-gpt-anim-blink { transform-box: fill-box; transform-origin: center; animation: paw-gpt-blink 4.5s ease-in-out infinite; }
+.paw-gpt-anim-spin { transform-box: fill-box; transform-origin: center; animation: paw-gpt-spin 40s linear infinite; }
+.paw-gpt-anim-twinkle { animation: paw-gpt-twinkle 2.4s ease-in-out infinite; }
+.paw-gpt-anim-float { animation: paw-gpt-float 5s ease-in-out infinite; }
+.paw-gpt-anim-drift { animation: paw-gpt-drift 9s ease-in-out infinite; }
+.paw-gpt-anim-zzz { transform-box: fill-box; animation: paw-gpt-zzz 2.8s ease-out infinite; }
+.paw-gpt-anim-rise { animation: paw-gpt-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="paw-gpt-anim-"] {
+    animation: none !important;
+  }
+}
+
+
+/* Login pet parade: each track holds its pets twice and slides by half its width. */
+@keyframes pet-parade {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+.pet-parade-track {
+  display: flex;
+  width: max-content;
+  animation: pet-parade var(--parade-duration, 70s) linear infinite;
+  will-change: transform;
+}
+.pet-parade-track[data-reverse] {
+  animation-direction: reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-parade-track {
+    animation: none;
+  }
+}
+

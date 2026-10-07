@@ -831,6 +831,21 @@ export const getPetFeeds = async () => {
   } as PetFeed));
 };
 
+// A signed-in user's own wellness reports (rules only allow reading docs with their userId).
+export const getUserPetFeeds = async (userId: string): Promise<PetFeed[]> => {
+  const snapshot = await getDocs(query(collection(db, "petFeeds"), where("userId", "==", userId)));
+  return snapshot.docs
+    .map((feedDoc) => {
+      const data = feedDoc.data();
+      return {
+        id: feedDoc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : data.createdAt,
+      } as PetFeed;
+    })
+    .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
+};
+
 export const savePetFeed = async (data: PetFeed) => {
   const cleanData = withoutUndefined(data);
   // Save to petFeeds collection
