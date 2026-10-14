@@ -29,7 +29,7 @@ const NAMED_ENTITIES: Record<string, string> = {
   ndash: "–", mdash: "—", hellip: "…",
 }
 
-function toPlainText(html: string) {
+export function toPlainText(html: string) {
   return html
     .replace(/<[^>]*>/g, " ")
     .replace(/&(?:#x([\da-f]+)|#(\d+)|(\w+));/gi, (match, hex, dec, name) => {
@@ -41,7 +41,7 @@ function toPlainText(html: string) {
     .trim()
 }
 
-const clip = (text: string, max: number) =>
+export const clip = (text: string, max: number) =>
   text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/, "")}…`
 
 export function toBlogSummary(blog: Blog): BlogSummary {

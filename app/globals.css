@@ -598,6 +598,43 @@ a {
     0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
+/* Liquid glass: paw-glass with deeper blur, a bright rim and a diagonal sheen, for floating bars.
+   At least 50% opaque everywhere, so content scrolling underneath stays a soft blur, not readable text. */
+.paw-liquid-glass {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.68), rgba(255, 250, 245, 0.55));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 18px rgba(255, 255, 255, 0.25),
+    0 14px 40px -14px rgba(24, 24, 27, 0.28),
+    0 2px 8px -2px rgba(24, 24, 27, 0.08);
+  backdrop-filter: blur(32px) saturate(190%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(190%) brightness(1.05);
+}
+.paw-liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.28) 100%);
+}
+.dark .paw-liquid-glass {
+  background: linear-gradient(180deg, rgba(39, 39, 42, 0.7), rgba(24, 24, 27, 0.58));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 18px rgba(255, 255, 255, 0.03),
+    0 14px 40px -14px rgba(0, 0, 0, 0.7);
+}
+.dark .paw-liquid-glass::before {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.05) 100%);
+}
+
 /* Moving banner: the track holds its chips twice and slides by half its width. */
 @keyframes paw-gpt-marquee {
   from { transform: translate3d(0, 0, 0); }
@@ -639,6 +676,47 @@ a {
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 .paw-gpt-anim-pop { animation: paw-gpt-pop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Paw GPT thinking card: a dog and a cat galloping in place (components/pet-scene/running-pets.tsx).
+   Legs swing from the hip, bodies bob, ground and scenery scroll past. One stride = --paw-stride. */
+@keyframes paw-gpt-leg {
+  0%, 100% { transform: rotate(38deg); }
+  50% { transform: rotate(-38deg); }
+}
+@keyframes paw-gpt-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3.5px) rotate(-2deg); }
+  50% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-1.5px) rotate(1.5deg); }
+}
+@keyframes paw-gpt-tail {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(14deg); }
+}
+@keyframes paw-gpt-ear {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(16deg); }
+}
+@keyframes paw-gpt-ground {
+  from { transform: translateX(0); }
+  to { transform: translateX(-28px); }
+}
+@keyframes paw-gpt-dust {
+  0% { transform: translate(0, 0) scale(0.4); opacity: 0.55; }
+  100% { transform: translate(-16px, -5px) scale(1.5); opacity: 0; }
+}
+.paw-gpt-anim-leg { transform-box: fill-box; transform-origin: 50% 0; animation: paw-gpt-leg var(--paw-stride, 0.42s) ease-in-out infinite; }
+.paw-gpt-anim-bob { transform-box: fill-box; transform-origin: 50% 100%; animation: paw-gpt-bob var(--paw-stride, 0.42s) ease-in-out infinite; }
+.paw-gpt-anim-tail { transform-box: fill-box; transform-origin: 100% 100%; animation: paw-gpt-tail calc(var(--paw-stride, 0.42s) * 2) ease-in-out infinite; }
+.paw-gpt-anim-ear { transform-box: fill-box; transform-origin: 50% 0; animation: paw-gpt-ear var(--paw-stride, 0.42s) ease-in-out infinite; }
+.paw-gpt-anim-ground { animation: paw-gpt-ground var(--paw-stride, 0.42s) linear infinite; }
+.paw-gpt-anim-dust { transform-box: fill-box; transform-origin: center; animation: paw-gpt-dust 0.6s ease-out infinite; }
+/* Thinking pill: three dots hopping in turn */
+@keyframes paw-gpt-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.paw-gpt-anim-dot { animation: paw-gpt-dot 1s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   [class*="paw-gpt-anim-"] {
