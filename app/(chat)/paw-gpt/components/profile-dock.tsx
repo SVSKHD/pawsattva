@@ -5,8 +5,9 @@ import Image from "next/image"
 import Link from "next/link"
 import type { User as FirebaseUser } from "firebase/auth"
 import { formatDistanceToNowStrict } from "date-fns"
-import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, MessageCircle, PawPrint, Phone, Plus, SquarePen, Trash2, User } from "lucide-react"
+import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, Menu, MessageCircle, PawPrint, Phone, Plus, SquarePen, Trash2, User } from "lucide-react"
 
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { UserProfile } from "@/firebase/firestore"
 import { imageUrlProblem } from "@/lib/image-hosts"
 import { UsageMeter, type PawGptQuota } from "./usage-meter"
@@ -298,15 +299,13 @@ export function ProfileDock({
 
   const name = profile?.displayName || user.displayName || user.email?.split("@")[0] || "Pet parent"
   const photo = profile?.photoURL || user.photoURL
-  const memberSince = user.metadata.creationTime
-    ? new Date(user.metadata.creationTime).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
-    : undefined
   const bodyMaxHeight = Math.max(180, viewportHeight - position.y - 96)
 
   return (
     <div
       ref={rootRef}
-      className="paw-glass fixed z-40 w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem]"
+      // Floating dock from tablet width up; phones use ProfileSidebar instead.
+      className="paw-glass fixed z-40 hidden w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem] md:block"
       style={{ left: position.x, top: position.y }}
     >
       {/* Accordion header doubles as the drag handle */}
@@ -361,6 +360,40 @@ export function ProfileDock({
       >
         <div className="min-h-0 overflow-hidden">
           <div className="overflow-y-auto border-t border-black/5 px-3 pb-3 pt-3 dark:border-white/10" style={{ maxHeight: bodyMaxHeight }}>
+            <DockBody
+              user={user}
+              profile={profile}
+              pets={pets}
+              loading={loading}
+              mealsLogged={mealsLogged}
+              selectedPet={selectedPet}
+              onSelectPet={onSelectPet}
+              chats={chats}
+              activeChatId={activeChatId}
+              onOpenChat={onOpenChat}
+              onNewChat={onNewChat}
+              onClearHistory={onClearHistory}
+              quota={quota}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type DockBodyProps = Omit<ProfileDockProps, "streaming">
+
+/** What the dock and the mobile sidebar both show: contact, pets, chats and today's usage. */
+function DockBody({
+  user, profile, pets, loading, mealsLogged, selectedPet, onSelectPet,
+  chats, activeChatId, onOpenChat, onNewChat, onClearHistory, quota,
+}: DockBodyProps) {
+  const memberSince = user.metadata.creationTime
+    ? new Date(user.metadata.creationTime).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    : undefined
+  return (
+    <>
             <ul className="space-y-1.5 px-1 text-xs text-muted-foreground">
               {user.email && (
                 <li className="flex items-center gap-2">
@@ -455,9 +488,68 @@ export function ProfileDock({
               </Link>
               .
             </p>
+    </>
+  )
+}
+
+/**
+ * Phones get the dock's contents as a left sidebar instead of a floating panel.
+ * Choosing a pet or a chat closes it, so the conversation is right there.
+ */
+export function ProfileSidebar(props: ProfileDockProps) {
+  const { user, profile, selectedPet, streaming, loading } = props
+  const [open, setOpen] = useState(false)
+  const name = profile?.displayName || user.displayName || user.email?.split("@")[0] || "Pet parent"
+  const photo = profile?.photoURL || user.photoURL
+  const close = <A extends unknown[]>(action: (...args: A) => void) => (...args: A) => {
+    action(...args)
+    setOpen(false)
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Open your pets, chats and usage"
+        className="paw-glass fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[45] flex h-11 max-w-[55vw] items-center gap-2 rounded-full py-1 pl-3 pr-3.5 text-sm font-semibold text-foreground/80 transition active:scale-95 md:hidden"
+      >
+        <Menu className="h-4 w-4 shrink-0" />
+        <span className="truncate">
+          {streaming ? (
+            <span className="paw-gpt-anim-shimmer">Answering…</span>
+          ) : (
+            selectedPet || (loading ? "Loading…" : "Your pets")
+          )}
+        </span>
+      </button>
+      <SheetContent side="left" className="w-[min(22rem,88vw)] gap-0 overflow-y-auto p-0">
+        <SheetHeader className="border-b border-black/5 p-4 dark:border-white/10">
+          <div className="flex items-center gap-3 pr-8">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-primary text-white">
+              {photo && !imageUrlProblem(photo) ? (
+                <Image src={photo} alt="" width={44} height={44} className="h-full w-full object-cover" />
+              ) : (
+                <User className="h-5 w-5" />
+              )}
+            </span>
+            <span className="min-w-0">
+              <SheetTitle className="truncate text-base font-bold">{name}</SheetTitle>
+              <SheetDescription className="truncate text-xs">
+                {selectedPet ? `Asking about ${selectedPet}` : "Choose a pet to start"}
+              </SheetDescription>
+            </span>
           </div>
+        </SheetHeader>
+        <div className="p-3">
+          <DockBody
+            {...props}
+            onSelectPet={close(props.onSelectPet)}
+            onOpenChat={close(props.onOpenChat)}
+            onNewChat={close(props.onNewChat)}
+          />
         </div>
-      </div>
-    </div>
+      </SheetContent>
+    </Sheet>
   )
 }

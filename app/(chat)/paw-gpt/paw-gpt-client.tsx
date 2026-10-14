@@ -61,7 +61,7 @@ import {
 } from "./components/pet-data"
 import { MealDialog, type MealDraft } from "@/app/(main)/logger/components/meal-dialog"
 import { mealLabels } from "@/app/(main)/logger/components/shared"
-import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
+import { ProfileDock, ProfileSidebar, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
 import { pickQuickReads, QuickViewDialog, useQuickReads, type QuickRead } from "./components/quick-reads"
@@ -526,6 +526,23 @@ export function PawGptClient() {
     }))
     .filter((chat) => chat.questions.length > 0)
 
+  const dockProps = {
+    user,
+    profile,
+    pets,
+    loading: loadingData,
+    mealsLogged: entries.length,
+    selectedPet: selectedPet === PLANNING_PET_NAME ? "Planning a pet" : selectedPet,
+    onSelectPet: selectPet,
+    chats: chatSummaries,
+    activeChatId: activeChat?.id ?? null,
+    streaming,
+    onOpenChat: openChat,
+    onNewChat: startNewChat,
+    onClearHistory: clearHistory,
+    quota,
+  }
+
   // Before the first words arrive the thinking card carries the banner; after that, the header does
   const writing = streaming && Boolean(messages.at(-1)?.content)
 
@@ -537,22 +554,9 @@ export function PawGptClient() {
         className={`pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b ${phaseCopy[phase].sky} to-transparent transition-colors duration-700`}
       />
 
-      <ProfileDock
-        user={user}
-        profile={profile}
-        pets={pets}
-        loading={loadingData}
-        mealsLogged={entries.length}
-        selectedPet={selectedPet}
-        onSelectPet={selectPet}
-        chats={chatSummaries}
-        activeChatId={activeChat?.id ?? null}
-        streaming={streaming}
-        onOpenChat={openChat}
-        onNewChat={startNewChat}
-        onClearHistory={clearHistory}
-        quota={quota}
-      />
+      {/* Floating dock from tablet width up; a left sidebar on phones. Same contents. */}
+      <ProfileDock {...dockProps} />
+      <ProfileSidebar {...dockProps} />
 
       {/* Greeting or conversation (no site header here, so less top padding) */}
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-20 sm:px-6 md:pt-24">

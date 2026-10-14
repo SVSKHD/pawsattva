@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm"
 import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils } from "lucide-react"
 import { toast } from "sonner"
 
-import { PET_PALETTES, PetSprite, type PetColors } from "@/components/pet-scene/scene-art"
+import { RunningPets } from "@/components/pet-scene/running-pets"
 import { QuickReads, type QuickRead } from "./quick-reads"
 
 export interface ChatItem {
@@ -204,7 +204,7 @@ export function ThinkingBanner({ petName, ticker, petKind = "dog" }: { petName?:
       <p key={step} className="paw-gpt-anim-pop px-4 pb-2 pt-0.5 text-xs text-muted-foreground">
         {STEPS[step]}
       </p>
-      <PetRun lead={petKind} />
+      <RunningPets lead={petKind} className="mx-4 mb-2 block h-auto w-[calc(100%-2rem)] rounded-2xl" />
       <div className="mx-4 mb-3 h-1 overflow-hidden rounded-full bg-black/[0.05] dark:bg-white/10">
         <div
           className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-[width] duration-700 ease-out"
@@ -212,39 +212,6 @@ export function ThinkingBanner({ petName, ticker, petKind = "dog" }: { petName?:
         />
       </div>
       {ticker.length > 0 && <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />}
-    </div>
-  )
-}
-
-// Negative delays start each runner mid-lap. Larger = further ahead (they run leftwards):
-// the ball leads, then the selected pet's kind.
-const RUNNERS: { kind: "same" | "other"; colors: PetColors; size: string; delay: number }[] = [
-  { kind: "same", colors: PET_PALETTES.golden, size: "h-11", delay: -4.6 },
-  { kind: "other", colors: PET_PALETTES.ginger, size: "h-9", delay: -3.1 },
-  { kind: "same", colors: PET_PALETTES.charcoal, size: "h-10", delay: -1.6 },
-  { kind: "other", colors: PET_PALETTES.cream, size: "h-8", delay: -0.1 },
-]
-
-/**
- * Dogs and cats galloping across the thinking card after a ball, led by the selected pet's
- * kind. Pure CSS (paw-gpt-anim-run / -hop), so it stops for users who prefer reduced motion.
- */
-function PetRun({ lead }: { lead: "dog" | "cat" }) {
-  const other = lead === "dog" ? "cat" : "dog"
-  return (
-    <div aria-hidden className="relative mx-4 mb-2 h-14 overflow-hidden rounded-2xl bg-gradient-to-b from-orange-500/[0.04] to-orange-500/[0.09]">
-      {/* Grass line */}
-      <div className="absolute inset-x-0 bottom-2 h-px bg-orange-900/10 dark:bg-white/10" />
-      <span className="paw-gpt-anim-run absolute bottom-2.5" style={{ animationDelay: "-5.5s" }}>
-        <span className="paw-gpt-anim-hop block h-3 w-3 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 shadow-sm" style={{ animationDuration: "0.5s" }} />
-      </span>
-      {RUNNERS.map((runner, index) => (
-        <span key={index} className="paw-gpt-anim-run absolute bottom-1.5" style={{ animationDelay: `${runner.delay}s` }}>
-          <span className="paw-gpt-anim-hop block" style={{ animationDelay: `${index * 0.09}s` }}>
-            <PetSprite kind={runner.kind === "same" ? lead : other} colors={runner.colors} className={`${runner.size} w-auto`} />
-          </span>
-        </span>
-      ))}
     </div>
   )
 }
