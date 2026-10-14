@@ -17,6 +17,9 @@ export const maxDuration = 120
 const ANTHROPIC_MODEL = "claude-opus-5-5"
 // A moving alias for Google's current Flash model; pin a specific one with GEMINI_MODEL.
 const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
+// Lighter model tried when the main one is overloaded; set GEMINI_FALLBACK_MODEL=none to disable.
+const GEMINI_FALLBACK_MODEL =
+  process.env.GEMINI_FALLBACK_MODEL?.trim() === "none" ? "" : process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-flash-lite-latest"
 
 type ServerProvider = "gemini" | "anthropic"
 
@@ -279,20 +282,19 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder()
 
   const caller = auth
-  const answer = provider === "gemini" ? answerWithGemini : answerWithAnthropic
   // Tokens this answer used (prompt incl. pet record and cached prefix, plus the answer).
   const usage: TokenUsage = { input: 0, output: 0 }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const text of answer(request, req.signal, usage)) {
+        for await (const text of answerWithFallback(answerPlan(provider), request, req.signal, usage)) {
           controller.enqueue(encoder.encode(text))
         }
       } catch (error) {
         if (req.signal.aborted) return
         console.error(`Paw GPT stream failed (${provider}):`, error)
-        const message = isRateLimit(error)
+        const message = isTransient(error)
           ? "Paw GPT is busy right now. Please try again in a minute."
           : "Something went wrong while answering. Please try again."
         controller.enqueue(encoder.encode(`\n\n${message}`))
@@ -328,14 +330,79 @@ const CUT_SHORT_NOTE = "\n\n_(The answer was cut short — ask me to continue.)_
 
 const petRecordPrompt = (request: PawGptRequest) => `Selected pet record:\n${JSON.stringify(request.context)}`
 
-const isRateLimit = (error: unknown) =>
-  error instanceof Anthropic.RateLimitError || (error instanceof GeminiApiError && error.status === 429)
+// Overloaded / rate-limited / temporarily failing (529 is Anthropic's "overloaded").
+const TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504, 529])
+
+const isTransient = (error: unknown) =>
+  (error instanceof GeminiApiError && TRANSIENT_STATUS.has(error.status)) ||
+  (error instanceof Anthropic.APIError && typeof error.status === "number" && TRANSIENT_STATUS.has(error.status))
+
+const errorStatus = (error: unknown) =>
+  error instanceof GeminiApiError || error instanceof Anthropic.APIError ? error.status : undefined
+
+type Attempt = { provider: ServerProvider; model: string; delayMs: number }
+
+/**
+ * What to try, in order, when a model is busy: the main model twice, then a lighter model
+ * from the same provider, then the other provider if its key is set.
+ */
+function answerPlan(primary: ServerProvider): Attempt[] {
+  const geminiAttempts: Attempt[] = [
+    { provider: "gemini", model: GEMINI_MODEL, delayMs: 0 },
+    { provider: "gemini", model: GEMINI_MODEL, delayMs: 1200 },
+    ...(GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL
+      ? [{ provider: "gemini" as const, model: GEMINI_FALLBACK_MODEL, delayMs: 300 }]
+      : []),
+  ]
+  const anthropicAttempts: Attempt[] = [
+    { provider: "anthropic", model: ANTHROPIC_MODEL, delayMs: 0 },
+    { provider: "anthropic", model: ANTHROPIC_MODEL, delayMs: 1200 },
+  ]
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim())
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+  return primary === "gemini"
+    ? [...geminiAttempts, ...(hasAnthropic ? [{ ...anthropicAttempts[0], delayMs: 300 }] : [])]
+    : [...anthropicAttempts, ...(hasGemini ? [{ ...geminiAttempts[0], delayMs: 300 }] : [])]
+}
+
+const pause = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (!ms || signal.aborted) return resolve()
+    const timer = setTimeout(resolve, ms)
+    signal.addEventListener("abort", () => { clearTimeout(timer); resolve() }, { once: true })
+  })
+
+/**
+ * Runs the plan until one attempt answers. Only switches while nothing has been streamed yet,
+ * so the pet parent never gets half an answer from one model and the rest from another.
+ */
+async function* answerWithFallback(plan: Attempt[], request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+  let lastError: unknown
+  for (const attempt of plan) {
+    await pause(attempt.delayMs, signal)
+    if (signal.aborted) return
+    let streamed = false
+    try {
+      const run = attempt.provider === "gemini" ? answerWithGemini : answerWithAnthropic
+      for await (const text of run(request, signal, usage, attempt.model)) {
+        streamed = true
+        yield text
+      }
+      return
+    } catch (error) {
+      if (streamed || signal.aborted || !isTransient(error)) throw error
+      lastError = error
+      console.warn(`Paw GPT: ${attempt.provider}/${attempt.model} unavailable (${errorStatus(error)}), trying the next option`)
+    }
+  }
+  throw lastError
+}
 
 /** Claude via the Anthropic API (ANTHROPIC_API_KEY). */
-async function* answerWithAnthropic(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+async function* answerWithAnthropic(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage, model: string) {
   const response = new Anthropic().beta.messages.stream(
     {
-      model: ANTHROPIC_MODEL,
+      model,
       max_tokens: 16000,
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
@@ -372,10 +439,10 @@ async function* answerWithAnthropic(request: PawGptRequest, signal: AbortSignal,
 const GEMINI_BLOCKED = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RECITATION", "SPII", "IMAGE_SAFETY"])
 
 /** Gemini via the Gemini Developer API (GEMINI_API_KEY). */
-async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage, model: string) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
   const response = await ai.models.generateContentStream({
-    model: GEMINI_MODEL,
+    model,
     contents: request.messages.map(({ role, content }) => ({
       role: role === "assistant" ? "model" : "user",
       parts: [{ text: content }],
