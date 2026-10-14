@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 function authorized(request: NextRequest) {
   const secret = process.env.PAWSATTVA_DRAFT_API_KEY;
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "") ?? "";
+  const supplied = /^Bearer[ \t]+(\S+)$/i.exec(request.headers.get("authorization")?.trim() ?? "")?.[1] ?? "";
   if (!secret || !supplied) return false;
   const a = createHash("sha256").update(secret).digest();
   const b = createHash("sha256").update(supplied).digest();
@@ -63,7 +63,8 @@ export async function POST(request: NextRequest) {
       return true;
     });
     return NextResponse.json({ id: ref.id, status: "draft", created: result }, { status: result ? 201 : 200 });
-  } catch {
+  } catch (error) {
+    console.error("blog-drafts: failed to save draft", error);
     return NextResponse.json({ error: "Unable to save draft" }, { status: 500 });
   }
 }
