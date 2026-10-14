@@ -82,8 +82,20 @@ available right now" instead of making unprotected requests.
 ## Daily limits (both backends)
 
 Each pet parent gets **5 questions** and **100,000 tokens** per India calendar day. Admins and
-authors are exempt. Usage is stored in `users/{uid}/pawGptUsage/{YYYY-M-D}` as `count` and
-`tokens` and shown in the chat (dock → "Today's usage", and next to the send button).
+authors are **counted but never limited**, so the totals show real usage. Usage is stored in
+`users/{uid}/pawGptUsage/{YYYY-M-D}` as `count`, `tokens`, `inputTokens` and `outputTokens`.
+It's shown in the chat (dock → "Today's usage", and next to the send button) and across all
+users in **Admin › Analytics › Paw GPT usage**: today's totals, a 14-day input/output chart,
+average tokens per question, and today's top users.
+
+The admin view uses a collection-group query that needs an index on `pawGptUsage.updatedAt`.
+Deploy [firebase/firestore.indexes.json](../firebase/firestore.indexes.json)
+(`firebase deploy --only firestore:indexes`), or open the link Firestore prints in the
+browser console the first time the view loads.
+
+**Estimating cost:** multiply input and output tokens by Anthropic's current per-token prices
+for the model in `app/api/paw-gpt/route.ts`. Input includes the cached pet record, and cached
+reads are billed at a lower rate, so this gives an upper bound.
 
 - **Firestore rules enforce it.** A question can only start (`count + 1`) while
   `count < 5` and `tokens < 100000`. `tokens` can only go up, and users can't delete or

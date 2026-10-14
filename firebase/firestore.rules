@@ -77,20 +77,34 @@ service cloud.firestore {
       return string(t.year()) + '-' + string(t.month()) + '-' + string(t.day());
     }
 
-    // Paw GPT usage (users/{uid}/pawGptUsage): starting a question adds 1 while under the limits.
-    function startsQuestion() {
-      return request.resource.data.count == resource.data.count + 1 &&
-        request.resource.data.count <= 5 &&
-        resource.data.get('tokens', 0) < 100000 &&
-        request.resource.data.get('tokens', 0) == resource.data.get('tokens', 0);
+    // Paw GPT usage (users/{uid}/pawGptUsage) token fields.
+    function usageField(data, field) {
+      return data.get(field, 0);
     }
 
-    // Paw GPT usage: recording an answer's tokens only ever raises the total.
+    // Starting a question adds 1 to count. Pet parents are capped at 5 questions and
+    // 100000 tokens a day; admins and authors are counted but never capped.
+    function startsQuestion() {
+      return request.resource.data.count == resource.data.count + 1 &&
+        (
+          (request.resource.data.count <= 5 && usageField(resource.data, 'tokens') < 100000) ||
+          isAdmin()
+        ) &&
+        usageField(request.resource.data, 'tokens') == usageField(resource.data, 'tokens') &&
+        usageField(request.resource.data, 'inputTokens') == usageField(resource.data, 'inputTokens') &&
+        usageField(request.resource.data, 'outputTokens') == usageField(resource.data, 'outputTokens');
+    }
+
+    // Recording an answer's tokens: totals only go up, and tokens = input + output.
     function recordsTokens() {
+      let added = usageField(request.resource.data, 'tokens') - usageField(resource.data, 'tokens');
+      let addedIn = usageField(request.resource.data, 'inputTokens') - usageField(resource.data, 'inputTokens');
+      let addedOut = usageField(request.resource.data, 'outputTokens') - usageField(resource.data, 'outputTokens');
       return request.resource.data.count == resource.data.count &&
-        request.resource.data.get('tokens', 0) is int &&
-        request.resource.data.get('tokens', 0) > resource.data.get('tokens', 0) &&
-        request.resource.data.get('tokens', 0) - resource.data.get('tokens', 0) <= 500000;
+        usageField(request.resource.data, 'tokens') is int &&
+        added > 0 && added <= 500000 &&
+        addedIn >= 0 && addedOut >= 0 &&
+        added == addedIn + addedOut;
     }
 
     // Public engagement counters may only stay the same or go up by exactly 1.
@@ -162,10 +176,10 @@ service cloud.firestore {
       // ───────────────────────────────────────
       // Written with the owner's own token (by /api/paw-gpt, or by the browser for the
       // Firebase AI backend). Two kinds of write:
-      //   • starting a question: count + 1, allowed only while count < 5 and tokens < 100000
-      //   • recording an answer's tokens: tokens goes up (never down), count unchanged
-      // The owner can't reset, lower, back-date or delete it. Admins and authors are exempt
-      // in the app and never write it. Keep 5 / 100000 in sync with lib/paw-gpt.ts.
+      //   • starting a question: count + 1 (pet parents: only while count < 5 and tokens < 100000)
+      //   • recording an answer's tokens: tokens / inputTokens / outputTokens go up, count unchanged
+      // The owner can't reset, lower, back-date or delete it. Admins and authors are counted
+      // too (for usage totals) but never capped. Keep 5 / 100000 in sync with lib/paw-gpt.ts.
 
       match /pawGptUsage/{dayKey} {
 
@@ -173,19 +187,32 @@ service cloud.firestore {
 
         allow create: if isOwner(userId) && !isRestricted() &&
           dayKey == indiaDayKey() &&
-          request.resource.data.keys().hasOnly(['count', 'tokens', 'updatedAt']) &&
+          request.resource.data.keys().hasOnly(['count', 'tokens', 'inputTokens', 'outputTokens', 'updatedAt']) &&
           request.resource.data.count == 1 &&
-          request.resource.data.get('tokens', 0) == 0 &&
+          usageField(request.resource.data, 'tokens') == 0 &&
+          usageField(request.resource.data, 'inputTokens') == 0 &&
+          usageField(request.resource.data, 'outputTokens') == 0 &&
           request.resource.data.updatedAt == request.time;
 
         allow update: if isOwner(userId) && !isRestricted() &&
           dayKey == indiaDayKey() &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['count', 'tokens', 'updatedAt']) &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['count', 'tokens', 'inputTokens', 'outputTokens', 'updatedAt']) &&
           request.resource.data.updatedAt == request.time &&
           (startsQuestion() || recordsTokens());
 
         allow delete: if isFullAdmin();
       }
+    }
+
+
+    // ─────────────────────────────────────────
+    // PAW GPT USAGE ACROSS ALL USERS
+    // Admin › Analytics reads every users/*/pawGptUsage day with a collection-group query.
+    // ─────────────────────────────────────────
+
+    match /{path=**}/pawGptUsage/{dayKey} {
+      allow read: if isFullAdmin();
     }
 
 

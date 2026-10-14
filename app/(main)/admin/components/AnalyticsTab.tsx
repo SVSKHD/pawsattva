@@ -8,6 +8,7 @@ import {
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Blog, Subscription, UserProfile } from "@/firebase/firestore"
+import { PawGptUsageCard } from "./PawGptUsageCard"
 import {
   ResponsiveContainer,
   BarChart,
@@ -139,6 +140,8 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
           </Card>
         ))}
       </div>
+
+      <PawGptUsageCard users={users} />
 
       {/* Post engagement */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">

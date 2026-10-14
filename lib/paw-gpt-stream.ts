@@ -97,12 +97,19 @@ const transcript = (messages: PawGptMessage[]) =>
  * Anthropic route it can't stop someone who calls AI Logic directly; App Check and the
  * AI Logic per-user rate limit are the backstop there.
  */
-async function consumeDailyQuestion(user: User) {
+async function consumeDailyQuestion(user: User, exempt: boolean) {
   const [{ doc, getDoc, increment, serverTimestamp, setDoc }, { db }] = await Promise.all([
     import("firebase/firestore"),
     import("@/firebase/db"),
   ])
   const ref = doc(db, pawGptUsagePath(user.uid))
+  if (exempt) {
+    // Admins and authors are counted for the usage totals but never limited.
+    await setDoc(ref, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true }).catch((error) =>
+      console.error("Paw GPT: could not count an admin question:", error)
+    )
+    return
+  }
   const current = await getDoc(ref)
   if (Number(current.get("tokens") ?? 0) >= PAW_GPT_DAILY_TOKEN_LIMIT) throw tokenLimitError()
   if (Number(current.get("count") ?? 0) >= PAW_GPT_DAILY_LIMIT) throw dailyLimitError()
@@ -114,15 +121,22 @@ async function consumeDailyQuestion(user: User) {
   }
 }
 
-/** Adds an answer's tokens to today's total. Best effort: the answer is already shown. */
-async function recordTokens(user: User, tokens: number) {
-  if (!tokens || tokens <= 0) return
+/** Adds an answer's tokens to today's totals. Best effort: the answer is already shown. */
+async function recordTokens(user: User, usage: { totalTokenCount?: number; promptTokenCount?: number } | undefined) {
+  const total = Math.max(0, Math.round(usage?.totalTokenCount ?? 0))
+  if (!total) return
+  // Gemini's total also includes thinking tokens, which are billed as output.
+  const input = Math.min(total, Math.max(0, Math.round(usage?.promptTokenCount ?? 0)))
   try {
     const [{ doc, increment, serverTimestamp, setDoc }, { db }] = await Promise.all([
       import("firebase/firestore"),
       import("@/firebase/db"),
     ])
-    await setDoc(doc(db, pawGptUsagePath(user.uid)), { tokens: increment(Math.round(tokens)), updatedAt: serverTimestamp() }, { merge: true })
+    await setDoc(
+      doc(db, pawGptUsagePath(user.uid)),
+      { tokens: increment(total), inputTokens: increment(input), outputTokens: increment(total - input), updatedAt: serverTimestamp() },
+      { merge: true }
+    )
   } catch (error) {
     console.error("Paw GPT: could not record token usage:", error)
   }
@@ -136,7 +150,7 @@ async function* streamFromFirebaseAi({ user, context, messages, signal, exempt }
   }
   const question = messages.at(-1)
   if (question?.role !== "user") throw new PawGptError("Ask Paw GPT a question to get started.")
-  if (!exempt) await consumeDailyQuestion(user)
+  await consumeDailyQuestion(user, exempt)
 
   const { getAI, getTemplateGenerativeModel, GoogleAIBackend, AIError } = await import("firebase/ai")
   // Limited-use tokens can each be used once, so a captured token can't be replayed.
@@ -169,7 +183,7 @@ async function* streamFromFirebaseAi({ user, context, messages, signal, exempt }
     }
 
     const final = await result.response
-    if (!exempt) await recordTokens(user, final.usageMetadata?.totalTokenCount ?? 0)
+    await recordTokens(user, final.usageMetadata)
     const finishReason = final.candidates?.[0]?.finishReason
     const blockReason = final.promptFeedback?.blockReason
     if (blockReason || (finishReason && BLOCKED_REASONS.has(finishReason))) {

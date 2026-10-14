@@ -136,7 +136,15 @@ function incrementUsage(uid: string, token: string, increments: Record<string, n
  * PAW_GPT_DAILY_LIMIT questions were asked and fewer than PAW_GPT_DAILY_TOKEN_LIMIT tokens
  * were used, so the rules (not this code) stop it, and a user can't reset the counter.
  */
-async function consumeDailyQuestion(uid: string, token: string): Promise<QuotaResult> {
+async function consumeDailyQuestion(uid: string, token: string, staff: boolean): Promise<QuotaResult> {
+  if (staff) {
+    // Admins and authors are counted for the usage totals but never limited,
+    // so a failed write (e.g. rules not deployed yet) must not block them.
+    const commit = await incrementUsage(uid, token, { count: 1 }).catch(() => null)
+    if (!commit?.ok) console.error("Paw GPT: could not count an admin question:", commit?.status)
+    return { ok: true }
+  }
+
   // Read first so a full quota gets a clear message rather than a generic denial.
   const current = await fetch(`${firestoreBase}/${pawGptUsagePath(uid)}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -161,11 +169,11 @@ async function consumeDailyQuestion(uid: string, token: string): Promise<QuotaRe
   return { ok: false, status: 502, error: "Could not start your question. Try again." }
 }
 
-/** Adds an answer's tokens to today's total. Best effort: the answer has already been sent. */
-async function recordTokens(uid: string, token: string, tokens: number) {
-  if (tokens <= 0) return
+/** Adds an answer's tokens to today's totals. Best effort: the answer has already been sent. */
+async function recordTokens(uid: string, token: string, { input, output }: { input: number; output: number }) {
+  if (input + output <= 0) return
   try {
-    const res = await incrementUsage(uid, token, { tokens })
+    const res = await incrementUsage(uid, token, { tokens: input + output, inputTokens: input, outputTokens: output })
     if (!res.ok) console.error("Paw GPT: could not record token usage:", res.status)
   } catch (error) {
     console.error("Paw GPT: could not record token usage:", error)
@@ -239,16 +247,14 @@ export async function POST(req: Request) {
   }
 
   // Counted last, so a rejected request never uses up one of the day's questions.
-  if (!auth.staff) {
-    let quota: QuotaResult
-    try {
-      quota = await consumeDailyQuestion(auth.uid, auth.token)
-    } catch (error) {
-      console.error("Paw GPT quota check failed:", error)
-      return NextResponse.json({ error: "Could not start your question. Try again." }, { status: 502 })
-    }
-    if (!quota.ok) return NextResponse.json({ error: quota.error, code: quota.code }, { status: quota.status })
+  let quota: QuotaResult
+  try {
+    quota = await consumeDailyQuestion(auth.uid, auth.token, auth.staff)
+  } catch (error) {
+    console.error("Paw GPT quota check failed:", error)
+    return NextResponse.json({ error: "Could not start your question. Try again." }, { status: 502 })
   }
+  if (!quota.ok) return NextResponse.json({ error: quota.error, code: quota.code }, { status: quota.status })
 
   const client = new Anthropic()
   const encoder = new TextEncoder()
@@ -308,7 +314,8 @@ export async function POST(req: Request) {
       } finally {
         // Record before closing: the function may stop once the response ends.
         // Stopped or failed answers still count for the tokens they actually used.
-        if (!caller.staff) await recordTokens(caller.uid, caller.token, usage.input + usage.output)
+        // Admins and authors are recorded too, so the totals show real usage.
+        await recordTokens(caller.uid, caller.token, usage)
         try {
           controller.close()
         } catch {
