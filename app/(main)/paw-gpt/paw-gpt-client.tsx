@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { getPetLoggerEntries, getPetWeightEntries, type PetLoggerEntry, type PetWeightEntry } from "@/lib/logger-store"
 import { PAW_GPT_LIMITS, type PawGptMessage } from "@/lib/paw-gpt"
+import { PAW_GPT_PROVIDER, PawGptError, streamPawGptAnswer } from "@/lib/paw-gpt-stream"
 
 import { toDateKey } from "../logger/components/shared"
 import { ChatMessage, HistoryTicker, type ChatItem } from "./components/chat-message"
@@ -225,35 +226,13 @@ export function PawGptClient() {
     try {
       const weights = await loadWeights(petName)
       const context = buildPetContext(pet, entries, weights, profile?.displayName || user.displayName || undefined)
-      const res = await fetch("/api/paw-gpt", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${await user.getIdToken()}`,
-        },
-        body: JSON.stringify({ context, messages: history }),
-        signal: controller.signal,
-      })
-
-      if (!res.ok || !res.body) {
-        const data = await res.json().catch(() => null)
-        updateItem(petName, answerId, {
-          content: data?.error || "Paw GPT could not answer right now. Please try again.",
-          error: true,
-          pending: false,
-        })
-        return
-      }
-
-      void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2) })
-
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        if (chunk) updateItem(petName, answerId, (item) => ({ content: item.content + chunk }))
+      let tracked = false
+      for await (const chunk of streamPawGptAnswer({ user, context, messages: history, signal: controller.signal })) {
+        if (!tracked) {
+          tracked = true
+          void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER })
+        }
+        updateItem(petName, answerId, (item) => ({ content: item.content + chunk }))
       }
       updateItem(petName, answerId, (item) =>
         item.content.trim()
@@ -265,6 +244,13 @@ export function PawGptClient() {
         updateItem(petName, answerId, (item) =>
           item.content.trim() ? { pending: false } : { pending: false, error: true, content: "Stopped." }
         )
+      } else if (error instanceof PawGptError) {
+        // Keep whatever was already streamed and add the explanation after it.
+        updateItem(petName, answerId, (item) => ({
+          pending: false,
+          error: true,
+          content: item.content.trim() ? `${item.content}\n\n_${error.message}_` : error.message,
+        }))
       } else {
         console.error("Paw GPT request failed:", error)
         updateItem(petName, answerId, {
