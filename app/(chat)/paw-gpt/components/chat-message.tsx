@@ -4,8 +4,10 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle } from "lucide-react"
+import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils } from "lucide-react"
 import { toast } from "sonner"
+
+import { PET_PALETTES, PetSprite, type PetColors } from "@/components/pet-scene/scene-art"
 
 export interface ChatItem {
   id: string
@@ -30,10 +32,14 @@ interface ChatMessageProps {
   petName?: string
   /** Earlier questions and record facts shown in the moving banner while Paw GPT works */
   ticker?: string[]
+  /** The selected pet's kind leads the running pets while Paw GPT thinks */
+  petKind?: "dog" | "cat"
   onRetry?: () => void
+  /** Shown as "Log <pet>'s food" when the answer is about food */
+  onLogFood?: () => void
 }
 
-export function ChatMessage({ item, petName, ticker = [], onRetry }: ChatMessageProps) {
+export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRetry, onLogFood }: ChatMessageProps) {
   if (item.role === "user") {
     return (
       <div id={`msg-${item.id}`} className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
@@ -71,7 +77,7 @@ export function ChatMessage({ item, petName, ticker = [], onRetry }: ChatMessage
     return (
       <div className="paw-gpt-anim-pop flex gap-3">
         <Avatar thinking />
-        <ThinkingBanner petName={petName} ticker={ticker} />
+        <ThinkingBanner petName={petName} ticker={ticker} petKind={petKind} />
       </div>
     )
   }
@@ -105,8 +111,42 @@ export function ChatMessage({ item, petName, ticker = [], onRetry }: ChatMessage
             {item.pending && <span aria-hidden className="ml-0.5 inline-block h-4 w-[3px] translate-y-0.5 animate-pulse rounded-full bg-orange-500" />}
           </div>
         </div>
-        {!item.pending && <CopyButton text={item.content} />}
+        {!item.pending && <AnswerActions text={item.content} petName={petName} onLogFood={onLogFood} />}
       </div>
+    </div>
+  )
+}
+
+/** Actions under a finished answer, as one segmented group: Copy, and Log food when relevant. */
+function AnswerActions({ text, petName, onLogFood }: { text: string; petName?: string; onLogFood?: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const button =
+    "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold text-muted-foreground transition hover:bg-black/5 hover:text-foreground active:scale-95 dark:hover:bg-white/10"
+
+  return (
+    <div role="group" aria-label="Answer actions" className="paw-glass ml-1 mt-1.5 inline-flex items-center divide-x divide-black/5 overflow-hidden rounded-full dark:divide-white/10">
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(text)
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), 1600)
+          } catch {
+            toast.error("Could not copy this answer.")
+          }
+        }}
+        className={button}
+      >
+        {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+        {copied ? "Copied" : "Copy"}
+      </button>
+      {onLogFood && (
+        <button type="button" onClick={onLogFood} className={`${button} text-orange-700 hover:text-orange-800 dark:text-orange-300`}>
+          <Utensils className="h-3.5 w-3.5" />
+          Log {petName ? `${petName}'s` : "pet"} food
+        </button>
+      )}
     </div>
   )
 }
@@ -126,7 +166,7 @@ function Avatar({ thinking }: { thinking?: boolean }) {
 const STEPS = ["Reading the profile", "Going through meal logs", "Checking the weight trend", "Recalling this chat", "Writing the answer"]
 
 /** Live status while Paw GPT prepares an answer, with the chat history drifting by underneath. */
-export function ThinkingBanner({ petName, ticker }: { petName?: string; ticker: string[] }) {
+export function ThinkingBanner({ petName, ticker, petKind = "dog" }: { petName?: string; ticker: string[]; petKind?: "dog" | "cat" }) {
   const [step, setStep] = useState(0)
 
   useEffect(() => {
@@ -147,6 +187,7 @@ export function ThinkingBanner({ petName, ticker }: { petName?: string; ticker: 
       <p key={step} className="paw-gpt-anim-pop px-4 pb-2 pt-0.5 text-xs text-muted-foreground">
         {STEPS[step]}
       </p>
+      <PetRun lead={petKind} />
       <div className="mx-4 mb-3 h-1 overflow-hidden rounded-full bg-black/[0.05] dark:bg-white/10">
         <div
           className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-[width] duration-700 ease-out"
@@ -154,6 +195,39 @@ export function ThinkingBanner({ petName, ticker }: { petName?: string; ticker: 
         />
       </div>
       {ticker.length > 0 && <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />}
+    </div>
+  )
+}
+
+// Negative delays start each runner mid-lap. Larger = further ahead (they run leftwards):
+// the ball leads, then the selected pet's kind.
+const RUNNERS: { kind: "same" | "other"; colors: PetColors; size: string; delay: number }[] = [
+  { kind: "same", colors: PET_PALETTES.golden, size: "h-11", delay: -4.6 },
+  { kind: "other", colors: PET_PALETTES.ginger, size: "h-9", delay: -3.1 },
+  { kind: "same", colors: PET_PALETTES.charcoal, size: "h-10", delay: -1.6 },
+  { kind: "other", colors: PET_PALETTES.cream, size: "h-8", delay: -0.1 },
+]
+
+/**
+ * Dogs and cats galloping across the thinking card after a ball, led by the selected pet's
+ * kind. Pure CSS (paw-gpt-anim-run / -hop), so it stops for users who prefer reduced motion.
+ */
+function PetRun({ lead }: { lead: "dog" | "cat" }) {
+  const other = lead === "dog" ? "cat" : "dog"
+  return (
+    <div aria-hidden className="relative mx-4 mb-2 h-14 overflow-hidden rounded-2xl bg-gradient-to-b from-orange-500/[0.04] to-orange-500/[0.09]">
+      {/* Grass line */}
+      <div className="absolute inset-x-0 bottom-2 h-px bg-orange-900/10 dark:bg-white/10" />
+      <span className="paw-gpt-anim-run absolute bottom-2.5" style={{ animationDelay: "-5.5s" }}>
+        <span className="paw-gpt-anim-hop block h-3 w-3 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 shadow-sm" style={{ animationDuration: "0.5s" }} />
+      </span>
+      {RUNNERS.map((runner, index) => (
+        <span key={index} className="paw-gpt-anim-run absolute bottom-1.5" style={{ animationDelay: `${runner.delay}s` }}>
+          <span className="paw-gpt-anim-hop block" style={{ animationDelay: `${index * 0.09}s` }}>
+            <PetSprite kind={runner.kind === "same" ? lead : other} colors={runner.colors} className={`${runner.size} w-auto`} />
+          </span>
+        </span>
+      ))}
     </div>
   )
 }
@@ -178,24 +252,3 @@ export function HistoryTicker({ items, className = "" }: { items: string[]; clas
   )
 }
 
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text)
-          setCopied(true)
-          window.setTimeout(() => setCopied(false), 1600)
-        } catch {
-          toast.error("Could not copy this answer.")
-        }
-      }}
-      className="ml-1 mt-1.5 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-black/5 hover:text-foreground active:scale-95 dark:hover:bg-white/10"
-    >
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? "Copied" : "Copy"}
-    </button>
-  )
-}

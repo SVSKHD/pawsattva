@@ -3,6 +3,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns"
 import type { PetFeed, PetFeedEntry } from "@/firebase/firestore"
 import type { PetLoggerEntry, PetWeightEntry } from "@/lib/logger-store"
 import { PAW_GPT_LIMITS, type PawGptPetContext } from "@/lib/paw-gpt"
+import type { LoggerPet } from "@/app/(main)/logger/components/shared"
 
 export interface GptPet {
   name: string
@@ -167,6 +168,27 @@ export function buildPetContext(
     summary,
   }
 }
+
+/** The shape the Food Logger's meal dialog expects. */
+export function toLoggerPet(pet: GptPet): LoggerPet {
+  const source = pet.profile ?? pet.report
+  return {
+    name: pet.name,
+    type: source?.petType,
+    breed: source?.petBreed,
+    foodBrand: source?.foodBrand,
+    foodType: source?.foodType,
+    dailyQuantity: source?.dailyQuantity,
+    weightKg: source?.weightKg,
+  }
+}
+
+const FOOD_WORDS =
+  /\b(food|foods|feed|feeding|fed|meal|meals|diet|portion|portions|kibble|treat|treats|water|drink|drinking|calorie|calories|breakfast|lunch|dinner|snack|appetite|eat|eats|eating|ate|grams?|food log|logger)\b/i
+
+/** True when a question or answer is about what the pet eats or drinks — worth a "Log food" shortcut. */
+export const isFoodRelated = (...texts: (string | undefined)[]) =>
+  texts.some((text) => Boolean(text && (FOOD_WORDS.test(text) || text.includes("/logger"))))
 
 export interface PromptGroup {
   id: string

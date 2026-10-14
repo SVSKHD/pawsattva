@@ -23,7 +23,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getPetLoggerEntries, getPetWeightEntries, type PetLoggerEntry, type PetWeightEntry } from "@/lib/logger-store"
+import {
+  getPetLoggerEntries,
+  getPetWeightEntries,
+  savePetLoggerEntry,
+  type PetLoggerEntry,
+  type PetWeightEntry,
+} from "@/lib/logger-store"
 import {
   PAW_GPT_DAILY_LIMIT,
   PAW_GPT_DAILY_TOKEN_LIMIT,
@@ -38,7 +44,19 @@ import { toDateKey } from "@/app/(main)/logger/components/shared"
 import { ChatMessage, HistoryTicker, type ChatItem, type Conversation } from "./components/chat-message"
 import { phaseCopy, useDayPhase, type DayPhase } from "@/components/pet-scene/day-phase"
 import { PetFriendsArt, SkyArt } from "@/components/pet-scene/scene-art"
-import { buildPetContext, isCatPet, mergePets, petSubtitle, reportPrompts, weightStatusOf, type GptPet } from "./components/pet-data"
+import {
+  buildPetContext,
+  isCatPet,
+  isFoodRelated,
+  mergePets,
+  petSubtitle,
+  reportPrompts,
+  toLoggerPet,
+  weightStatusOf,
+  type GptPet,
+} from "./components/pet-data"
+import { MealDialog, type MealDraft } from "@/app/(main)/logger/components/meal-dialog"
+import { mealLabels } from "@/app/(main)/logger/components/shared"
 import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 
@@ -96,6 +114,7 @@ export function PawGptClient() {
   const [streaming, setStreaming] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [promptsOpen, setPromptsOpen] = usePromptDockOpen()
+  const [mealOpen, setMealOpen] = useState(false)
 
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -224,6 +243,8 @@ export function PawGptClient() {
   }, [loadWeights, selectedPet])
 
   const pet = pets.find((item) => item.name === selectedPet) ?? null
+  // Stable reference: the meal dialog resets its form whenever `pets` changes.
+  const loggerPets = useMemo(() => pets.map(toLoggerPet), [pets])
   const activeChat = useMemo(
     () => chats.find((chat) => chat.id === activeChatId && chat.petName === selectedPet) ?? null,
     [chats, activeChatId, selectedPet]
@@ -394,6 +415,29 @@ export function PawGptClient() {
     }
   }
 
+  // "Log food" from an answer: same entry the Food Logger saves, for today. Added to the
+  // loaded logs too, so Paw GPT's next answer already knows about it.
+  const handleSaveMeal = async (draft: MealDraft) => {
+    if (!user) return
+    try {
+      const saved = await savePetLoggerEntry({ ...draft, userId: user.uid, loggedOn: toDateKey(new Date()) })
+      setEntries((current) => [saved, ...current])
+      toast.success(`${mealLabels[saved.mealType]} logged for ${saved.petName}.`, {
+        action: { label: "Open logger", onClick: () => router.push("/logger") },
+      })
+      void trackEvent("meal_logged", {
+        meal_type: saved.mealType,
+        quality: saved.feedQuality,
+        with_details: Boolean(saved.quantity || saved.waterMl !== undefined || saved.treats || saved.notes),
+      })
+    } catch (error) {
+      console.error("Unable to save the food log from Paw GPT:", error)
+      toast.error("Could not save this food log.")
+      // Keeps the dialog open so nothing typed is lost.
+      throw error
+    }
+  }
+
   const clearHistory = () => {
     if (streaming) abortRef.current?.abort()
     setChats([])
@@ -529,13 +573,19 @@ export function PawGptClient() {
               </div>
             </div>
             <div className="space-y-5">
-              {messages.map((item) => (
+              {messages.map((item, index) => (
                 <ChatMessage
                   key={item.id}
                   item={item}
                   petName={pet?.name}
+                  petKind={isCatPet(pet) ? "cat" : "dog"}
                   ticker={ticker}
                   onRetry={item.error && !streaming ? () => retry(item.id) : undefined}
+                  onLogFood={
+                    pet && item.role === "assistant" && !item.error && isFoodRelated(item.content, messages[index - 1]?.content)
+                      ? () => setMealOpen(true)
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -679,6 +729,16 @@ export function PawGptClient() {
           .
         </p>
       </form>
+
+      {/* Same dialog as the Food Logger: meal, food, quality, plus water, treats and notes on habits */}
+      <MealDialog
+        open={mealOpen}
+        onOpenChange={setMealOpen}
+        date={new Date()}
+        pets={loggerPets}
+        defaultPetName={pet?.name ?? ""}
+        onSave={handleSaveMeal}
+      />
     </div>
   )
 }

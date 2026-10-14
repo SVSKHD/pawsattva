@@ -640,10 +640,25 @@ a {
 }
 .paw-gpt-anim-pop { animation: paw-gpt-pop 420ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* Paw GPT thinking card: pets run right-to-left (the sprites face left) with a gallop hop. */
+@keyframes paw-gpt-run {
+  from { left: 105%; }
+  to { left: -18%; }
+}
+@keyframes paw-gpt-hop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  35% { transform: translateY(-7px) rotate(-6deg); }
+  65% { transform: translateY(-2px) rotate(3deg); }
+}
+.paw-gpt-anim-run { animation: paw-gpt-run 6.5s linear infinite; will-change: left; }
+.paw-gpt-anim-hop { animation: paw-gpt-hop 0.42s ease-in-out infinite; transform-origin: 50% 100%; }
+
 @media (prefers-reduced-motion: reduce) {
   [class*="paw-gpt-anim-"] {
     animation: none !important;
   }
+  /* Without motion, line the runners up in place instead of stacking them off-screen. */
+  .paw-gpt-anim-run { position: static !important; display: inline-block; margin-left: 0.75rem; }
   .paw-gpt-anim-shimmer {
     -webkit-text-fill-color: currentColor;
   }
