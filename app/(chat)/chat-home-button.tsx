@@ -20,7 +20,7 @@ export function ChatHomeButton() {
       href="/"
       aria-label={name ? `Back to PawSattva home (signed in as ${name})` : "Back to PawSattva home"}
       title={name ? `Home · ${name}` : "Home"}
-      className="paw-glass fixed right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[70] flex h-11 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold text-foreground/80 transition hover:text-orange-600 active:scale-95 sm:right-5 sm:top-5"
+      className="paw-glass fixed right-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[45] flex h-11 items-center gap-2 rounded-full py-1 pl-1 pr-3.5 text-sm font-semibold text-foreground/80 transition hover:text-orange-600 active:scale-95 sm:right-5 sm:top-5"
     >
       <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-sm font-bold text-white ring-2 ring-white dark:ring-zinc-900">
         {photo ? (

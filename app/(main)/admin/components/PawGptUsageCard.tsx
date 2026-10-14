@@ -7,9 +7,12 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
+
 import { db } from "@/firebase/db"
+import { auth } from "@/firebase/firebase"
 import type { UserProfile } from "@/firebase/firestore"
-import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptDayKey } from "@/lib/paw-gpt"
+import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_PASS, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptDayKey } from "@/lib/paw-gpt"
 
 const DAYS = 14
 
@@ -20,6 +23,8 @@ interface UsageRow {
   tokens: number
   inputTokens: number
   outputTokens: number
+  /** > 0 when a Daily Pass is active for that day */
+  passTokenLimit: number
 }
 
 const fmt = (value: number) => Math.round(value).toLocaleString("en-IN")
@@ -41,6 +46,28 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
   // When the data arrived; the day buckets are built from this, not the render time.
   const [loadedAt, setLoadedAt] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [givingPassTo, setGivingPassTo] = useState<string | null>(null)
+
+  // Support / goodwill: today's Daily Pass for one user, granted by the server.
+  const givePass = async (uid: string, name: string) => {
+    if (!window.confirm(`Give ${name} today's Daily Pass (unlimited questions, up to ${fmt(PAW_GPT_DAILY_PASS.tokenLimit)} tokens)?`)) return
+    setGivingPassTo(uid)
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      const res = await fetch("/api/admin/paw-gpt/daily-pass", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ uid }),
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Could not give the Daily Pass.")
+      toast.success(data?.granted ? `Daily Pass given to ${name}.` : `${name} already has today's pass.`)
+    } catch (failure) {
+      toast.error(failure instanceof Error ? failure.message : "Could not give the Daily Pass.")
+    } finally {
+      setGivingPassTo(null)
+    }
+  }
 
   useEffect(() => {
     const since = Timestamp.fromMillis(Date.now() - (DAYS + 1) * 86_400_000)
@@ -56,6 +83,7 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
           tokens: Number(entry.get("tokens") ?? 0),
           inputTokens: Number(entry.get("inputTokens") ?? 0),
           outputTokens: Number(entry.get("outputTokens") ?? 0),
+          passTokenLimit: Number(entry.get("passTokenLimit") ?? 0),
         })))
       },
       (failure) => {
@@ -100,7 +128,13 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
         questions: sum(todayRows, "questions"),
         tokens: sum(todayRows, "tokens"),
         users: todayRows.length,
-        atLimit: todayRows.filter((row) => !isStaff(row.uid) && (row.questions >= PAW_GPT_DAILY_LIMIT || row.tokens >= PAW_GPT_DAILY_TOKEN_LIMIT)).length,
+        atLimit: todayRows.filter((row) =>
+          !isStaff(row.uid) &&
+          (row.passTokenLimit > 0
+            ? row.tokens >= row.passTokenLimit
+            : row.questions >= PAW_GPT_DAILY_LIMIT || row.tokens >= PAW_GPT_DAILY_TOKEN_LIMIT)
+        ).length,
+        passes: todayRows.filter((row) => row.passTokenLimit > 0).length,
       },
       period: {
         questions: sum(periodRows, "questions"),
@@ -139,7 +173,10 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
               {[
                 { label: "Tokens today", value: fmt(summary.today.tokens) },
                 { label: "Questions today", value: fmt(summary.today.questions) },
-                { label: "Users today", value: `${summary.today.users}${summary.today.atLimit ? ` · ${summary.today.atLimit} at limit` : ""}` },
+                {
+                  label: summary.today.passes ? `Users today · ${summary.today.passes} with Daily Pass` : "Users today",
+                  value: `${summary.today.users}${summary.today.atLimit ? ` · ${summary.today.atLimit} at limit` : ""}`,
+                },
                 { label: `Avg tokens / question (${DAYS}d)`, value: perQuestion ? fmt(perQuestion) : "—" },
               ].map((stat) => (
                 <div key={stat.label} className="rounded-2xl border border-border/50 bg-white/50 p-3 dark:bg-white/[0.03]">
@@ -187,21 +224,35 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
                       {summary.topToday.map((row) => {
                         const profile = usersById.get(row.uid)
                         const staff = summary.isStaff(row.uid)
-                        const share = Math.min(1, row.tokens / PAW_GPT_DAILY_TOKEN_LIMIT)
+                        const hasPass = row.passTokenLimit > 0
+                        const share = Math.min(1, row.tokens / (hasPass ? row.passTokenLimit : PAW_GPT_DAILY_TOKEN_LIMIT))
                         return (
                           <tr key={row.uid}>
                             <td className="max-w-0 py-2 pr-3">
                               <p className="truncate font-semibold">
                                 {profile?.displayName || profile?.email || row.uid}
                                 {staff && <span className="ml-1.5 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-400">Staff</span>}
+                                {hasPass && <span className="ml-1.5 rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-400">Daily Pass</span>}
                               </p>
                               {!staff && (
-                                <div className="mt-1 h-1 max-w-40 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                                  <div className={`h-full rounded-full ${share >= 1 ? "bg-rose-500" : share >= 0.8 ? "bg-amber-500" : "bg-orange-500"}`} style={{ width: `${share * 100}%` }} />
+                                <div className="mt-1 flex items-center gap-2">
+                                  <div className="h-1 w-full max-w-40 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                                    <div className={`h-full rounded-full ${share >= 1 ? "bg-rose-500" : share >= 0.8 ? "bg-amber-500" : hasPass ? "bg-violet-500" : "bg-orange-500"}`} style={{ width: `${share * 100}%` }} />
+                                  </div>
+                                  {!hasPass && (
+                                    <button
+                                      type="button"
+                                      disabled={givingPassTo === row.uid}
+                                      onClick={() => void givePass(row.uid, profile?.displayName || profile?.email || "this user")}
+                                      className="shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-violet-500/30 transition hover:bg-violet-500/10 disabled:opacity-50 dark:text-violet-300"
+                                    >
+                                      {givingPassTo === row.uid ? "Giving…" : "Give Daily Pass"}
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{staff ? row.questions : `${row.questions}/${PAW_GPT_DAILY_LIMIT}`}</td>
+                            <td className="py-2 pr-3 text-right tabular-nums">{staff || hasPass ? row.questions : `${row.questions}/${PAW_GPT_DAILY_LIMIT}`}</td>
                             <td className="py-2 pr-3 text-right tabular-nums">{fmt(row.tokens)}</td>
                             <td className="hidden py-2 text-right tabular-nums text-muted-foreground sm:table-cell">
                               {fmt(row.inputTokens)} / {fmt(row.outputTokens)}

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 
 import {
   PAW_GPT_DAILY_LIMIT,
+  PAW_GPT_DAILY_PASS,
   PAW_GPT_DAILY_TOKEN_LIMIT,
   PAW_GPT_LIMITS,
   pawGptUsagePath,
@@ -177,16 +178,25 @@ async function consumeDailyQuestion(uid: string, token: string, staff: boolean):
     console.error("Paw GPT: reading the usage counter was denied. Deploy firebase/firestore.rules.")
     return { ok: false, status: 503, error: "Paw GPT isn't available right now. Please try again later." }
   }
+  let hasPass = false
   if (current.ok) {
     const fields = ((await current.json()) as { fields?: Record<string, { integerValue?: string }> }).fields
-    if (Number(fields?.tokens?.integerValue ?? 0) >= PAW_GPT_DAILY_TOKEN_LIMIT) return tokenLimitReached()
-    if (Number(fields?.count?.integerValue ?? 0) >= PAW_GPT_DAILY_LIMIT) return dailyLimitReached()
+    const tokens = Number(fields?.tokens?.integerValue ?? 0)
+    const passTokenLimit = Number(fields?.passTokenLimit?.integerValue ?? 0)
+    hasPass = passTokenLimit > 0
+    if (hasPass) {
+      // Daily Pass: no question cap, only the pass's token allowance.
+      if (tokens >= passTokenLimit) return passUsedUp()
+    } else {
+      if (tokens >= PAW_GPT_DAILY_TOKEN_LIMIT) return tokenLimitReached()
+      if (Number(fields?.count?.integerValue ?? 0) >= PAW_GPT_DAILY_LIMIT) return dailyLimitReached()
+    }
   }
 
   const commit = await incrementUsage(uid, token, { count: 1 })
   if (commit.ok) return { ok: true }
   // Denied here means another tab used the last of the quota first (or the day just rolled over).
-  if (commit.status === 403) return dailyLimitReached()
+  if (commit.status === 403) return hasPass ? passUsedUp() : dailyLimitReached()
   console.error("Paw GPT: could not update the usage counter:", commit.status)
   return { ok: false, status: 502, error: "Could not start your question. Try again." }
 }
@@ -207,6 +217,13 @@ const dailyLimitReached = (): QuotaResult => ({
   status: 429,
   code: "DAILY_LIMIT",
   error: `You've used all ${PAW_GPT_DAILY_LIMIT} Paw GPT questions for today. You can ask more after midnight.`,
+})
+
+const passUsedUp = (): QuotaResult => ({
+  ok: false,
+  status: 429,
+  code: "PASS_USED_UP",
+  error: `You've used today's Daily Pass (${PAW_GPT_DAILY_PASS.tokenLimit.toLocaleString("en-IN")} tokens). Paw GPT will be back for you after midnight.`,
 })
 
 const tokenLimitReached = (): QuotaResult => ({

@@ -83,11 +83,14 @@ service cloud.firestore {
     }
 
     // Starting a question adds 1 to count. Pet parents are capped at 5 questions and
-    // 100000 tokens a day; admins and authors are counted but never capped.
+    // 100000 tokens a day, or with a Daily Pass (passTokenLimit, set only by the server)
+    // unlimited questions up to the pass's tokens. Admins and authors are counted, never capped.
     function startsQuestion() {
       return request.resource.data.count == resource.data.count + 1 &&
         (
           (request.resource.data.count <= 5 && usageField(resource.data, 'tokens') < 100000) ||
+          (usageField(resource.data, 'passTokenLimit') > 0 &&
+            usageField(resource.data, 'tokens') < usageField(resource.data, 'passTokenLimit')) ||
           isAdmin()
         ) &&
         usageField(request.resource.data, 'tokens') == usageField(resource.data, 'tokens') &&

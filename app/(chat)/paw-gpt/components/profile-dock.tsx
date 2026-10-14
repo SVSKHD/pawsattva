@@ -9,7 +9,7 @@ import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical,
 
 import type { UserProfile } from "@/firebase/firestore"
 import { imageUrlProblem } from "@/lib/image-hosts"
-import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT } from "@/lib/paw-gpt"
+import { UsageMeter, type PawGptQuota } from "./usage-meter"
 
 import { isCatPet, petSubtitle, weightStatusOf, type GptPet } from "./pet-data"
 
@@ -60,66 +60,7 @@ interface ProfileDockProps {
   quota: PawGptQuota | null
 }
 
-export interface PawGptQuota {
-  questionsLeft: number
-  tokensUsed: number
-  tokensLeft: number
-}
-
-/** Today's questions and tokens, each with a progress bar. */
-function UsageMeter({ quota }: { quota: PawGptQuota }) {
-  const questionsUsed = PAW_GPT_DAILY_LIMIT - quota.questionsLeft
-  const rows = [
-    {
-      label: "Questions",
-      value: `${questionsUsed} / ${PAW_GPT_DAILY_LIMIT}`,
-      share: questionsUsed / PAW_GPT_DAILY_LIMIT,
-    },
-    {
-      label: "Tokens",
-      value: `${quota.tokensUsed.toLocaleString("en-IN")} / ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")}`,
-      share: quota.tokensUsed / PAW_GPT_DAILY_TOKEN_LIMIT,
-    },
-  ]
-  const done = quota.questionsLeft === 0 || quota.tokensLeft === 0
-
-  return (
-    <section aria-label="Today's Paw GPT usage" className="mt-4 rounded-2xl bg-black/[0.03] p-2.5 dark:bg-white/[0.04]">
-      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Today&apos;s usage</p>
-      <div className="space-y-2">
-        {rows.map((row) => {
-          const share = Math.min(1, Math.max(0, row.share))
-          return (
-            <div key={row.label}>
-              <div className="flex items-baseline justify-between text-[11px]">
-                <span className="font-semibold text-foreground/80">{row.label}</span>
-                <span className="tabular-nums text-muted-foreground">{row.value}</span>
-              </div>
-              <div
-                role="progressbar"
-                aria-label={`${row.label} used today`}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(share * 100)}
-                className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
-              >
-                <div
-                  className={`h-full rounded-full transition-[width] duration-500 ${share >= 1 ? "bg-rose-500" : share >= 0.8 ? "bg-amber-500" : "bg-orange-500"}`}
-                  style={{ width: `${share * 100}%` }}
-                />
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <p className={`mt-2 text-[11px] leading-snug ${done ? "font-semibold text-rose-600" : "text-muted-foreground"}`}>
-        {done
-          ? "You've reached today's limit. It resets at midnight (India time)."
-          : "Tokens measure how much text Paw GPT reads and writes, including your pet's record. Resets at midnight."}
-      </p>
-    </section>
-  )
-}
+export type { PawGptQuota } from "./usage-meter"
 
 /**
  * Past chats as an accordion: each row is one conversation and expands to the questions
@@ -365,7 +306,7 @@ export function ProfileDock({
   return (
     <div
       ref={rootRef}
-      className="paw-glass fixed z-[60] w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem]"
+      className="paw-glass fixed z-40 w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem]"
       style={{ left: position.x, top: position.y }}
     >
       {/* Accordion header doubles as the drag handle */}
@@ -505,7 +446,7 @@ export function ProfileDock({
               onClearHistory={onClearHistory}
             />
 
-            {quota && <UsageMeter quota={quota} />}
+            {quota && <UsageMeter quota={quota} className="mt-4" />}
 
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-muted-foreground">
               Sharper answers come from more data: log meals and weights in the{" "}

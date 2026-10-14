@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth"
 import { app, appCheckEnabled } from "@/firebase/firebase"
-import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptUsagePath, type PawGptMessage, type PawGptPetContext } from "./paw-gpt"
+import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_PASS, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptUsagePath, type PawGptMessage, type PawGptPetContext } from "./paw-gpt"
 
 /**
  * Streams a Paw GPT answer from the configured backend.
@@ -26,7 +26,7 @@ const TEMPLATE_ID = process.env.NEXT_PUBLIC_PAW_GPT_TEMPLATE_ID || "paw-gpt-v1"
 
 /** An error whose message is safe to show the pet parent. */
 export class PawGptError extends Error {
-  constructor(message: string, readonly code?: "daily-limit" | "token-limit") {
+  constructor(message: string, readonly code?: "daily-limit" | "token-limit" | "pass-used-up") {
     super(message)
   }
 }
@@ -35,6 +35,12 @@ const dailyLimitError = () =>
   new PawGptError(
     `You've used all ${PAW_GPT_DAILY_LIMIT} Paw GPT questions for today. You can ask more after midnight.`,
     "daily-limit"
+  )
+
+const passUsedUpError = () =>
+  new PawGptError(
+    `You've used today's Daily Pass (${PAW_GPT_DAILY_PASS.tokenLimit.toLocaleString("en-IN")} tokens). Paw GPT will be back for you after midnight.`,
+    "pass-used-up"
   )
 
 const tokenLimitError = () =>
@@ -73,6 +79,7 @@ async function* streamFromRoute({ user, context, messages, signal }: StreamReque
     const data = await res.json().catch(() => null)
     if (data?.code === "DAILY_LIMIT") throw dailyLimitError()
     if (data?.code === "TOKEN_LIMIT") throw tokenLimitError()
+    if (data?.code === "PASS_USED_UP") throw passUsedUpError()
     throw new PawGptError(data?.error || "Paw GPT could not answer right now. Please try again.")
   }
   const reader = res.body.getReader()
@@ -113,8 +120,14 @@ async function consumeDailyQuestion(user: User, exempt: boolean) {
     return
   }
   const current = await getDoc(ref)
-  if (Number(current.get("tokens") ?? 0) >= PAW_GPT_DAILY_TOKEN_LIMIT) throw tokenLimitError()
-  if (Number(current.get("count") ?? 0) >= PAW_GPT_DAILY_LIMIT) throw dailyLimitError()
+  const tokens = Number(current.get("tokens") ?? 0)
+  const passTokenLimit = Number(current.get("passTokenLimit") ?? 0)
+  if (passTokenLimit > 0) {
+    if (tokens >= passTokenLimit) throw passUsedUpError()
+  } else {
+    if (tokens >= PAW_GPT_DAILY_TOKEN_LIMIT) throw tokenLimitError()
+    if (Number(current.get("count") ?? 0) >= PAW_GPT_DAILY_LIMIT) throw dailyLimitError()
+  }
   try {
     await setDoc(ref, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true })
   } catch (error) {

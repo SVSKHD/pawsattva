@@ -63,6 +63,7 @@ import { MealDialog, type MealDraft } from "@/app/(main)/logger/components/meal-
 import { mealLabels } from "@/app/(main)/logger/components/shared"
 import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
+import { UsageLimitDialog } from "./components/usage-limit-dialog"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
 
@@ -152,7 +153,7 @@ export function PawGptClient() {
   // ── Daily question limit (admins and authors are exempt) ──────────────────
   const exempt = isAdmin
   const [dayKey, setDayKey] = useState(() => pawGptDayKey())
-  const [usageToday, setUsageToday] = useState<{ questions: number; tokens: number } | null>(null)
+  const [usageToday, setUsageToday] = useState<{ questions: number; tokens: number; passTokenLimit: number } | null>(null)
   useEffect(() => {
     // Roll over at midnight (India time) without a reload.
     const timer = window.setInterval(() => setDayKey(pawGptDayKey()), 60_000)
@@ -162,22 +163,43 @@ export function PawGptClient() {
     if (!user || exempt) return
     return onSnapshot(
       doc(db, pawGptUsagePath(user.uid, dayKey)),
-      (snapshot) => setUsageToday({ questions: Number(snapshot.get("count") ?? 0), tokens: Number(snapshot.get("tokens") ?? 0) }),
+      (snapshot) =>
+        setUsageToday({
+          questions: Number(snapshot.get("count") ?? 0),
+          tokens: Number(snapshot.get("tokens") ?? 0),
+          passTokenLimit: Number(snapshot.get("passTokenLimit") ?? 0),
+        }),
       () => setUsageToday(null)
     )
   }, [user, exempt, dayKey])
-  const quota: PawGptQuota | null =
-    exempt || !usageToday
-      ? null
-      : {
-          questionsLeft: Math.max(0, PAW_GPT_DAILY_LIMIT - usageToday.questions),
-          tokensUsed: usageToday.tokens,
-          tokensLeft: Math.max(0, PAW_GPT_DAILY_TOKEN_LIMIT - usageToday.tokens),
-        }
+  const quota: PawGptQuota | null = (() => {
+    if (exempt || !usageToday) return null
+    const hasPass = usageToday.passTokenLimit > 0
+    const tokenLimit = hasPass ? usageToday.passTokenLimit : PAW_GPT_DAILY_TOKEN_LIMIT
+    return {
+      hasPass,
+      // A Daily Pass removes the question cap; only its tokens count.
+      questionsLeft: hasPass ? null : Math.max(0, PAW_GPT_DAILY_LIMIT - usageToday.questions),
+      questionsUsed: usageToday.questions,
+      tokensUsed: usageToday.tokens,
+      tokenLimit,
+      tokensLeft: Math.max(0, tokenLimit - usageToday.tokens),
+    }
+  })()
   const limitReached = Boolean(quota && (quota.questionsLeft === 0 || quota.tokensLeft === 0))
-  const limitMessage = quota?.tokensLeft === 0
-    ? `You've used today's ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens`
-    : `You've used today's ${PAW_GPT_DAILY_LIMIT} questions`
+  const limitMessage = quota?.hasPass
+    ? "You've used today's Daily Pass"
+    : quota?.tokensLeft === 0
+      ? `You've used today's ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens`
+      : `You've used today's ${PAW_GPT_DAILY_LIMIT} questions`
+
+  // The "you've been busy" dialog opens by itself the moment the allowance runs out.
+  const [limitDialogOpen, setLimitDialogOpen] = useState(false)
+  const [wasLimited, setWasLimited] = useState(false)
+  if (limitReached !== wasLimited) {
+    setWasLimited(limitReached)
+    if (limitReached) setLimitDialogOpen(true)
+  }
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?returnTo=/paw-gpt")
@@ -309,7 +331,7 @@ export function PawGptClient() {
       return
     }
     if (limitReached) {
-      toast.message(limitMessage, { description: "You can ask more after midnight." })
+      setLimitDialogOpen(true)
       return
     }
 
@@ -363,6 +385,7 @@ export function PawGptClient() {
           item.content.trim() ? { pending: false } : { pending: false, error: true, content: "Stopped." }
         )
       } else if (error instanceof PawGptError) {
+        if (error.code) setLimitDialogOpen(true)
         // Keep whatever was already streamed and add the explanation after it.
         updateItem(chatId, answerId, (item) => ({
           pending: false,
@@ -705,18 +728,26 @@ export function PawGptClient() {
             )}
 
             {quota && (
-              <span
-                className={`ml-auto mr-1 flex min-w-0 flex-col items-end text-[11px] font-semibold leading-tight tabular-nums ${
-                  limitReached ? "text-rose-600" : quota.questionsLeft <= 2 || quota.tokensLeft < PAW_GPT_DAILY_TOKEN_LIMIT * 0.2 ? "text-amber-600" : "text-muted-foreground"
+              <button
+                type="button"
+                onClick={() => setLimitDialogOpen(true)}
+                className={`ml-auto mr-1 flex min-w-0 flex-col items-end rounded-lg px-1 text-[11px] font-semibold leading-tight tabular-nums transition hover:bg-black/5 dark:hover:bg-white/10 ${
+                  limitReached
+                    ? "text-rose-600"
+                    : (quota.questionsLeft !== null && quota.questionsLeft <= 2) || quota.tokensLeft < quota.tokenLimit * 0.2
+                      ? "text-amber-600"
+                      : quota.hasPass ? "text-violet-600 dark:text-violet-300" : "text-muted-foreground"
                 }`}
                 aria-live="polite"
-                title={`${quota.tokensUsed.toLocaleString("en-IN")} of ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens used today`}
+                title={`${quota.tokensUsed.toLocaleString("en-IN")} of ${quota.tokenLimit.toLocaleString("en-IN")} tokens used today. Tap for details.`}
               >
-                <span className="whitespace-nowrap">{quota.questionsLeft}/{PAW_GPT_DAILY_LIMIT} questions left</span>
-                <span className="whitespace-nowrap font-medium opacity-80">
-                  {compactTokens(quota.tokensUsed)}/{compactTokens(PAW_GPT_DAILY_TOKEN_LIMIT)} tokens
+                <span className="whitespace-nowrap">
+                  {quota.questionsLeft === null ? "Daily Pass" : `${quota.questionsLeft}/${PAW_GPT_DAILY_LIMIT} questions left`}
                 </span>
-              </span>
+                <span className="whitespace-nowrap font-medium opacity-80">
+                  {compactTokens(quota.tokensUsed)}/{compactTokens(quota.tokenLimit)} tokens
+                </span>
+              </button>
             )}
 
             {streaming ? (
@@ -748,6 +779,16 @@ export function PawGptClient() {
           .
         </p>
       </form>
+
+      {quota && (
+        <UsageLimitDialog
+          open={limitDialogOpen}
+          onOpenChange={setLimitDialogOpen}
+          quota={quota}
+          petName={pet && !pet.planning ? pet.name : undefined}
+          petKind={isCatPet(pet) ? "cat" : "dog"}
+        />
+      )}
 
       {/* Same dialog as the Food Logger: meal, food, quality, plus water, treats and notes on habits */}
       <MealDialog

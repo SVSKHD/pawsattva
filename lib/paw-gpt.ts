@@ -60,6 +60,16 @@ export const PAW_GPT_DAILY_LIMIT = 5
 export const PAW_GPT_DAILY_TOKEN_LIMIT = 100_000
 
 /**
+ * Paid Daily Pass: unlimited questions for the rest of the India day, up to `tokenLimit` tokens
+ * in total that day. Granted only by the server (lib/server/paw-gpt-pass.ts) after payment or by
+ * an admin; stored as `passTokenLimit` on the day's usage document. Must match firestore.rules.
+ */
+export const PAW_GPT_DAILY_PASS = {
+  priceInr: 29,
+  tokenLimit: 300_000,
+} as const
+
+/**
  * Today's usage document id, by the India calendar day: "2026-10-14" → "2026-10-14",
  * but with unpadded month/day ("2026-1-5") so firestore.rules can build the same id.
  */
