@@ -8,6 +8,7 @@ import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils } fr
 import { toast } from "sonner"
 
 import { PET_PALETTES, PetSprite, type PetColors } from "@/components/pet-scene/scene-art"
+import { QuickReads, type QuickRead } from "./quick-reads"
 
 export interface ChatItem {
   id: string
@@ -37,9 +38,12 @@ interface ChatMessageProps {
   onRetry?: () => void
   /** Shown as "Log <pet>'s food" when the answer is about food */
   onLogFood?: () => void
+  /** Blog posts offered while an answer takes a while */
+  quickReads?: QuickRead[]
+  onOpenQuickRead?: (read: QuickRead) => void
 }
 
-export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRetry, onLogFood }: ChatMessageProps) {
+export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
   if (item.role === "user") {
     return (
       <div id={`msg-${item.id}`} className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
@@ -77,7 +81,10 @@ export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRet
     return (
       <div className="paw-gpt-anim-pop flex gap-3">
         <Avatar thinking />
-        <ThinkingBanner petName={petName} ticker={ticker} petKind={petKind} />
+        <div className="min-w-0 flex-1 space-y-3">
+          <ThinkingBanner petName={petName} ticker={ticker} petKind={petKind} />
+          {quickReads?.length && onOpenQuickRead ? <DelayedQuickReads reads={quickReads} onOpen={onOpenQuickRead} /> : null}
+        </div>
       </div>
     )
   }
@@ -115,6 +122,16 @@ export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRet
       </div>
     </div>
   )
+}
+
+/** Quick reads appear only if the answer is slow, so fast answers don't flash cards. */
+function DelayedQuickReads({ reads, onOpen }: { reads: QuickRead[]; onOpen: (read: QuickRead) => void }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(true), 2500)
+    return () => window.clearTimeout(timer)
+  }, [])
+  return visible ? <QuickReads reads={reads} onOpen={onOpen} /> : null
 }
 
 /** Actions under a finished answer, as one segmented group: Copy, and Log food when relevant. */

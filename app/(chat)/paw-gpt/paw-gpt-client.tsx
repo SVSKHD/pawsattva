@@ -64,6 +64,7 @@ import { mealLabels } from "@/app/(main)/logger/components/shared"
 import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
+import { pickQuickReads, QuickViewDialog, useQuickReads, type QuickRead } from "./components/quick-reads"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
 
@@ -121,6 +122,10 @@ export function PawGptClient() {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [promptsOpen, setPromptsOpen] = usePromptDockOpen()
   const [mealOpen, setMealOpen] = useState(false)
+  // Blog posts to read while a slow answer is on its way; loaded on the first question.
+  const allQuickReads = useQuickReads(streaming)
+  // Kept here (not in the message) so the quick view stays open when the answer arrives.
+  const [quickView, setQuickView] = useState<QuickRead | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -617,6 +622,12 @@ export function PawGptClient() {
                       ? () => setMealOpen(true)
                       : undefined
                   }
+                  quickReads={
+                    item.pending && !item.content
+                      ? pickQuickReads(allQuickReads, messages[index - 1]?.content ?? "", pet && !pet.planning ? (isCatPet(pet) ? "cat" : "dog") : null)
+                      : undefined
+                  }
+                  onOpenQuickRead={setQuickView}
                 />
               ))}
             </div>
@@ -779,6 +790,8 @@ export function PawGptClient() {
           .
         </p>
       </form>
+
+      <QuickViewDialog read={quickView} onOpenChange={(open) => !open && setQuickView(null)} />
 
       {quota && (
         <UsageLimitDialog
