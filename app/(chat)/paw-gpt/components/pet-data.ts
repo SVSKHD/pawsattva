@@ -11,7 +11,14 @@ export interface GptPet {
   profile?: PetFeedEntry
   /** Latest full wellness report (adds allergies, medical conditions, dislikes) */
   report?: PetFeed
+  /** Not a real pet: the "planning a pet" chat for owners who don't have one yet */
+  planning?: boolean
 }
+
+/** Chats about getting a new pet are filed under this name (chat history, prompt dock, picker). */
+export const PLANNING_PET_NAME = "Pet planning"
+export const planningPet: GptPet = { name: PLANNING_PET_NAME, planning: true }
+export const isPlanningPet = (pet?: GptPet | null) => Boolean(pet?.planning)
 
 export const isCatPet = (pet?: GptPet | null) =>
   Boolean((pet?.profile?.petType ?? pet?.report?.petType)?.toLowerCase().includes("cat"))
@@ -55,6 +62,7 @@ export function describeAge(pet: GptPet) {
 }
 
 export function petSubtitle(pet: GptPet) {
+  if (pet.planning) return "Choosing and preparing for a new pet"
   const source = pet.profile ?? pet.report
   return [source?.petBreed, describeAge(pet), source?.weightKg ? `${source.weightKg} kg` : undefined]
     .filter(Boolean)
@@ -77,8 +85,19 @@ export function buildPetContext(
   weights: PetWeightEntry[],
   ownerName?: string
 ): PawGptPetContext {
-  const source = { ...pet.report, ...pet.profile }
   const today = new Date()
+  if (pet.planning) {
+    // No pet yet: the prompt switches Paw GPT to helping the owner choose and prepare.
+    return {
+      today: format(today, "yyyy-MM-dd (EEEE)"),
+      ownerName: ownerName?.split(" ")[0] || undefined,
+      pet: { mode: "planning", note: "The owner has no pet on PawSattva yet and is planning to get one." },
+      mealLogs: [],
+      weights: [],
+      summary: {},
+    }
+  }
+  const source = { ...pet.report, ...pet.profile }
 
   const petRecord = compact({
     name: pet.name,
@@ -186,7 +205,7 @@ export function toLoggerPet(pet: GptPet): LoggerPet {
 const FOOD_WORDS =
   /\b(food|foods|feed|feeding|fed|meal|meals|diet|portion|portions|kibble|treat|treats|water|drink|drinking|calorie|calories|breakfast|lunch|dinner|snack|appetite|eat|eats|eating|ate|grams?|food log|logger)\b/i
 
-/** True when a question or answer is about what the pet eats or drinks — worth a "Log food" shortcut. */
+/** True when a question or answer is about what the pet eats or drinks: worth a "Log food" shortcut. */
 export const isFoodRelated = (...texts: (string | undefined)[]) =>
   texts.some((text) => Boolean(text && (FOOD_WORDS.test(text) || text.includes("/logger"))))
 
@@ -196,8 +215,33 @@ export interface PromptGroup {
   prompts: { label: string; prompt: string }[]
 }
 
+/** Questions for owners who don't have a pet yet. */
+const PLANNING_PROMPTS: PromptGroup[] = [
+  {
+    id: "choose",
+    label: "Choosing",
+    prompts: [
+      { label: "Dog or cat?", prompt: "I'm thinking about getting a pet. Help me decide between a dog and a cat based on my home, schedule and budget. Ask me what you need to know." },
+      { label: "Breeds for my home", prompt: "Which dog and cat breeds suit apartment living in an Indian city, with someone away at work for part of the day?" },
+      { label: "Adopt or buy?", prompt: "Should I adopt (including Indian breeds/indies) or buy from a breeder? How do I spot a responsible breeder or shelter?" },
+      { label: "Monthly cost", prompt: "What does a dog or cat cost per month in India: food, vet care, vaccinations, grooming and supplies? Give a realistic range in ₹." },
+    ],
+  },
+  {
+    id: "prepare",
+    label: "Preparing",
+    prompts: [
+      { label: "First-week checklist", prompt: "Give me a checklist of everything to buy and set up before bringing a new puppy or kitten home." },
+      { label: "Pet-proof my home", prompt: "How do I pet-proof my home for a new puppy or kitten? Cover cables, plants, balconies and unsafe foods." },
+      { label: "First vet visit", prompt: "What happens at the first vet visit, and which vaccinations and deworming does a new puppy or kitten need in India?" },
+      { label: "First food", prompt: "What should a new puppy or kitten eat, how often, and how do I switch from what the shelter or breeder fed?" },
+    ],
+  },
+]
+
 /** Ready-made questions for the prompt dock, written for the selected pet. */
 export function promptLibrary(pet: GptPet): PromptGroup[] {
+  if (pet.planning) return PLANNING_PROMPTS
   const name = pet.name
   const cat = isCatPet(pet)
   const kind = cat ? "cat" : "dog"

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import { doc, onSnapshot } from "firebase/firestore"
@@ -48,8 +48,12 @@ import {
   buildPetContext,
   isCatPet,
   isFoodRelated,
+  isPlanningPet,
   mergePets,
+  PLANNING_PET_NAME,
+  planningPet,
   petSubtitle,
+  promptLibrary,
   reportPrompts,
   toLoggerPet,
   weightStatusOf,
@@ -94,7 +98,8 @@ function loadChats(uid: string): Conversation[] {
 const compactTokens = (value: number) =>
   value >= 1000 ? `${(value / 1000).toFixed(value >= 100_000 ? 0 : 1).replace(/\.0$/, "")}k` : String(value)
 
-const petIcon = (pet: GptPet | null) => (isCatPet(pet) ? Cat : pet?.profile || pet?.report ? Dog : PawPrint)
+const petIcon = (pet: GptPet | null) =>
+  isPlanningPet(pet) ? Heart : isCatPet(pet) ? Cat : pet?.profile || pet?.report ? Dog : PawPrint
 
 export function PawGptClient() {
   const router = useRouter()
@@ -239,10 +244,10 @@ export function PawGptClient() {
   )
 
   useEffect(() => {
-    if (selectedPet) void loadWeights(selectedPet)
+    if (selectedPet && selectedPet !== PLANNING_PET_NAME) void loadWeights(selectedPet)
   }, [loadWeights, selectedPet])
 
-  const pet = pets.find((item) => item.name === selectedPet) ?? null
+  const pet = selectedPet === PLANNING_PET_NAME ? planningPet : pets.find((item) => item.name === selectedPet) ?? null
   // Stable reference: the meal dialog resets its form whenever `pets` changes.
   const loggerPets = useMemo(() => pets.map(toLoggerPet), [pets])
   const activeChat = useMemo(
@@ -293,7 +298,9 @@ export function PawGptClient() {
     const question = text.trim()
     if (!user || streaming || !question) return
     if (!pet) {
-      toast.message("Select a pet first", { description: "Paw GPT answers from your pet's own record." })
+      toast.message(pets.length ? "Select a pet first" : "Add a pet or start planning one", {
+        description: pets.length ? "Paw GPT answers from your pet's own record." : 'Choose "Planning a pet" to ask about getting one.',
+      })
       setPickerOpen(true)
       return
     }
@@ -335,7 +342,7 @@ export function PawGptClient() {
     abortRef.current = controller
 
     try {
-      const weights = await loadWeights(petName)
+      const weights = pet.planning ? [] : await loadWeights(petName)
       const context = buildPetContext(pet, entries, weights, profile?.displayName || user.displayName || undefined)
       let tracked = false
       for await (const chunk of streamPawGptAnswer({ user, context, messages: history, signal: controller.signal, exempt })) {
@@ -467,6 +474,7 @@ export function PawGptClient() {
       .reverse()
       .slice(0, 6)
       .map((item) => `You asked: ${item.content}`)
+    if (pet.planning) return [...asked, petSubtitle(pet)]
     const meals = entries.filter((entry) => entry.petName === pet.name).length
     const weighIns = weightsByPet[pet.name]?.length ?? 0
     const status = weightStatusOf(pet)
@@ -582,7 +590,7 @@ export function PawGptClient() {
                   ticker={ticker}
                   onRetry={item.error && !streaming ? () => retry(item.id) : undefined}
                   onLogFood={
-                    pet && item.role === "assistant" && !item.error && isFoodRelated(item.content, messages[index - 1]?.content)
+                    pet && !pet.planning && item.role === "assistant" && !item.error && isFoodRelated(item.content, messages[index - 1]?.content)
                       ? () => setMealOpen(true)
                       : undefined
                   }
@@ -624,7 +632,11 @@ export function PawGptClient() {
             placeholder={
               limitReached
                 ? `${limitMessage}. Ask again after midnight.`
-                : pet ? `Ask anything about ${pet.name}…` : "Select your pet, then ask a question…"
+                : pet?.planning
+                  ? "Ask anything about getting a new pet…"
+                  : pet
+                    ? `Ask anything about ${pet.name}…`
+                    : pets.length ? "Select your pet, then ask a question…" : "Add a pet, or choose Planning a pet…"
             }
             aria-label="Ask Paw GPT"
             className="block max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground"
@@ -660,7 +672,14 @@ export function PawGptClient() {
                     </DropdownMenuItem>
                   )
                 })}
-                {pets.length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuItem onSelect={() => selectPet(PLANNING_PET_NAME)} className="rounded-lg px-2.5 py-2">
+                  <Heart />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">Planning a pet</span>
+                    <span className="block truncate text-xs text-muted-foreground">Choosing and preparing for one</span>
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem asChild className="rounded-lg px-2.5 py-2">
                   <Link href="/pet-feed">
                     <Plus /> Add a pet
@@ -780,23 +799,44 @@ function Greeting({
       <div className="paw-gpt-anim-rise mt-6 w-full" style={{ animationDelay: "200ms" }}>
         {loading ? (
           <p className="text-sm text-muted-foreground">Finding your pets…</p>
-        ) : pets.length === 0 ? (
-          <div className="flex flex-col items-center gap-3">
-            <p className="text-sm text-muted-foreground">Add your pet and I&apos;ll answer from their profile, meals and weigh-ins.</p>
+        ) : pets.length === 0 && !pet ? (
+          // No pets yet: add one, or plan one with Paw GPT
+          <div className="mx-auto grid w-full max-w-lg gap-3 sm:grid-cols-2">
             <Link
               href="/pet-feed"
-              className="inline-flex h-10 items-center gap-1.5 rounded-full bg-orange-500 px-5 text-sm font-bold text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-600"
+              className="paw-glass group flex flex-col items-center gap-2 rounded-[1.6rem] p-5 text-center transition hover:-translate-y-0.5 hover:ring-2 hover:ring-orange-400/40"
             >
-              <Plus className="h-4 w-4" /> Add your first pet
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500 text-white shadow-md shadow-orange-500/25">
+                <Plus className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-black">I have a pet</span>
+              <span className="text-xs leading-snug text-muted-foreground">
+                Add them in Pet Feed and I&apos;ll answer from their profile, meals and weigh-ins.
+              </span>
+              <span className="mt-1 text-xs font-bold text-orange-600 group-hover:underline">Add your pet →</span>
             </Link>
+            <button
+              type="button"
+              onClick={() => onSelectPet(PLANNING_PET_NAME)}
+              className="paw-glass group flex flex-col items-center gap-2 rounded-[1.6rem] p-5 text-center transition hover:-translate-y-0.5 hover:ring-2 hover:ring-orange-400/40"
+            >
+              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-500 text-white shadow-md shadow-rose-500/25">
+                <Heart className="h-5 w-5" />
+              </span>
+              <span className="text-sm font-black">Planning a pet?</span>
+              <span className="text-xs leading-snug text-muted-foreground">
+                Dog or cat, the right breed, costs in ₹ and a first-week checklist. Let&apos;s plan it together.
+              </span>
+              <span className="mt-1 text-xs font-bold text-rose-600 group-hover:underline">Start planning →</span>
+            </button>
           </div>
         ) : (
           <>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600 dark:text-orange-400">
-              {pet ? `Ask me about ${pet.name}` : "Who are we caring for today?"}
+              {pet?.planning ? "Let's plan your new pet" : pet ? `Ask me about ${pet.name}` : "Who are we caring for today?"}
             </p>
             <div role="radiogroup" aria-label="Choose a pet" className="mt-3 flex flex-wrap justify-center gap-2">
-              {pets.map((item) => {
+              {[...pets, planningPet].map((item) => {
                 const Icon = petIcon(item)
                 const active = item.name === pet?.name
                 return (
@@ -813,7 +853,7 @@ function Greeting({
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    {item.name}
+                    {item.planning ? "Planning a pet" : item.name}
                   </button>
                 )
               })}
@@ -821,7 +861,10 @@ function Greeting({
 
             {pet && (
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {reportPrompts(pet.name).map((item) => (
+                {(pet.planning
+                  ? promptLibrary(pet).flatMap((group) => group.prompts).slice(0, 4).map(({ label, prompt }) => ({ title: label, description: prompt, prompt }))
+                  : reportPrompts(pet.name)
+                ).map((item) => (
                   <button
                     key={item.title}
                     type="button"
@@ -835,7 +878,16 @@ function Greeting({
                 ))}
               </div>
             )}
-            {pet && !pet.profile && !pet.report && (
+            {pet?.planning && pets.length === 0 && (
+              <p className="mt-4 text-xs text-muted-foreground">
+                Already have your pet?{" "}
+                <Link href="/pet-feed" className="font-semibold text-orange-600 hover:underline">
+                  Add them in Pet Feed
+                </Link>{" "}
+                for answers based on their own record.
+              </p>
+            )}
+            {pet && !pet.planning && !pet.profile && !pet.report && (
               <p className="mt-4 text-xs text-muted-foreground">
                 {pet.name} only appears in your food logs.{" "}
                 <Link href="/pet-feed" className="font-semibold text-orange-600 hover:underline">

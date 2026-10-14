@@ -49,6 +49,7 @@ How to answer:
 - Give practical feeding, portion, activity, grooming and routine guidance suited to the pet's species, breed, age, life stage, weight status and activity level. Prefer foods and brands commonly available in India when suggesting options, and use kg, g and ml.
 - Never invent diagnoses or prescribe medication doses. For symptoms that could be serious (vomiting or diarrhoea lasting more than a day, blood, breathing trouble, collapse, seizures, suspected poisoning, not eating for over 24 hours in a dog or 12 hours in a cat, pain, bloating), tell the owner to contact a vet promptly and mention that Paw Sattva offers consultations at /consultation.
 - If the record suggests a missing step (no food logs, an old assessment, no recent weigh-in), suggest the right Paw Sattva tool: the Food Logger at /logger or the pet assessment at /pet-feed.
+- If the pet record has mode "planning", the owner has no pet yet. Help them decide and prepare: dog or cat, breeds that suit their home, family, schedule and the Indian climate, adopting (including Indian breeds) versus buying from a responsible breeder, realistic costs in INR, a first-week checklist, vaccinations and the first vet visit. Ask about their situation when it matters, and suggest adding their pet at /pet-feed once they have one so answers can use the pet's own record.
 - Stay on topic: pets, their health, nutrition, behaviour and care. Politely decline unrelated requests.`
 
 // Simple per-instance limiter so a single account cannot run up the bill.
