@@ -64,6 +64,7 @@ import { mealLabels } from "@/app/(main)/logger/components/shared"
 import { ProfileDock, ProfileSidebar, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
+import { ChatHomeButton } from "../chat-home-button"
 import { pickQuickReads, QuickViewDialog, useQuickReads, type QuickRead } from "./components/quick-reads"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
@@ -554,12 +555,65 @@ export function PawGptClient() {
         className={`pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b ${phaseCopy[phase].sky} to-transparent transition-colors duration-700`}
       />
 
-      {/* Floating dock from tablet width up; a left sidebar on phones. Same contents. */}
-      <ProfileDock {...dockProps} />
-      <ProfileSidebar {...dockProps} />
+      {/* Floating liquid-glass top bar, fixed at the top: the conversation scrolls underneath it
+          (blurred through the glass) instead of a pill sitting in the middle of an answer.
+          Phones: pets menu · pet · New chat · Home. Wider screens: the pets dock floats below it. */}
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-5">
+        <div className="paw-liquid-glass pointer-events-auto mx-auto max-w-4xl overflow-hidden rounded-[1.75rem]">
+        <div className="flex h-14 items-center gap-2 pl-2 pr-2 sm:gap-3 sm:pl-2.5">
+          <ProfileSidebar {...dockProps} />
 
-      {/* Greeting or conversation (no site header here, so less top padding) */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-20 sm:px-6 md:pt-24">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 md:justify-center">
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
+                streaming ? "paw-gpt-anim-breathe" : ""
+              }`}
+            >
+              {pet ? <PetIcon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+            </span>
+            <span className="min-w-0 leading-tight">
+              <span className="block truncate text-[15px] font-bold tracking-tight">
+                {pet?.planning ? "Planning a pet" : pet?.name || "Paw GPT"}
+              </span>
+              <span className={`block truncate text-xs ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
+                {streaming
+                  ? "Paw GPT is answering…"
+                  : pet
+                    ? petSubtitle(pet) || "Paw GPT"
+                    : loadingData ? "Finding your pets…" : "Your pet's AI care companion"}
+              </span>
+            </span>
+          </div>
+
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={startNewChat}
+              aria-label="New chat"
+              title="New chat"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
+            >
+              <SquarePen className="h-4 w-4" />
+              <span className="hidden sm:inline">New chat</span>
+            </button>
+          )}
+          <ChatHomeButton />
+        </div>
+
+        {/* While an answer is being written: earlier questions and record facts drift by */}
+        <div className={`grid transition-[grid-template-rows,opacity] duration-500 ${writing && ticker.length ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
+          <div className="min-h-0 overflow-hidden">
+            <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />
+          </div>
+        </div>
+        </div>
+      </header>
+
+      {/* Floating dock from tablet width up (below the top bar); phones use the sidebar in the bar. */}
+      <ProfileDock {...dockProps} />
+
+      {/* Greeting or conversation; padding clears the fixed top bar */}
+      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-[calc(5.5rem+env(safe-area-inset-top))] sm:px-6">
         {messages.length === 0 ? (
           <Greeting
             phase={phase}
@@ -572,46 +626,6 @@ export function PawGptClient() {
           />
         ) : (
           <div className="mx-auto max-w-3xl pb-6">
-            {/* Live header: a glass capsule that grows into a moving banner while Paw GPT works */}
-            {/* Below lg the bar would slide under the floating Home button, so it sticks just beneath it */}
-            <div className="sticky top-[calc(3.75rem+env(safe-area-inset-top))] z-10 mb-6 flex justify-center pt-1 lg:top-0">
-              <div
-                className={`paw-glass w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                  streaming ? "max-w-xl rounded-[1.6rem]" : "max-w-md rounded-full"
-                }`}
-              >
-                <div className="flex items-center gap-2.5 py-1.5 pl-1.5 pr-1.5">
-                  <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] ${
-                      streaming ? "paw-gpt-anim-breathe" : ""
-                    }`}
-                  >
-                    <PetIcon className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1 leading-tight">
-                    <span className="block truncate text-sm font-semibold tracking-tight">{pet?.name}</span>
-                    <span className={`block truncate text-[11px] ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
-                      {streaming ? "Paw GPT is answering…" : petSubtitle(pet ?? { name: "" }) || "Paw GPT"}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={startNewChat}
-                    aria-label="New chat"
-                    title="New chat"
-                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-xs font-semibold text-foreground/80 transition hover:bg-black/[0.08] active:scale-95 dark:bg-white/10 dark:hover:bg-white/15"
-                  >
-                    <SquarePen className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">New chat</span>
-                  </button>
-                </div>
-                <div className={`grid transition-[grid-template-rows,opacity] duration-500 ${writing && ticker.length ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}>
-                  <div className="min-h-0 overflow-hidden">
-                    <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />
-                  </div>
-                </div>
-              </div>
-            </div>
             <div className="space-y-5">
               {messages.map((item, index) => (
                 <ChatMessage

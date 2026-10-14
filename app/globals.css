@@ -598,6 +598,42 @@ a {
     0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
+/* Liquid glass: paw-glass with deeper blur, a bright rim and a diagonal sheen, for floating bars. */
+.paw-liquid-glass {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.36));
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 0 18px rgba(255, 255, 255, 0.25),
+    0 14px 40px -14px rgba(24, 24, 27, 0.28),
+    0 2px 8px -2px rgba(24, 24, 27, 0.08);
+  backdrop-filter: blur(28px) saturate(200%) brightness(1.04);
+  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.04);
+}
+.paw-liquid-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.28) 100%);
+}
+.dark .paw-liquid-glass {
+  background: linear-gradient(180deg, rgba(39, 39, 42, 0.62), rgba(24, 24, 27, 0.45));
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 18px rgba(255, 255, 255, 0.03),
+    0 14px 40px -14px rgba(0, 0, 0, 0.7);
+}
+.dark .paw-liquid-glass::before {
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.05) 100%);
+}
+
 /* Moving banner: the track holds its chips twice and slides by half its width. */
 @keyframes paw-gpt-marquee {
   from { transform: translate3d(0, 0, 0); }

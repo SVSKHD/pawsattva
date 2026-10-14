@@ -17,6 +17,7 @@ import { isCatPet, petSubtitle, weightStatusOf, type GptPet } from "./pet-data"
 const POSITION_KEY = "paw-gpt-dock-position"
 const EDGE = 8
 const KEY_STEP = 24
+const TOP_BAR = 72
 
 const statusDot: Record<string, string> = {
   ideal: "bg-emerald-500",
@@ -31,7 +32,8 @@ type Position = { x: number; y: number }
 function clampToViewport(next: Position, width = 300, handleHeight = 64): Position {
   return {
     x: Math.min(Math.max(EDGE, next.x), Math.max(EDGE, window.innerWidth - width - EDGE)),
-    y: Math.min(Math.max(EDGE, next.y), Math.max(EDGE, window.innerHeight - handleHeight - EDGE)),
+    // Never above the chat's floating top bar (12px gap + 56px bar).
+    y: Math.min(Math.max(TOP_BAR + EDGE, next.y), Math.max(TOP_BAR + EDGE, window.innerHeight - handleHeight - EDGE)),
   }
 }
 
@@ -497,7 +499,7 @@ function DockBody({
  * Choosing a pet or a chat closes it, so the conversation is right there.
  */
 export function ProfileSidebar(props: ProfileDockProps) {
-  const { user, profile, selectedPet, streaming, loading } = props
+  const { user, profile, selectedPet } = props
   const [open, setOpen] = useState(false)
   const name = profile?.displayName || user.displayName || user.email?.split("@")[0] || "Pet parent"
   const photo = profile?.photoURL || user.photoURL
@@ -512,16 +514,10 @@ export function ProfileSidebar(props: ProfileDockProps) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open your pets, chats and usage"
-        className="paw-glass fixed left-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-[45] flex h-11 max-w-[55vw] items-center gap-2 rounded-full py-1 pl-3 pr-3.5 text-sm font-semibold text-foreground/80 transition active:scale-95 md:hidden"
+        // Lives in the chat's top bar; phones only (wider screens have the floating dock).
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground/80 ring-1 ring-black/5 transition hover:bg-black/[0.04] active:scale-95 md:hidden dark:ring-white/10 dark:hover:bg-white/10"
       >
-        <Menu className="h-4 w-4 shrink-0" />
-        <span className="truncate">
-          {streaming ? (
-            <span className="paw-gpt-anim-shimmer">Answering…</span>
-          ) : (
-            selectedPet || (loading ? "Loading…" : "Your pets")
-          )}
-        </span>
+        <Menu className="h-[18px] w-[18px]" />
       </button>
       <SheetContent side="left" className="w-[min(22rem,88vw)] gap-0 overflow-y-auto p-0">
         <SheetHeader className="border-b border-black/5 p-4 dark:border-white/10">
