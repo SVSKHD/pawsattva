@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { ApiError as GeminiApiError, GoogleGenAI } from "@google/genai"
 import { NextResponse } from "next/server"
 
 import {
@@ -13,7 +14,24 @@ import {
 // Long answers (full reports) stream for a while.
 export const maxDuration = 120
 
-const MODEL = "claude-opus-5-5"
+const ANTHROPIC_MODEL = "claude-opus-5-5"
+// A moving alias for Google's current Flash model; pin a specific one with GEMINI_MODEL.
+const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
+
+type ServerProvider = "gemini" | "anthropic"
+
+/**
+ * Which model answers on the server. Gemini when GEMINI_API_KEY is set, otherwise Anthropic;
+ * PAW_GPT_SERVER_PROVIDER=gemini|anthropic forces one. null when the chosen one has no key.
+ */
+function serverProvider(): ServerProvider | null {
+  const forced = process.env.PAW_GPT_SERVER_PROVIDER?.trim().toLowerCase()
+  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim())
+  const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
+  if (forced === "gemini") return hasGemini ? "gemini" : null
+  if (forced === "anthropic") return hasAnthropic ? "anthropic" : null
+  return hasGemini ? "gemini" : hasAnthropic ? "anthropic" : null
+}
 const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
 const firestoreBase = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`
 
@@ -216,7 +234,9 @@ function parseBody(body: unknown): PawGptRequest | null {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  const provider = serverProvider()
+  if (!provider) {
+    console.error("Paw GPT: set GEMINI_API_KEY or ANTHROPIC_API_KEY (matching PAW_GPT_SERVER_PROVIDER if set).")
     return NextResponse.json({ error: "Paw GPT is not configured on the server yet." }, { status: 503 })
   }
 
@@ -256,60 +276,25 @@ export async function POST(req: Request) {
   }
   if (!quota.ok) return NextResponse.json({ error: quota.error, code: quota.code }, { status: quota.status })
 
-  const client = new Anthropic()
   const encoder = new TextEncoder()
 
   const caller = auth
+  const answer = provider === "gemini" ? answerWithGemini : answerWithAnthropic
   // Tokens this answer used (prompt incl. pet record and cached prefix, plus the answer).
-  const usage = { input: 0, output: 0 }
+  const usage: TokenUsage = { input: 0, output: 0 }
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const response = client.beta.messages.stream(
-          {
-            model: MODEL,
-            max_tokens: 16000,
-            betas: ["server-side-fallback-2026-07-01"],
-            fallbacks: "default",
-            output_config: { effort: "medium" },
-            // Follow-up questions resend the same pet record and history, so cache the prefix.
-            cache_control: { type: "ephemeral" },
-            system: [
-              { type: "text", text: SYSTEM_PROMPT },
-              { type: "text", text: `Selected pet record:\n${JSON.stringify(request.context)}` },
-            ],
-            messages: request.messages,
-          },
-          { signal: req.signal }
-        )
-
-        for await (const event of response) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text))
-          } else if (event.type === "message_start") {
-            const u = event.message.usage
-            usage.input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
-            usage.output = u.output_tokens ?? 0
-          } else if (event.type === "message_delta") {
-            // output_tokens is cumulative in message_delta.
-            usage.output = event.usage.output_tokens ?? usage.output
-          }
-        }
-
-        const final = await response.finalMessage()
-        if (final.stop_reason === "refusal") {
-          controller.enqueue(encoder.encode("\n\nSorry, I can't help with that one. Try asking about your pet's care, food or health."))
-        } else if (final.stop_reason === "max_tokens") {
-          controller.enqueue(encoder.encode("\n\n_(The answer was cut short — ask me to continue.)_"))
+        for await (const text of answer(request, req.signal, usage)) {
+          controller.enqueue(encoder.encode(text))
         }
       } catch (error) {
         if (req.signal.aborted) return
-        console.error("Paw GPT stream failed:", error)
-        const message =
-          error instanceof Anthropic.RateLimitError
-            ? "Paw GPT is busy right now. Please try again in a minute."
-            : "Something went wrong while answering. Please try again."
+        console.error(`Paw GPT stream failed (${provider}):`, error)
+        const message = isRateLimit(error)
+          ? "Paw GPT is busy right now. Please try again in a minute."
+          : "Something went wrong while answering. Please try again."
         controller.enqueue(encoder.encode(`\n\n${message}`))
       } finally {
         // Record before closing: the function may stop once the response ends.
@@ -332,4 +317,93 @@ export async function POST(req: Request) {
       "X-Content-Type-Options": "nosniff",
     },
   })
+}
+
+// ── Model backends ───────────────────────────────────────────────────────────
+
+type TokenUsage = { input: number; output: number }
+
+const REFUSAL_NOTE = "\n\nSorry, I can't help with that one. Try asking about your pet's care, food or health."
+const CUT_SHORT_NOTE = "\n\n_(The answer was cut short — ask me to continue.)_"
+
+const petRecordPrompt = (request: PawGptRequest) => `Selected pet record:\n${JSON.stringify(request.context)}`
+
+const isRateLimit = (error: unknown) =>
+  error instanceof Anthropic.RateLimitError || (error instanceof GeminiApiError && error.status === 429)
+
+/** Claude via the Anthropic API (ANTHROPIC_API_KEY). */
+async function* answerWithAnthropic(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+  const response = new Anthropic().beta.messages.stream(
+    {
+      model: ANTHROPIC_MODEL,
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-07-01"],
+      fallbacks: "default",
+      output_config: { effort: "medium" },
+      // Follow-up questions resend the same pet record and history, so cache the prefix.
+      cache_control: { type: "ephemeral" },
+      system: [
+        { type: "text", text: SYSTEM_PROMPT },
+        { type: "text", text: petRecordPrompt(request) },
+      ],
+      messages: request.messages,
+    },
+    { signal }
+  )
+
+  for await (const event of response) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      yield event.delta.text
+    } else if (event.type === "message_start") {
+      const u = event.message.usage
+      usage.input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0)
+      usage.output = u.output_tokens ?? 0
+    } else if (event.type === "message_delta") {
+      // output_tokens is cumulative in message_delta.
+      usage.output = event.usage.output_tokens ?? usage.output
+    }
+  }
+
+  const final = await response.finalMessage()
+  if (final.stop_reason === "refusal") yield REFUSAL_NOTE
+  else if (final.stop_reason === "max_tokens") yield CUT_SHORT_NOTE
+}
+
+const GEMINI_BLOCKED = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RECITATION", "SPII", "IMAGE_SAFETY"])
+
+/** Gemini via the Gemini Developer API (GEMINI_API_KEY). */
+async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  const response = await ai.models.generateContentStream({
+    model: GEMINI_MODEL,
+    contents: request.messages.map(({ role, content }) => ({
+      role: role === "assistant" ? "model" : "user",
+      parts: [{ text: content }],
+    })),
+    config: {
+      systemInstruction: `${SYSTEM_PROMPT}\n\n${petRecordPrompt(request)}`,
+      maxOutputTokens: 16000,
+      temperature: 0.6,
+      abortSignal: signal,
+    },
+  })
+
+  let finishReason: string | undefined
+  let blocked = false
+  for await (const chunk of response) {
+    const text = chunk.text
+    if (text) yield text
+    // usageMetadata is cumulative; the last chunk has the totals.
+    if (chunk.usageMetadata) {
+      const total = chunk.usageMetadata.totalTokenCount ?? 0
+      usage.input = Math.min(total, chunk.usageMetadata.promptTokenCount ?? 0)
+      // Thinking tokens are billed as output, and they're in the total.
+      usage.output = total - usage.input
+    }
+    finishReason = chunk.candidates?.[0]?.finishReason ?? finishReason
+    if (chunk.promptFeedback?.blockReason) blocked = true
+  }
+
+  if (blocked || (finishReason && GEMINI_BLOCKED.has(finishReason))) yield REFUSAL_NOTE
+  else if (finishReason === "MAX_TOKENS") yield CUT_SHORT_NOTE
 }

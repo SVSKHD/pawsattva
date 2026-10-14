@@ -7,18 +7,20 @@ import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptUsagePath, type P
 /**
  * Streams a Paw GPT answer from the configured backend.
  *
- *   anthropic   (default) — /api/paw-gpt route handler (server-side, Anthropic).
+ *   server      (default) — /api/paw-gpt route handler. It answers with Gemini (GEMINI_API_KEY)
+ *                 or Claude (ANTHROPIC_API_KEY); see serverProvider() in the route.
  *   firebase-ai — Firebase AI Logic (Gemini) called from the browser through a server
  *                 prompt template, protected by App Check. The prompt, model and limits
  *                 live in the template, so the browser can only fill in its variables.
  *
- * Switch with NEXT_PUBLIC_PAW_GPT_PROVIDER once App Check and the template are set up.
+ * Choose with NEXT_PUBLIC_PAW_GPT_PROVIDER ("server" or "firebase-ai"; the old value
+ * "anthropic" still means the server route).
  */
 
-export type PawGptProvider = "anthropic" | "firebase-ai"
+export type PawGptProvider = "server" | "firebase-ai"
 
 export const PAW_GPT_PROVIDER: PawGptProvider =
-  process.env.NEXT_PUBLIC_PAW_GPT_PROVIDER === "firebase-ai" ? "firebase-ai" : "anthropic"
+  process.env.NEXT_PUBLIC_PAW_GPT_PROVIDER === "firebase-ai" ? "firebase-ai" : "server"
 
 const TEMPLATE_ID = process.env.NEXT_PUBLIC_PAW_GPT_TEMPLATE_ID || "paw-gpt-v1"
 
@@ -55,7 +57,7 @@ export function streamPawGptAnswer(request: StreamRequest): AsyncGenerator<strin
   return PAW_GPT_PROVIDER === "firebase-ai" ? streamFromFirebaseAi(request) : streamFromRoute(request)
 }
 
-// ── Anthropic via /api/paw-gpt ───────────────────────────────────────────────
+// ── Server route /api/paw-gpt (Gemini or Claude) ─────────────────────────────
 
 async function* streamFromRoute({ user, context, messages, signal }: StreamRequest) {
   const res = await fetch("/api/paw-gpt", {
