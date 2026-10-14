@@ -312,6 +312,36 @@ service cloud.firestore {
 
 
     // ─────────────────────────────────────────
+    // AI BLOG DRAFTS
+    // Submitted by the AI integration (/api/integrations/ai/blog-drafts) and moderated through
+    // /api/admin/ai-drafts/{id}. Both use the Admin SDK, so every client write is refused here:
+    // status, approval and publishing can only change through the server-verified workflow.
+    // Drafts never appear in /blogs until a moderator publishes them.
+    // ─────────────────────────────────────────
+
+    match /aiBlogDrafts/{draftId} {
+
+      allow read: if isFullAdmin();
+      allow write: if false;
+
+      // Moderation history: append-only, written by the server.
+      match /audit/{eventId} {
+        allow read: if isFullAdmin();
+        allow write: if false;
+      }
+    }
+
+    // Idempotency records and API rate-limit counters are server-only.
+    match /aiBlogDraftIdempotency/{keyHash} {
+      allow read, write: if false;
+    }
+
+    match /integrationRateLimits/{windowId} {
+      allow read, write: if false;
+    }
+
+
+    // ─────────────────────────────────────────
     // CATEGORIES
     // ─────────────────────────────────────────
 
