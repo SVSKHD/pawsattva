@@ -560,10 +560,11 @@ export function PawGptClient() {
           Phones: pets menu · pet · New chat · Home. Wider screens: the pets dock floats below it. */}
       <header className="pointer-events-none fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-5">
         <div className="paw-liquid-glass pointer-events-auto mx-auto max-w-4xl overflow-hidden rounded-[1.75rem]">
-        <div className="flex h-14 items-center gap-2 pl-2 pr-2 sm:gap-3 sm:pl-2.5">
+        {/* Pet details on the left, New chat + profile on the right (phones add the pets menu first). */}
+        <div className="flex h-14 items-center gap-2 px-2 sm:gap-3 sm:px-2.5">
           <ProfileSidebar {...dockProps} />
 
-          <div className="flex min-w-0 flex-1 items-center gap-2.5 md:justify-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span
               className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
                 streaming ? "paw-gpt-anim-breathe" : ""
@@ -585,19 +586,21 @@ export function PawGptClient() {
             </span>
           </div>
 
-          {messages.length > 0 && (
-            <button
-              type="button"
-              onClick={startNewChat}
-              aria-label="New chat"
-              title="New chat"
-              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
-            >
-              <SquarePen className="h-4 w-4" />
-              <span className="hidden sm:inline">New chat</span>
-            </button>
-          )}
-          <ChatHomeButton />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={startNewChat}
+                aria-label="New chat"
+                title="New chat"
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
+              >
+                <SquarePen className="h-4 w-4" />
+                <span className="hidden sm:inline">New chat</span>
+              </button>
+            )}
+            <ChatHomeButton />
+          </div>
         </div>
 
         {/* While an answer is being written: earlier questions and record facts drift by */}
@@ -633,7 +636,7 @@ export function PawGptClient() {
                   item={item}
                   petName={pet?.name}
                   petKind={isCatPet(pet) ? "cat" : "dog"}
-                  ticker={ticker}
+                  planning={Boolean(pet?.planning)}
                   onRetry={item.error && !streaming ? () => retry(item.id) : undefined}
                   onLogFood={
                     pet && !pet.planning && item.role === "assistant" && !item.error && isFoodRelated(item.content, messages[index - 1]?.content)

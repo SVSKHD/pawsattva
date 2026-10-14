@@ -82,67 +82,25 @@ function RunningCat({ x, y, colors }: { x: number; y: number; colors: PetColors 
 }
 
 /**
- * A dog and a cat running after a ball while Paw GPT thinks. The pets gallop in place and the
- * ground and scenery scroll past. Pure CSS (paw-gpt-anim-*), so it stops for reduced motion.
+ * One pet galloping in place on a strip of ground, small enough to sit inside a pill
+ * (Paw GPT's thinking indicator). Pure CSS (paw-gpt-anim-*), so it stops for reduced motion.
  */
-export function RunningPets({ lead = "dog", className }: { lead?: "dog" | "cat"; className?: string }) {
-  const dog = <RunningDog x={0} y={52} colors={PET_PALETTES.golden} />
-  const cat = <RunningCat x={0} y={55} colors={PET_PALETTES.ginger} />
-  // The selected pet's kind runs in front, closest to the ball.
-  const [front, back] = lead === "dog" ? [dog, cat] : [cat, dog]
-
+export function MiniRunner({ kind = "dog", className }: { kind?: "dog" | "cat"; className?: string }) {
   return (
-    <svg viewBox="0 0 320 84" className={className} aria-hidden style={{ "--paw-stride": `${STRIDE}s` } as CSSProperties}>
-      {/* sky glow */}
-      <rect x={0} y={0} width={320} height={84} fill="url(#paw-run-sky)" />
-      <defs>
-        <linearGradient id="paw-run-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#fb923c" stopOpacity={0.06} />
-          <stop offset="1" stopColor="#fb923c" stopOpacity={0.14} />
-        </linearGradient>
-      </defs>
-
-      {/* distant bushes and clouds drift slowly (two copies for a seamless loop) */}
-      <g className="paw-gpt-anim-scenery" opacity={0.5}>
-        {[0, 320].map((offset) => (
-          <g key={offset} transform={`translate(${offset} 0)`}>
-            <ellipse cx={40} cy={16} rx={16} ry={5} fill="#fff" opacity={0.7} />
-            <ellipse cx={210} cy={11} rx={20} ry={5.5} fill="#fff" opacity={0.6} />
-            <circle cx={70} cy={70} r={12} fill="#86efac" opacity={0.5} />
-            <circle cx={82} cy={72} r={9} fill="#86efac" opacity={0.5} />
-            <circle cx={250} cy={71} r={11} fill="#86efac" opacity={0.45} />
-          </g>
-        ))}
-      </g>
-
-      {/* ground: a line plus dashes scrolling at running speed */}
-      <line x1={0} y1={76} x2={320} y2={76} stroke="#9a3412" strokeOpacity={0.18} strokeWidth={1.5} />
+    <svg viewBox="-58 14 124 68" className={className} aria-hidden style={{ "--paw-stride": `${STRIDE}s` } as CSSProperties}>
+      {/* ground scrolling under the paws */}
+      <line x1={-58} y1={76} x2={66} y2={76} stroke="#9a3412" strokeOpacity={0.2} strokeWidth={2} />
       <g className="paw-gpt-anim-ground">
-        {Array.from({ length: 13 }, (_, index) => (
-          <rect key={index} x={index * 28} y={79} width={12} height={2} rx={1} fill="#9a3412" opacity={0.18} />
+        {Array.from({ length: 7 }, (_, index) => (
+          <rect key={index} x={-58 + index * 28} y={79.5} width={12} height={2.5} rx={1.25} fill="#9a3412" opacity={0.2} />
         ))}
       </g>
-
-      {/* the ball, bouncing ahead */}
-      <g transform="translate(278 0)">
-        <ellipse cx={0} cy={76.5} rx={6} ry={1.6} fill="#000" opacity={0.12} className="paw-gpt-anim-ballshadow" />
-        <g className="paw-gpt-anim-ball">
-          <circle cx={0} cy={68} r={6.5} fill="#f43f5e" />
-          <path d="M-6 66 q6 4 12 0" stroke="#fff" strokeWidth={1.4} fill="none" opacity={0.85} />
-        </g>
-      </g>
-
-      {/* back runner, then front runner closer to the ball */}
-      <g transform="translate(88 0)">{back}</g>
-      <g transform="translate(206 0)">{front}</g>
-
-      {/* dust kicked up behind each runner */}
-      {[48, 166].map((x, index) => (
-        <g key={x} transform={`translate(${x} 74)`}>
-          <circle cx={0} cy={0} r={3} fill="#d6a77a" className="paw-gpt-anim-dust" style={{ animationDelay: `${-index * 0.2}s` }} />
-          <circle cx={-6} cy={-2} r={2} fill="#d6a77a" className="paw-gpt-anim-dust" style={{ animationDelay: `${-index * 0.2 - 0.15}s` }} />
-        </g>
-      ))}
+      <circle cx={-52} cy={73} r={3.5} fill="#d6a77a" className="paw-gpt-anim-dust" />
+      {kind === "cat" ? (
+        <RunningCat x={-4} y={55} colors={PET_PALETTES.ginger} />
+      ) : (
+        <RunningDog x={-6} y={52} colors={PET_PALETTES.golden} />
+      )}
     </svg>
   )
 }

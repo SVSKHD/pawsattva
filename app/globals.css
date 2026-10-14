@@ -598,11 +598,12 @@ a {
     0 10px 30px -10px rgba(0, 0, 0, 0.6);
 }
 
-/* Liquid glass: paw-glass with deeper blur, a bright rim and a diagonal sheen, for floating bars. */
+/* Liquid glass: paw-glass with deeper blur, a bright rim and a diagonal sheen, for floating bars.
+   At least 50% opaque everywhere, so content scrolling underneath stays a soft blur, not readable text. */
 .paw-liquid-glass {
   position: relative;
   isolation: isolate;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.36));
+  background: linear-gradient(180deg, rgba(255, 252, 248, 0.68), rgba(255, 250, 245, 0.55));
   border: 1px solid rgba(255, 255, 255, 0.7);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.95),
@@ -610,8 +611,8 @@ a {
     inset 0 0 18px rgba(255, 255, 255, 0.25),
     0 14px 40px -14px rgba(24, 24, 27, 0.28),
     0 2px 8px -2px rgba(24, 24, 27, 0.08);
-  backdrop-filter: blur(28px) saturate(200%) brightness(1.04);
-  -webkit-backdrop-filter: blur(28px) saturate(200%) brightness(1.04);
+  backdrop-filter: blur(32px) saturate(190%) brightness(1.05);
+  -webkit-backdrop-filter: blur(32px) saturate(190%) brightness(1.05);
 }
 .paw-liquid-glass::before {
   content: "";
@@ -623,7 +624,7 @@ a {
   background: linear-gradient(115deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.28) 100%);
 }
 .dark .paw-liquid-glass {
-  background: linear-gradient(180deg, rgba(39, 39, 42, 0.62), rgba(24, 24, 27, 0.45));
+  background: linear-gradient(180deg, rgba(39, 39, 42, 0.7), rgba(24, 24, 27, 0.58));
   border-color: rgba(255, 255, 255, 0.12);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
@@ -700,18 +701,6 @@ a {
   from { transform: translateX(0); }
   to { transform: translateX(-28px); }
 }
-@keyframes paw-gpt-scenery {
-  from { transform: translateX(0); }
-  to { transform: translateX(-320px); }
-}
-@keyframes paw-gpt-ball {
-  0%, 100% { transform: translateY(0); animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
-  50% { transform: translateY(-15px); animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1); }
-}
-@keyframes paw-gpt-ballshadow {
-  0%, 100% { transform: scale(1); opacity: 0.12; }
-  50% { transform: scale(0.55); opacity: 0.05; }
-}
 @keyframes paw-gpt-dust {
   0% { transform: translate(0, 0) scale(0.4); opacity: 0.55; }
   100% { transform: translate(-16px, -5px) scale(1.5); opacity: 0; }
@@ -721,10 +710,13 @@ a {
 .paw-gpt-anim-tail { transform-box: fill-box; transform-origin: 100% 100%; animation: paw-gpt-tail calc(var(--paw-stride, 0.42s) * 2) ease-in-out infinite; }
 .paw-gpt-anim-ear { transform-box: fill-box; transform-origin: 50% 0; animation: paw-gpt-ear var(--paw-stride, 0.42s) ease-in-out infinite; }
 .paw-gpt-anim-ground { animation: paw-gpt-ground var(--paw-stride, 0.42s) linear infinite; }
-.paw-gpt-anim-scenery { animation: paw-gpt-scenery 9s linear infinite; }
-.paw-gpt-anim-ball { animation: paw-gpt-ball 0.6s infinite; }
-.paw-gpt-anim-ballshadow { transform-box: fill-box; transform-origin: center; animation: paw-gpt-ballshadow 0.6s ease-in-out infinite; }
 .paw-gpt-anim-dust { transform-box: fill-box; transform-origin: center; animation: paw-gpt-dust 0.6s ease-out infinite; }
+/* Thinking pill: three dots hopping in turn */
+@keyframes paw-gpt-dot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+.paw-gpt-anim-dot { animation: paw-gpt-dot 1s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   [class*="paw-gpt-anim-"] {

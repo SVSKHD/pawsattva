@@ -7,7 +7,7 @@ import remarkGfm from "remark-gfm"
 import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils } from "lucide-react"
 import { toast } from "sonner"
 
-import { RunningPets } from "@/components/pet-scene/running-pets"
+import { MiniRunner } from "@/components/pet-scene/running-pets"
 import { QuickReads, type QuickRead } from "./quick-reads"
 
 export interface ChatItem {
@@ -31,8 +31,8 @@ export interface Conversation {
 interface ChatMessageProps {
   item: ChatItem
   petName?: string
-  /** Earlier questions and record facts shown in the moving banner while Paw GPT works */
-  ticker?: string[]
+  /** "Planning a pet" chats get planning-themed thinking steps */
+  planning?: boolean
   /** The selected pet's kind leads the running pets while Paw GPT thinks */
   petKind?: "dog" | "cat"
   onRetry?: () => void
@@ -43,7 +43,7 @@ interface ChatMessageProps {
   onOpenQuickRead?: (read: QuickRead) => void
 }
 
-export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
+export function ChatMessage({ item, petName, petKind = "dog", planning = false, onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
   if (item.role === "user") {
     return (
       <div id={`msg-${item.id}`} className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
@@ -82,7 +82,7 @@ export function ChatMessage({ item, petName, ticker = [], petKind = "dog", onRet
       <div className="paw-gpt-anim-pop flex gap-3">
         <Avatar thinking />
         <div className="min-w-0 flex-1 space-y-3">
-          <ThinkingBanner petName={petName} ticker={ticker} petKind={petKind} />
+          <ThinkingPill petName={petName} petKind={petKind} planning={planning} />
           {quickReads?.length && onOpenQuickRead ? <DelayedQuickReads reads={quickReads} onOpen={onOpenQuickRead} /> : null}
         </div>
       </div>
@@ -180,38 +180,43 @@ function Avatar({ thinking }: { thinking?: boolean }) {
   )
 }
 
-const STEPS = ["Reading the profile", "Going through meal logs", "Checking the weight trend", "Recalling this chat", "Writing the answer"]
+/** Playful steps the little runner goes through, in the pet's own language. */
+function thinkingSteps(petName: string | undefined, kind: "dog" | "cat", planning: boolean) {
+  const name = petName || "your pet"
+  if (planning) {
+    return ["Sniffing out the right breeds", "Digging into costs", "Fetching a first-week checklist", "Chasing down the details", "Wagging out an answer"]
+  }
+  return kind === "cat"
+    ? [`Pawing through ${name}'s profile`, "Batting at the meal logs", "Stalking the weight chart", "Pouncing on the details", "Purring out an answer"]
+    : [`Sniffing through ${name}'s profile`, "Digging up meal logs", "Fetching the weight chart", "Chasing down the details", "Wagging out an answer"]
+}
 
-/** Live status while Paw GPT prepares an answer, with the chat history drifting by underneath. */
-export function ThinkingBanner({ petName, ticker, petKind = "dog" }: { petName?: string; ticker: string[]; petKind?: "dog" | "cat" }) {
+/**
+ * Small "thinking" pill: a pet galloping in place and a status line that changes every ~1.6s.
+ * Stays on the last step if the answer takes longer.
+ */
+export function ThinkingPill({ petName, petKind = "dog", planning = false }: { petName?: string; petKind?: "dog" | "cat"; planning?: boolean }) {
+  const steps = thinkingSteps(petName, petKind, planning)
   const [step, setStep] = useState(0)
 
   useEffect(() => {
-    const timer = window.setInterval(() => setStep((current) => Math.min(current + 1, STEPS.length - 1)), 1400)
+    const timer = window.setInterval(() => setStep((current) => Math.min(current + 1, steps.length - 1)), 1600)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [steps.length])
 
   return (
-    <div role="status" aria-live="polite" className="paw-glass min-w-0 flex-1 overflow-hidden rounded-[1.4rem] rounded-tl-md">
-      <div className="flex items-center justify-between gap-3 px-4 pt-3">
-        <p className="paw-gpt-anim-shimmer truncate text-sm font-semibold text-foreground/70">
-          Thinking about {petName || "your pet"}…
-        </p>
-        <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">
-          {step + 1}/{STEPS.length}
-        </span>
-      </div>
-      <p key={step} className="paw-gpt-anim-pop px-4 pb-2 pt-0.5 text-xs text-muted-foreground">
-        {STEPS[step]}
-      </p>
-      <RunningPets lead={petKind} className="mx-4 mb-2 block h-auto w-[calc(100%-2rem)] rounded-2xl" />
-      <div className="mx-4 mb-3 h-1 overflow-hidden rounded-full bg-black/[0.05] dark:bg-white/10">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-orange-400 to-orange-500 transition-[width] duration-700 ease-out"
-          style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-        />
-      </div>
-      {ticker.length > 0 && <HistoryTicker items={ticker} className="border-t border-black/5 py-2 dark:border-white/10" />}
+    <div role="status" aria-live="polite" className="paw-glass inline-flex max-w-full items-center gap-2 rounded-full py-1 pl-1 pr-3.5">
+      <span className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-orange-500/[0.08]">
+        <MiniRunner kind={petKind} className="h-8 w-auto" />
+      </span>
+      <span key={step} className="paw-gpt-anim-pop min-w-0 truncate text-[13px] font-medium text-foreground/75">
+        {steps[step]}
+      </span>
+      <span aria-hidden className="flex shrink-0 items-end gap-0.5 pb-0.5">
+        {[0, 1, 2].map((dot) => (
+          <span key={dot} className="paw-gpt-anim-dot h-1 w-1 rounded-full bg-orange-500" style={{ animationDelay: `${dot * 0.15}s` }} />
+        ))}
+      </span>
     </div>
   )
 }
