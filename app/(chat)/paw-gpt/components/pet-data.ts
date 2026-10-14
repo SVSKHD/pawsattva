@@ -168,6 +168,63 @@ export function buildPetContext(
   }
 }
 
+export interface PromptGroup {
+  id: string
+  label: string
+  prompts: { label: string; prompt: string }[]
+}
+
+/** Ready-made questions for the prompt dock, written for the selected pet. */
+export function promptLibrary(pet: GptPet): PromptGroup[] {
+  const name = pet.name
+  const cat = isCatPet(pet)
+  const kind = cat ? "cat" : "dog"
+  return [
+    {
+      id: "reports",
+      label: "Reports",
+      prompts: reportPrompts(name).map(({ title, prompt }) => ({ label: title, prompt })),
+    },
+    {
+      id: "food",
+      label: "Food",
+      prompts: [
+        { label: "Daily portion", prompt: `How much should ${name} eat per day, split into meals? Show grams based on their weight, age and activity.` },
+        { label: "Healthy treats", prompt: `Which healthy treats suit ${name}, how many per day, and which common foods are unsafe for a ${kind}?` },
+        { label: "Switch food safely", prompt: `How do I switch ${name} to a new food without upsetting their stomach? Give a day-by-day plan.` },
+        { label: "Water intake", prompt: `How much water should ${name} drink each day, and how can I tell if they're drinking too little or too much?` },
+      ],
+    },
+    {
+      id: "health",
+      label: "Health",
+      prompts: [
+        { label: "Weight goal", prompt: `Is ${name} at a healthy weight? If not, what target weight and weekly pace should we aim for?` },
+        { label: "Warning signs", prompt: `Which symptoms in ${name} should make me call a vet straight away, and which can wait a day?` },
+        { label: "Upset stomach", prompt: `${name} has an upset stomach. What can I do at home today, and when should I see a vet?` },
+        { label: "Vaccines & deworming", prompt: `What vaccination and deworming schedule is usual for a ${kind} like ${name} in India?` },
+      ],
+    },
+    {
+      id: "care",
+      label: cat ? "Care & play" : "Exercise & care",
+      prompts: cat
+        ? [
+            { label: "Play routine", prompt: `Suggest a daily play and enrichment routine for ${name} that fits their age.` },
+            { label: "Litter habits", prompt: `What's normal for ${name}'s litter box habits, and what changes should worry me?` },
+            { label: "Grooming", prompt: `How often should I brush ${name}, trim nails and clean ears, and how do I make it stress-free?` },
+            { label: "Hot weather", prompt: `How do I keep ${name} cool and hydrated during an Indian summer?` },
+          ]
+        : [
+            { label: "Daily exercise", prompt: `How much exercise does ${name} need each day, and what kinds suit their breed and age?` },
+            { label: "Grooming", prompt: `How often should I bathe and brush ${name}, trim nails and clean ears?` },
+            { label: "Hot weather walks", prompt: `How do I keep ${name} safe on walks during an Indian summer? Best times, signs of heatstroke and paw care.` },
+            { label: "Calmer at home", prompt: `${name} gets restless or anxious at home. What routine and training tips can help?` },
+          ],
+    },
+  ]
+}
+
 export function reportPrompts(petName: string) {
   return [
     {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, SquarePen, Square } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import { doc, onSnapshot } from "firebase/firestore"
@@ -40,6 +40,7 @@ import { phaseCopy, useDayPhase, type DayPhase } from "@/components/pet-scene/da
 import { PetFriendsArt, SkyArt } from "@/components/pet-scene/scene-art"
 import { buildPetContext, isCatPet, mergePets, petSubtitle, reportPrompts, weightStatusOf, type GptPet } from "./components/pet-data"
 import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
+import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
 
@@ -94,6 +95,7 @@ export function PawGptClient() {
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [promptsOpen, setPromptsOpen] = usePromptDockOpen()
 
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -543,6 +545,23 @@ export function PawGptClient() {
 
       {/* Composer */}
       <form onSubmit={handleSubmit} className="relative px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-6 md:pb-5">
+        {pet && (
+          <PromptDock
+            pet={pet}
+            open={promptsOpen}
+            disabled={limitReached || streaming}
+            onClose={() => setPromptsOpen(false)}
+            onPick={(prompt) => {
+              setInput(prompt)
+              window.setTimeout(() => {
+                const el = inputRef.current
+                if (!el) return
+                el.focus()
+                el.setSelectionRange(prompt.length, prompt.length)
+              }, 0)
+            }}
+          />
+        )}
         <div className="paw-glass mx-auto max-w-3xl rounded-[1.75rem] p-2 transition focus-within:ring-4 focus-within:ring-orange-500/15">
           <textarea
             ref={inputRef}
@@ -599,6 +618,22 @@ export function PawGptClient() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {pet && (
+              <button
+                type="button"
+                aria-pressed={promptsOpen}
+                aria-label={promptsOpen ? "Hide suggested questions" : "Show suggested questions"}
+                title="Suggested questions"
+                onClick={() => setPromptsOpen(!promptsOpen)}
+                className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${
+                  promptsOpen ? "bg-orange-500/15 text-orange-700 dark:text-orange-300" : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Prompts</span>
+              </button>
+            )}
 
             {quota && (
               <span
