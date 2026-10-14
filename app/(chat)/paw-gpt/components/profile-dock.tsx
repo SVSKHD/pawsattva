@@ -5,10 +5,11 @@ import Image from "next/image"
 import Link from "next/link"
 import type { User as FirebaseUser } from "firebase/auth"
 import { formatDistanceToNowStrict } from "date-fns"
-import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, MessageCircle, PawPrint, Phone, Plus, User } from "lucide-react"
+import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, MessageCircle, PawPrint, Phone, Plus, SquarePen, Trash2, User } from "lucide-react"
 
 import type { UserProfile } from "@/firebase/firestore"
 import { imageUrlProblem } from "@/lib/image-hosts"
+import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT } from "@/lib/paw-gpt"
 
 import { isCatPet, petSubtitle, weightStatusOf, type GptPet } from "./pet-data"
 
@@ -33,11 +34,12 @@ function clampToViewport(next: Position, width = 300, handleHeight = 64): Positi
   }
 }
 
-export interface HistoryEntry {
+/** One conversation in the history list, with the questions asked in it (oldest first). */
+export interface ChatSummary {
   id: string
   petName: string
-  question: string
-  askedAt?: number
+  updatedAt: number
+  questions: { id: string; text: string }[]
 }
 
 interface ProfileDockProps {
@@ -48,9 +50,198 @@ interface ProfileDockProps {
   mealsLogged: number
   selectedPet: string
   onSelectPet: (name: string) => void
-  history: HistoryEntry[]
+  chats: ChatSummary[]
+  activeChatId: string | null
   streaming: boolean
-  onOpenHistory: (entry: HistoryEntry) => void
+  onOpenChat: (chatId: string, questionId?: string) => void
+  onNewChat: () => void
+  onClearHistory: () => void
+  /** Today's allowance, or null when unlimited (admins/authors) or still loading. */
+  quota: PawGptQuota | null
+}
+
+export interface PawGptQuota {
+  questionsLeft: number
+  tokensUsed: number
+  tokensLeft: number
+}
+
+/** Today's questions and tokens, each with a progress bar. */
+function UsageMeter({ quota }: { quota: PawGptQuota }) {
+  const questionsUsed = PAW_GPT_DAILY_LIMIT - quota.questionsLeft
+  const rows = [
+    {
+      label: "Questions",
+      value: `${questionsUsed} / ${PAW_GPT_DAILY_LIMIT}`,
+      share: questionsUsed / PAW_GPT_DAILY_LIMIT,
+    },
+    {
+      label: "Tokens",
+      value: `${quota.tokensUsed.toLocaleString("en-IN")} / ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")}`,
+      share: quota.tokensUsed / PAW_GPT_DAILY_TOKEN_LIMIT,
+    },
+  ]
+  const done = quota.questionsLeft === 0 || quota.tokensLeft === 0
+
+  return (
+    <section aria-label="Today's Paw GPT usage" className="mt-4 rounded-2xl bg-black/[0.03] p-2.5 dark:bg-white/[0.04]">
+      <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Today&apos;s usage</p>
+      <div className="space-y-2">
+        {rows.map((row) => {
+          const share = Math.min(1, Math.max(0, row.share))
+          return (
+            <div key={row.label}>
+              <div className="flex items-baseline justify-between text-[11px]">
+                <span className="font-semibold text-foreground/80">{row.label}</span>
+                <span className="tabular-nums text-muted-foreground">{row.value}</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={`${row.label} used today`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(share * 100)}
+                className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10"
+              >
+                <div
+                  className={`h-full rounded-full transition-[width] duration-500 ${share >= 1 ? "bg-rose-500" : share >= 0.8 ? "bg-amber-500" : "bg-orange-500"}`}
+                  style={{ width: `${share * 100}%` }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className={`mt-2 text-[11px] leading-snug ${done ? "font-semibold text-rose-600" : "text-muted-foreground"}`}>
+        {done
+          ? "You've reached today's limit. It resets at midnight (India time)."
+          : "Tokens measure how much text Paw GPT reads and writes, including your pet's record. Resets at midnight."}
+      </p>
+    </section>
+  )
+}
+
+/**
+ * Past chats as an accordion: each row is one conversation and expands to the questions
+ * asked in it. Clearing asks for confirmation inline (the dock floats above dialogs).
+ */
+function ChatHistory({
+  chats,
+  activeChatId,
+  onOpenChat,
+  onNewChat,
+  onClearHistory,
+}: Pick<ProfileDockProps, "chats" | "activeChatId" | "onOpenChat" | "onNewChat" | "onClearHistory">) {
+  const [expandedId, setExpandedId] = useState<string | null>(activeChatId)
+  const [confirmingClear, setConfirmingClear] = useState(false)
+
+  // Follow the chat on screen: a new or reopened chat expands in the list.
+  const [shownActiveId, setShownActiveId] = useState(activeChatId)
+  if (activeChatId !== shownActiveId) {
+    setShownActiveId(activeChatId)
+    if (activeChatId) setExpandedId(activeChatId)
+  }
+
+  return (
+    <section aria-label="Chat history" className="mt-4">
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Chats</p>
+        <button type="button" onClick={onNewChat} className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 hover:text-orange-700">
+          <SquarePen className="h-3.5 w-3.5" /> New
+        </button>
+      </div>
+
+      {chats.length === 0 ? (
+        <p className="px-1 py-1 text-xs text-muted-foreground">Your chats will appear here.</p>
+      ) : (
+        <ul className="space-y-1">
+          {chats.map((chat) => {
+            const open = expandedId === chat.id
+            const active = chat.id === activeChatId
+            const panelId = `chat-${chat.id}`
+            return (
+              <li key={chat.id} className={`overflow-hidden rounded-2xl transition ${open ? "bg-black/[0.03] dark:bg-white/[0.04]" : ""}`}>
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  aria-controls={panelId}
+                  onClick={() => {
+                    setExpandedId(open ? null : chat.id)
+                    if (!open) onOpenChat(chat.id)
+                  }}
+                  className="group flex w-full items-center gap-2.5 px-2 py-1.5 text-left transition hover:bg-black/5 dark:hover:bg-white/5"
+                >
+                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${active ? "bg-orange-500 text-white" : "bg-orange-500/10 text-orange-600 dark:text-orange-300"}`}>
+                    <MessageCircle className="h-3.5 w-3.5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold text-foreground">{chat.questions[0]?.text}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {chat.petName} · {chat.questions.length} question{chat.questions.length === 1 ? "" : "s"} ·{" "}
+                      {formatDistanceToNowStrict(chat.updatedAt, { addSuffix: true })}
+                    </span>
+                  </span>
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+                </button>
+                <div
+                  id={panelId}
+                  className={`grid transition-[grid-template-rows] duration-200 ease-out ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                  inert={!open}
+                >
+                  <ol className="min-h-0 overflow-hidden">
+                    {chat.questions.map((question) => (
+                      <li key={question.id}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenChat(chat.id, question.id)}
+                          className="group flex w-full items-start gap-2 py-1.5 pl-11 pr-2 text-left text-xs text-foreground/80 transition hover:text-orange-700 dark:hover:text-orange-300"
+                        >
+                          <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5" />
+                          <span className="line-clamp-2">{question.text}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {chats.length > 0 && (
+        <div className="mt-2 px-1">
+          {confirmingClear ? (
+            <div className="flex items-center gap-2 rounded-2xl bg-rose-500/10 px-2.5 py-2 text-xs">
+              <span className="flex-1 font-semibold text-rose-700 dark:text-rose-300">Delete all chats?</span>
+              <button type="button" onClick={() => setConfirmingClear(false)} className="rounded-full px-2 py-1 font-semibold text-muted-foreground hover:text-foreground">
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmingClear(false)
+                  setExpandedId(null)
+                  onClearHistory()
+                }}
+                className="rounded-full bg-rose-600 px-2.5 py-1 font-bold text-white hover:bg-rose-700"
+              >
+                Clear
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingClear(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground transition hover:text-rose-600"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Clear history
+            </button>
+          )}
+        </div>
+      )}
+    </section>
+  )
 }
 
 /** The owner's profile and pets as an accordion that can be dragged anywhere on screen. */
@@ -62,9 +253,13 @@ export function ProfileDock({
   mealsLogged,
   selectedPet,
   onSelectPet,
-  history,
+  chats,
+  activeChatId,
   streaming,
-  onOpenHistory,
+  onOpenChat,
+  onNewChat,
+  onClearHistory,
+  quota,
 }: ProfileDockProps) {
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -302,34 +497,15 @@ export function ProfileDock({
               </div>
             )}
 
-            {history.length > 0 && (
-              <>
-                <p className="mb-1.5 mt-4 px-1 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Recent questions</p>
-                <ul className="space-y-0.5">
-                  {history.map((entry) => (
-                    <li key={entry.id}>
-                      <button
-                        type="button"
-                        onClick={() => onOpenHistory(entry)}
-                        className="group flex w-full items-center gap-2.5 rounded-2xl px-2 py-1.5 text-left transition hover:bg-black/5 active:scale-[0.98] dark:hover:bg-white/5"
-                      >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-300">
-                          <MessageCircle className="h-3.5 w-3.5" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-xs font-medium text-foreground">{entry.question}</span>
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {entry.petName}
-                            {entry.askedAt ? ` · ${formatDistanceToNowStrict(entry.askedAt, { addSuffix: true })}` : ""}
-                          </span>
-                        </span>
-                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 transition group-hover:translate-x-0.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+            <ChatHistory
+              chats={chats}
+              activeChatId={activeChatId}
+              onOpenChat={onOpenChat}
+              onNewChat={onNewChat}
+              onClearHistory={onClearHistory}
+            />
+
+            {quota && <UsageMeter quota={quota} />}
 
             <p className="mt-3 px-1 text-[11px] leading-relaxed text-muted-foreground">
               Sharper answers come from more data: log meals and weights in the{" "}

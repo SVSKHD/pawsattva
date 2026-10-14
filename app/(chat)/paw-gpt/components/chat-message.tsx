@@ -16,6 +16,15 @@ export interface ChatItem {
   createdAt?: number
 }
 
+/** One chat window: every question and answer asked about one pet until "New chat". */
+export interface Conversation {
+  id: string
+  petName: string
+  items: ChatItem[]
+  createdAt: number
+  updatedAt: number
+}
+
 interface ChatMessageProps {
   item: ChatItem
   petName?: string

@@ -79,6 +79,27 @@ are fixed at build time). To roll back, remove the variable and redeploy.
 If App Check isn't configured, Paw GPT refuses to call Gemini and shows "Paw GPT isn't
 available right now" instead of making unprotected requests.
 
+## Daily limits (both backends)
+
+Each pet parent gets **5 questions** and **100,000 tokens** per India calendar day. Admins and
+authors are exempt. Usage is stored in `users/{uid}/pawGptUsage/{YYYY-M-D}` as `count` and
+`tokens` and shown in the chat (dock → "Today's usage", and next to the send button).
+
+- **Firestore rules enforce it.** A question can only start (`count + 1`) while
+  `count < 5` and `tokens < 100000`. `tokens` can only go up, and users can't delete or
+  reset the document.
+- **Anthropic route:** the server increments `count` before answering and records the
+  answer's real token usage (input, including the cached pet record, plus output) when the
+  stream ends. A user can't skip this.
+- **Firebase AI:** the browser does both writes (`count` before, `usageMetadata.totalTokenCount`
+  after). Someone who calls AI Logic directly could skip them, so App Check and the AI Logic
+  per-user rate limit are the real backstop on that path.
+- A question that fails or is stopped still counts, along with the tokens it used.
+- To change the limits, update `PAW_GPT_DAILY_LIMIT` / `PAW_GPT_DAILY_TOKEN_LIMIT` in
+  `lib/paw-gpt.ts` **and** the matching numbers in `firebase/firestore.rules`, then deploy
+  the rules **before** the app. Without the rules, every non-admin gets "Paw GPT isn't
+  available".
+
 ## What changes compared with the Anthropic route
 
 | | Anthropic route | Firebase AI Logic |

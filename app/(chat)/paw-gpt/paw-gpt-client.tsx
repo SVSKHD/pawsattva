@@ -7,6 +7,9 @@ import { subDays } from "date-fns"
 import { ArrowUp, Cat, ChevronDown, Dog, FileText, PawPrint, Plus, SquarePen, Square } from "lucide-react"
 import { toast } from "sonner"
 
+import { doc, onSnapshot } from "firebase/firestore"
+
+import { db } from "@/firebase/db"
 import { getUserPetFeeds, getUserProfile, type UserProfile } from "@/firebase/firestore"
 import { trackEvent } from "@/firebase/analytics"
 import { useAuth } from "@/components/auth-provider"
@@ -21,26 +24,62 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { getPetLoggerEntries, getPetWeightEntries, type PetLoggerEntry, type PetWeightEntry } from "@/lib/logger-store"
-import { PAW_GPT_LIMITS, type PawGptMessage } from "@/lib/paw-gpt"
+import {
+  PAW_GPT_DAILY_LIMIT,
+  PAW_GPT_DAILY_TOKEN_LIMIT,
+  PAW_GPT_LIMITS,
+  pawGptDayKey,
+  pawGptUsagePath,
+  type PawGptMessage,
+} from "@/lib/paw-gpt"
 import { PAW_GPT_PROVIDER, PawGptError, streamPawGptAnswer } from "@/lib/paw-gpt-stream"
 
-import { toDateKey } from "../logger/components/shared"
-import { ChatMessage, HistoryTicker, type ChatItem } from "./components/chat-message"
+import { toDateKey } from "@/app/(main)/logger/components/shared"
+import { ChatMessage, HistoryTicker, type ChatItem, type Conversation } from "./components/chat-message"
 import { phaseCopy, useDayPhase, type DayPhase } from "@/components/pet-scene/day-phase"
 import { PetFriendsArt, SkyArt } from "@/components/pet-scene/scene-art"
 import { buildPetContext, isCatPet, mergePets, petSubtitle, reportPrompts, weightStatusOf, type GptPet } from "./components/pet-data"
-import { ProfileDock, type HistoryEntry } from "./components/profile-dock"
+import { ProfileDock, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
 
-const THREADS_KEY = "paw-gpt-threads"
-const MAX_SAVED_PER_PET = 40
+const CHATS_KEY = "paw-gpt-chats"
+/** Before conversations existed, each pet had one thread saved under this key. */
+const LEGACY_THREADS_KEY = "paw-gpt-threads"
+const MAX_SAVED_CHATS = 30
+const MAX_SAVED_PER_CHAT = 40
+
+/** This account's saved chats, migrating the old one-thread-per-pet format once. */
+function loadChats(uid: string): Conversation[] {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(`${CHATS_KEY}:${uid}`) ?? "null")
+    if (Array.isArray(saved)) return saved as Conversation[]
+
+    const legacy = JSON.parse(window.localStorage.getItem(`${LEGACY_THREADS_KEY}:${uid}`) ?? "null") as Record<string, ChatItem[]> | null
+    if (!legacy || typeof legacy !== "object") return []
+    const migrated = Object.entries(legacy)
+      .filter(([, items]) => Array.isArray(items) && items.length > 0)
+      .map(([petName, items]) => {
+        const times = items.map((item) => item.createdAt ?? 0).filter(Boolean)
+        const updatedAt = times.length ? Math.max(...times) : Date.now()
+        return { id: newId(), petName, items, createdAt: times.length ? Math.min(...times) : updatedAt, updatedAt }
+      })
+    window.localStorage.removeItem(`${LEGACY_THREADS_KEY}:${uid}`)
+    return migrated
+  } catch {
+    return []
+  }
+}
+
+/** 12345 → "12.3k" for the compact token counter. */
+const compactTokens = (value: number) =>
+  value >= 1000 ? `${(value / 1000).toFixed(value >= 100_000 ? 0 : 1).replace(/\.0$/, "")}k` : String(value)
 
 const petIcon = (pet: GptPet | null) => (isCatPet(pet) ? Cat : pet?.profile || pet?.report ? Dog : PawPrint)
 
 export function PawGptClient() {
   const router = useRouter()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, isAdmin } = useAuth()
   const phase = useDayPhase()
 
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -50,7 +89,8 @@ export function PawGptClient() {
   const [weightsByPet, setWeightsByPet] = useState<Record<string, PetWeightEntry[]>>({})
 
   const [selectedPet, setSelectedPet] = useState("")
-  const [threads, setThreads] = useState<Record<string, ChatItem[]>>({})
+  const [chats, setChats] = useState<Conversation[]>([])
+  const [activeChatId, setActiveChatId] = useState<string | null>(null)
   const [input, setInput] = useState("")
   const [streaming, setStreaming] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -58,34 +98,60 @@ export function PawGptClient() {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const [threadsOwner, setThreadsOwner] = useState<string | null>(null)
+  const [chatsOwner, setChatsOwner] = useState<string | null>(null)
 
   // Restore this account's earlier chats from the browser
   useEffect(() => {
     if (!user) return
-    try {
-      const saved = JSON.parse(window.localStorage.getItem(`${THREADS_KEY}:${user.uid}`) ?? "null") as Record<string, ChatItem[]> | null
-      setThreads(saved && typeof saved === "object" ? saved : {})
-    } catch {
-      setThreads({})
-    }
-    setThreadsOwner(user.uid)
+    setChats(loadChats(user.uid))
+    setActiveChatId(null)
+    setChatsOwner(user.uid)
   }, [user])
 
   // Save finished turns only, so a reload never shows a half-written answer
   useEffect(() => {
-    if (!user || threadsOwner !== user.uid || streaming) return
-    const finished = Object.fromEntries(
-      Object.entries(threads)
-        .map(([name, items]) => [name, items.filter((item) => !item.pending).slice(-MAX_SAVED_PER_PET)] as const)
-        .filter(([, items]) => items.length > 0)
-    )
+    if (!user || chatsOwner !== user.uid || streaming) return
+    const finished = chats
+      .map((chat) => ({ ...chat, items: chat.items.filter((item) => !item.pending).slice(-MAX_SAVED_PER_CHAT) }))
+      .filter((chat) => chat.items.length > 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, MAX_SAVED_CHATS)
     try {
-      window.localStorage.setItem(`${THREADS_KEY}:${user.uid}`, JSON.stringify(finished))
+      window.localStorage.setItem(`${CHATS_KEY}:${user.uid}`, JSON.stringify(finished))
     } catch {
       // storage unavailable; history just lasts for this visit
     }
-  }, [streaming, threads, threadsOwner, user])
+  }, [streaming, chats, chatsOwner, user])
+
+  // ── Daily question limit (admins and authors are exempt) ──────────────────
+  const exempt = isAdmin
+  const [dayKey, setDayKey] = useState(() => pawGptDayKey())
+  const [usageToday, setUsageToday] = useState<{ questions: number; tokens: number } | null>(null)
+  useEffect(() => {
+    // Roll over at midnight (India time) without a reload.
+    const timer = window.setInterval(() => setDayKey(pawGptDayKey()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  useEffect(() => {
+    if (!user || exempt) return
+    return onSnapshot(
+      doc(db, pawGptUsagePath(user.uid, dayKey)),
+      (snapshot) => setUsageToday({ questions: Number(snapshot.get("count") ?? 0), tokens: Number(snapshot.get("tokens") ?? 0) }),
+      () => setUsageToday(null)
+    )
+  }, [user, exempt, dayKey])
+  const quota: PawGptQuota | null =
+    exempt || !usageToday
+      ? null
+      : {
+          questionsLeft: Math.max(0, PAW_GPT_DAILY_LIMIT - usageToday.questions),
+          tokensUsed: usageToday.tokens,
+          tokensLeft: Math.max(0, PAW_GPT_DAILY_TOKEN_LIMIT - usageToday.tokens),
+        }
+  const limitReached = Boolean(quota && (quota.questionsLeft === 0 || quota.tokensLeft === 0))
+  const limitMessage = quota?.tokensLeft === 0
+    ? `You've used today's ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens`
+    : `You've used today's ${PAW_GPT_DAILY_LIMIT} questions`
 
   useEffect(() => {
     if (!authLoading && !user) router.replace("/login?returnTo=/paw-gpt")
@@ -156,7 +222,11 @@ export function PawGptClient() {
   }, [loadWeights, selectedPet])
 
   const pet = pets.find((item) => item.name === selectedPet) ?? null
-  const messages = useMemo(() => threads[selectedPet] ?? [], [threads, selectedPet])
+  const activeChat = useMemo(
+    () => chats.find((chat) => chat.id === activeChatId && chat.petName === selectedPet) ?? null,
+    [chats, activeChatId, selectedPet]
+  )
+  const messages = useMemo(() => activeChat?.items ?? [], [activeChat])
 
   // Keep the newest message in view while answers stream in
   useEffect(() => {
@@ -174,19 +244,27 @@ export function PawGptClient() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [input])
 
+  // Switching pets resumes that pet's latest chat (or starts a fresh one).
   const selectPet = (name: string) => {
     if (streaming) abortRef.current?.abort()
     setSelectedPet(name)
+    const latest = chats.filter((chat) => chat.petName === name).sort((a, b) => b.updatedAt - a.updatedAt)[0]
+    setActiveChatId(latest?.id ?? null)
     window.setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  const updateItem = (petName: string, id: string, patch: Partial<ChatItem> | ((item: ChatItem) => Partial<ChatItem>)) =>
-    setThreads((current) => ({
-      ...current,
-      [petName]: (current[petName] ?? []).map((item) =>
-        item.id === id ? { ...item, ...(typeof patch === "function" ? patch(item) : patch) } : item
-      ),
-    }))
+  const updateItem = (chatId: string, id: string, patch: Partial<ChatItem> | ((item: ChatItem) => Partial<ChatItem>)) =>
+    setChats((current) =>
+      current.map((chat) =>
+        chat.id !== chatId
+          ? chat
+          : {
+              ...chat,
+              updatedAt: Date.now(),
+              items: chat.items.map((item) => (item.id === id ? { ...item, ...(typeof patch === "function" ? patch(item) : patch) } : item)),
+            }
+      )
+    )
 
   const send = async (text: string, base?: ChatItem[]) => {
     const question = text.trim()
@@ -200,16 +278,26 @@ export function PawGptClient() {
       toast.error("That question is too long — try a shorter one.")
       return
     }
+    if (limitReached) {
+      toast.message(limitMessage, { description: "You can ask more after midnight." })
+      return
+    }
 
     const petName = pet.name
-    const userItem: ChatItem = { id: newId(), role: "user", content: question, createdAt: Date.now() }
+    const now = Date.now()
+    const userItem: ChatItem = { id: newId(), role: "user", content: question, createdAt: now }
     const answerId = newId()
-    const previous = base ?? threads[petName] ?? []
+    // Every question in this window belongs to the same conversation until "New chat".
+    const chatId = activeChat?.id ?? newId()
+    const previous = base ?? activeChat?.items ?? []
+    const items = [...previous, userItem, { id: answerId, role: "assistant" as const, content: "", pending: true, createdAt: now }]
 
-    setThreads((current) => ({
-      ...current,
-      [petName]: [...previous, userItem, { id: answerId, role: "assistant", content: "", pending: true, createdAt: Date.now() }],
-    }))
+    setChats((current) =>
+      current.some((chat) => chat.id === chatId)
+        ? current.map((chat) => (chat.id === chatId ? { ...chat, items, updatedAt: now } : chat))
+        : [{ id: chatId, petName, items, createdAt: now, updatedAt: now }, ...current]
+    )
+    setActiveChatId(chatId)
     setInput("")
     setStreaming(true)
 
@@ -227,33 +315,33 @@ export function PawGptClient() {
       const weights = await loadWeights(petName)
       const context = buildPetContext(pet, entries, weights, profile?.displayName || user.displayName || undefined)
       let tracked = false
-      for await (const chunk of streamPawGptAnswer({ user, context, messages: history, signal: controller.signal })) {
+      for await (const chunk of streamPawGptAnswer({ user, context, messages: history, signal: controller.signal, exempt })) {
         if (!tracked) {
           tracked = true
           void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER })
         }
-        updateItem(petName, answerId, (item) => ({ content: item.content + chunk }))
+        updateItem(chatId, answerId, (item) => ({ content: item.content + chunk }))
       }
-      updateItem(petName, answerId, (item) =>
+      updateItem(chatId, answerId, (item) =>
         item.content.trim()
           ? { pending: false }
           : { pending: false, error: true, content: "Paw GPT didn't return an answer. Please try again." }
       )
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
-        updateItem(petName, answerId, (item) =>
+        updateItem(chatId, answerId, (item) =>
           item.content.trim() ? { pending: false } : { pending: false, error: true, content: "Stopped." }
         )
       } else if (error instanceof PawGptError) {
         // Keep whatever was already streamed and add the explanation after it.
-        updateItem(petName, answerId, (item) => ({
+        updateItem(chatId, answerId, (item) => ({
           pending: false,
           error: true,
           content: item.content.trim() ? `${item.content}\n\n_${error.message}_` : error.message,
         }))
       } else {
         console.error("Paw GPT request failed:", error)
-        updateItem(petName, answerId, {
+        updateItem(chatId, answerId, {
           pending: false,
           error: true,
           content: "Could not reach Paw GPT. Check your connection and try again.",
@@ -279,16 +367,41 @@ export function PawGptClient() {
 
   // Ask the failed question again in place of the failed turn
   const retry = (answerId: string) => {
-    const thread = threads[selectedPet] ?? []
+    const thread = activeChat?.items ?? []
     const index = thread.findIndex((item) => item.id === answerId)
     const question = thread[index - 1]
     if (index < 1 || question?.role !== "user") return
     void send(question.content, thread.slice(0, index - 1))
   }
 
-  const resetThread = () => {
+  // The current chat stays in history; the window starts empty.
+  const startNewChat = () => {
     if (streaming) abortRef.current?.abort()
-    setThreads((current) => ({ ...current, [selectedPet]: [] }))
+    setActiveChatId(null)
+    window.setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  const openChat = (chatId: string, messageId?: string) => {
+    const chat = chats.find((entry) => entry.id === chatId)
+    if (!chat) return
+    if (streaming && chat.id !== activeChatId) abortRef.current?.abort()
+    setSelectedPet(chat.petName)
+    setActiveChatId(chat.id)
+    if (messageId) {
+      window.setTimeout(() => document.getElementById(`msg-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80)
+    }
+  }
+
+  const clearHistory = () => {
+    if (streaming) abortRef.current?.abort()
+    setChats([])
+    setActiveChatId(null)
+    try {
+      if (user) window.localStorage.removeItem(`${CHATS_KEY}:${user.uid}`)
+    } catch {
+      // storage unavailable; nothing saved to clear
+    }
+    toast.success("Chat history cleared.")
   }
 
   if (authLoading || !user) {
@@ -320,26 +433,22 @@ export function PawGptClient() {
     ].filter(Boolean)
   })()
 
-  // Every question asked, newest first, across all pets
-  const history: HistoryEntry[] = Object.entries(threads)
-    .flatMap(([petName, items]) =>
-      items
-        .filter((item) => item.role === "user")
-        .map((item) => ({ id: item.id, petName, question: item.content, askedAt: item.createdAt }))
-    )
-    .sort((a, b) => (b.askedAt ?? 0) - (a.askedAt ?? 0))
-    .slice(0, 12)
+  // One entry per conversation, newest first; each lists the questions asked in it
+  const chatSummaries: ChatSummary[] = [...chats]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((chat) => ({
+      id: chat.id,
+      petName: chat.petName,
+      updatedAt: chat.updatedAt,
+      questions: chat.items.filter((item) => item.role === "user").map((item) => ({ id: item.id, text: item.content })),
+    }))
+    .filter((chat) => chat.questions.length > 0)
 
   // Before the first words arrive the thinking card carries the banner; after that, the header does
   const writing = streaming && Boolean(messages.at(-1)?.content)
 
-  const openHistory = (entry: HistoryEntry) => {
-    if (entry.petName !== selectedPet) selectPet(entry.petName)
-    window.setTimeout(() => document.getElementById(`msg-${entry.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80)
-  }
-
   return (
-    <div className="relative flex h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] flex-col md:h-[100dvh]">
+    <div className="relative flex h-dvh flex-col">
       {/* Sky tint for the time of day */}
       <div
         aria-hidden
@@ -354,13 +463,17 @@ export function PawGptClient() {
         mealsLogged={entries.length}
         selectedPet={selectedPet}
         onSelectPet={selectPet}
-        history={history}
+        chats={chatSummaries}
+        activeChatId={activeChat?.id ?? null}
         streaming={streaming}
-        onOpenHistory={openHistory}
+        onOpenChat={openChat}
+        onNewChat={startNewChat}
+        onClearHistory={clearHistory}
+        quota={quota}
       />
 
-      {/* Greeting or conversation */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-24 sm:px-6 md:pt-28">
+      {/* Greeting or conversation (no site header here, so less top padding) */}
+      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-20 sm:px-6 md:pt-24">
         {messages.length === 0 ? (
           <Greeting
             phase={phase}
@@ -396,7 +509,7 @@ export function PawGptClient() {
                   </span>
                   <button
                     type="button"
-                    onClick={resetThread}
+                    onClick={startNewChat}
                     aria-label="New chat"
                     title="New chat"
                     className="flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-black/[0.04] px-3 text-xs font-semibold text-foreground/80 transition hover:bg-black/[0.08] active:scale-95 dark:bg-white/10 dark:hover:bg-white/15"
@@ -428,7 +541,7 @@ export function PawGptClient() {
       </div>
 
       {/* Composer */}
-      <form onSubmit={handleSubmit} className="relative px-3 pb-3 pt-2 sm:px-6 md:pb-5">
+      <form onSubmit={handleSubmit} className="relative px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-6 md:pb-5">
         <div className="paw-glass mx-auto max-w-3xl rounded-[1.75rem] p-2 transition focus-within:ring-4 focus-within:ring-orange-500/15">
           <textarea
             ref={inputRef}
@@ -437,7 +550,12 @@ export function PawGptClient() {
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={handleKeyDown}
             maxLength={PAW_GPT_LIMITS.maxMessageChars}
-            placeholder={pet ? `Ask anything about ${pet.name}…` : "Select your pet, then ask a question…"}
+            disabled={limitReached}
+            placeholder={
+              limitReached
+                ? `${limitMessage}. Ask again after midnight.`
+                : pet ? `Ask anything about ${pet.name}…` : "Select your pet, then ask a question…"
+            }
             aria-label="Ask Paw GPT"
             className="block max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground"
           />
@@ -481,6 +599,21 @@ export function PawGptClient() {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            {quota && (
+              <span
+                className={`ml-auto mr-1 flex min-w-0 flex-col items-end text-[11px] font-semibold leading-tight tabular-nums ${
+                  limitReached ? "text-rose-600" : quota.questionsLeft <= 2 || quota.tokensLeft < PAW_GPT_DAILY_TOKEN_LIMIT * 0.2 ? "text-amber-600" : "text-muted-foreground"
+                }`}
+                aria-live="polite"
+                title={`${quota.tokensUsed.toLocaleString("en-IN")} of ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens used today`}
+              >
+                <span className="whitespace-nowrap">{quota.questionsLeft}/{PAW_GPT_DAILY_LIMIT} questions left</span>
+                <span className="whitespace-nowrap font-medium opacity-80">
+                  {compactTokens(quota.tokensUsed)}/{compactTokens(PAW_GPT_DAILY_TOKEN_LIMIT)} tokens
+                </span>
+              </span>
+            )}
+
             {streaming ? (
               <button
                 type="button"
@@ -494,7 +627,7 @@ export function PawGptClient() {
               <button
                 type="submit"
                 aria-label="Send"
-                disabled={!input.trim()}
+                disabled={!input.trim() || limitReached}
                 className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-600 disabled:opacity-40"
               >
                 <ArrowUp className="h-4 w-4" />

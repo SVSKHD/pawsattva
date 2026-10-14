@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth"
 import { app, appCheckEnabled } from "@/firebase/firebase"
-import type { PawGptMessage, PawGptPetContext } from "./paw-gpt"
+import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptUsagePath, type PawGptMessage, type PawGptPetContext } from "./paw-gpt"
 
 /**
  * Streams a Paw GPT answer from the configured backend.
@@ -23,7 +23,23 @@ export const PAW_GPT_PROVIDER: PawGptProvider =
 const TEMPLATE_ID = process.env.NEXT_PUBLIC_PAW_GPT_TEMPLATE_ID || "paw-gpt-v1"
 
 /** An error whose message is safe to show the pet parent. */
-export class PawGptError extends Error {}
+export class PawGptError extends Error {
+  constructor(message: string, readonly code?: "daily-limit" | "token-limit") {
+    super(message)
+  }
+}
+
+const dailyLimitError = () =>
+  new PawGptError(
+    `You've used all ${PAW_GPT_DAILY_LIMIT} Paw GPT questions for today. You can ask more after midnight.`,
+    "daily-limit"
+  )
+
+const tokenLimitError = () =>
+  new PawGptError(
+    `You've used today's ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} Paw GPT tokens. You can ask more after midnight.`,
+    "token-limit"
+  )
 
 interface StreamRequest {
   user: User
@@ -31,6 +47,8 @@ interface StreamRequest {
   /** Completed turns, oldest first, ending with the new user message. */
   messages: PawGptMessage[]
   signal: AbortSignal
+  /** Admins and authors have no daily question limit. */
+  exempt: boolean
 }
 
 export function streamPawGptAnswer(request: StreamRequest): AsyncGenerator<string> {
@@ -51,6 +69,8 @@ async function* streamFromRoute({ user, context, messages, signal }: StreamReque
   })
   if (!res.ok || !res.body) {
     const data = await res.json().catch(() => null)
+    if (data?.code === "DAILY_LIMIT") throw dailyLimitError()
+    if (data?.code === "TOKEN_LIMIT") throw tokenLimitError()
     throw new PawGptError(data?.error || "Paw GPT could not answer right now. Please try again.")
   }
   const reader = res.body.getReader()
@@ -71,7 +91,44 @@ const BLOCKED_REASONS = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "R
 const transcript = (messages: PawGptMessage[]) =>
   messages.map(({ role, content }) => `${role === "user" ? "Owner" : "Paw GPT"}: ${content}`).join("\n\n")
 
-async function* streamFromFirebaseAi({ context, messages, signal }: StreamRequest) {
+/**
+ * Uses one of today's questions before calling Gemini. Firestore rules cap the counter, so a
+ * denied write means the limit is reached. This path runs in the browser, so unlike the
+ * Anthropic route it can't stop someone who calls AI Logic directly; App Check and the
+ * AI Logic per-user rate limit are the backstop there.
+ */
+async function consumeDailyQuestion(user: User) {
+  const [{ doc, getDoc, increment, serverTimestamp, setDoc }, { db }] = await Promise.all([
+    import("firebase/firestore"),
+    import("@/firebase/db"),
+  ])
+  const ref = doc(db, pawGptUsagePath(user.uid))
+  const current = await getDoc(ref)
+  if (Number(current.get("tokens") ?? 0) >= PAW_GPT_DAILY_TOKEN_LIMIT) throw tokenLimitError()
+  if (Number(current.get("count") ?? 0) >= PAW_GPT_DAILY_LIMIT) throw dailyLimitError()
+  try {
+    await setDoc(ref, { count: increment(1), updatedAt: serverTimestamp() }, { merge: true })
+  } catch (error) {
+    if ((error as { code?: string })?.code === "permission-denied") throw dailyLimitError()
+    throw error
+  }
+}
+
+/** Adds an answer's tokens to today's total. Best effort: the answer is already shown. */
+async function recordTokens(user: User, tokens: number) {
+  if (!tokens || tokens <= 0) return
+  try {
+    const [{ doc, increment, serverTimestamp, setDoc }, { db }] = await Promise.all([
+      import("firebase/firestore"),
+      import("@/firebase/db"),
+    ])
+    await setDoc(doc(db, pawGptUsagePath(user.uid)), { tokens: increment(Math.round(tokens)), updatedAt: serverTimestamp() }, { merge: true })
+  } catch (error) {
+    console.error("Paw GPT: could not record token usage:", error)
+  }
+}
+
+async function* streamFromFirebaseAi({ user, context, messages, signal, exempt }: StreamRequest) {
   if (!appCheckEnabled()) {
     // Never call AI Logic unprotected: without App Check anyone could spend the quota.
     console.error("Paw GPT: NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY is not set, so App Check is off.")
@@ -79,6 +136,7 @@ async function* streamFromFirebaseAi({ context, messages, signal }: StreamReques
   }
   const question = messages.at(-1)
   if (question?.role !== "user") throw new PawGptError("Ask Paw GPT a question to get started.")
+  if (!exempt) await consumeDailyQuestion(user)
 
   const { getAI, getTemplateGenerativeModel, GoogleAIBackend, AIError } = await import("firebase/ai")
   // Limited-use tokens can each be used once, so a captured token can't be replayed.
@@ -111,6 +169,7 @@ async function* streamFromFirebaseAi({ context, messages, signal }: StreamReques
     }
 
     const final = await result.response
+    if (!exempt) await recordTokens(user, final.usageMetadata?.totalTokenCount ?? 0)
     const finishReason = final.candidates?.[0]?.finishReason
     const blockReason = final.promptFeedback?.blockReason
     if (blockReason || (finishReason && BLOCKED_REASONS.has(finishReason))) {
