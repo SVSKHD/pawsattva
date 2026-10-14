@@ -487,7 +487,8 @@ export function PawGptClient() {
         ) : (
           <div className="mx-auto max-w-3xl pb-6">
             {/* Live header: a glass capsule that grows into a moving banner while Paw GPT works */}
-            <div className="sticky top-0 z-10 mb-6 flex justify-center pt-1">
+            {/* Below lg the bar would slide under the floating Home button, so it sticks just beneath it */}
+            <div className="sticky top-[calc(3.75rem+env(safe-area-inset-top))] z-10 mb-6 flex justify-center pt-1 lg:top-0">
               <div
                 className={`paw-glass w-full overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
                   streaming ? "max-w-xl rounded-[1.6rem]" : "max-w-md rounded-full"

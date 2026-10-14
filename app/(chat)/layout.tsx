@@ -4,7 +4,7 @@ import { Home } from "lucide-react"
 /** Full-screen chat pages: no site header, footer or bottom nav — just the chat and a way home. */
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   return (
- <>
+    <>
       {children}
       <Link
         href="/"
@@ -15,6 +15,6 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
         <Home className="h-4 w-4" />
         <span className="hidden sm:inline">Home</span>
       </Link>
-      </>
+    </>
   )
 }
