@@ -21,7 +21,7 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const requestedTab = first(params.tab);
-  const initialTab = requestedTab === "blog" ? "blog" : "blog-list";
+  const initialTab = requestedTab === "blog" || requestedTab === "ai-drafts" ? requestedTab : "blog-list";
 
   return (
     <AdminPanel

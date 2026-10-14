@@ -28,6 +28,7 @@ import {
   restrictedEmailKey,
 } from "./restricted-email";
 import type { HospitalType } from "@/lib/walks";
+import type { ImageAttribution } from "@/lib/ai-drafts/types";
 
 // ── TYPES ─────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,10 @@ export interface Blog {
   instagramPostStatus?: 'pending' | 'posted' | 'failed';
   instagramPostError?: string;
   seo?: SeoConfigFields;
+  /** Credit/license for the featured image (set on posts published from AI drafts). */
+  imageAttribution?: ImageAttribution | null;
+  source?: "ai-integration";
+  aiDraftId?: string;
   date: any;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;

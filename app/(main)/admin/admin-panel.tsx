@@ -32,6 +32,7 @@ import { BlogToolbar } from "./components/BlogToolbar"
 import { BlogJsonDialog, type BlogJsonDialogMode } from "./components/BlogJsonDialog"
 import type { BlogImportData } from "@/lib/blog-json"
 import { imageUrlProblem } from "@/lib/image-hosts"
+import { AI_DRAFT_PENDING_STATUSES, type AiBlogDraft } from "@/lib/ai-drafts/types"
 
 function TabLoading() {
   return (
@@ -82,6 +83,10 @@ const UsersTab = dynamic(
   () => import("./components/UsersTab").then((mod) => mod.UsersTab),
   { loading: TabLoading }
 )
+const AiDraftsTab = dynamic(
+  () => import("./components/AiDraftsTab").then((mod) => mod.AiDraftsTab),
+  { loading: TabLoading }
+)
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -120,7 +125,7 @@ export default function AdminPanel({
       ? new Set([
         "content-goals", "page-seo", "blog-list", "blog", "category-list",
         "category", "sub-category-list", "sub-category", "users", "subscribers", "analytics",
-        "vet-hospitals",
+        "vet-hospitals", "ai-drafts",
       ])
       : new Set(["blog-list", "blog", "category-list", "category", "sub-category-list", "sub-category"]),
     [isFullAdmin]
@@ -202,6 +207,36 @@ export default function AdminPanel({
       unsubBlogs()
     }
   }, [isAdmin])
+
+  // AI drafts: one live listener feeds both the nav badge and the AI Drafts tab (full admins only).
+  const [aiDrafts, setAiDrafts] = useState<AiBlogDraft[]>([])
+  const [aiDraftsLoading, setAiDraftsLoading] = useState(true)
+  const [aiDraftsError, setAiDraftsError] = useState<string | null>(null)
+  const [aiDraftsAttempt, setAiDraftsAttempt] = useState(0)
+  useEffect(() => {
+    if (!isFullAdmin) return
+    let unsubscribe = () => {}
+    let active = true
+    setAiDraftsError(null)
+    import("@/firebase/ai-drafts").then(({ onAiDraftsSnapshot }) => {
+      if (!active) return
+      unsubscribe = onAiDraftsSnapshot((drafts) => {
+        setAiDrafts(drafts)
+        setAiDraftsLoading(false)
+      }, () => {
+        setAiDraftsError("Couldn't load AI drafts. Check that the latest Firestore rules are deployed.")
+        setAiDraftsLoading(false)
+      })
+    })
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [isFullAdmin, aiDraftsAttempt])
+  const pendingAiDrafts = useMemo(
+    () => aiDrafts.filter((draft) => AI_DRAFT_PENDING_STATUSES.includes(draft.status)).length,
+    [aiDrafts]
+  )
 
   useEffect(() => {
     if (!isFullAdmin || (activeTab !== "users" && activeTab !== "analytics")) return
@@ -1222,7 +1257,7 @@ export default function AdminPanel({
 
       {/* ── Mobile nav ── */}
       <div className="md:hidden mb-6">
-        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={isAuthor ? "author" : "admin"} />
+        <AdminNav activeTab={activeTab} onTabChange={handleTabChange} role={isAuthor ? "author" : "admin"} badges={{ "ai-drafts": pendingAiDrafts }} />
       </div>
 
       {/* ── Body: sidebar + content ── */}
@@ -1232,6 +1267,7 @@ export default function AdminPanel({
           activeTab={activeTab}
           onTabChange={handleTabChange}
           role={isAuthor ? "author" : "admin"}
+          badges={{ "ai-drafts": pendingAiDrafts }}
           header={
             <>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20 text-[10px] font-semibold tracking-widest uppercase">
@@ -1408,6 +1444,18 @@ export default function AdminPanel({
                 categories={categories}
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("sub-category-list") }}
+              />
+            </div>
+          )}
+
+          {isFullAdmin && activeTab === "ai-drafts" && (
+            <div className="tab-panel">
+              <AiDraftsTab
+                drafts={aiDrafts}
+                loading={aiDraftsLoading}
+                error={aiDraftsError}
+                onRetry={() => { setAiDraftsLoading(true); setAiDraftsAttempt((attempt) => attempt + 1) }}
+                categories={categories}
               />
             </div>
           )}

@@ -1,0 +1,276 @@
+openapi: 3.1.0
+info:
+  title: PawSattva AI Blog Drafts
+  version: 1.0.0
+  description: >-
+    Submit SEO-optimised pet wellness articles to PawSattva as unpublished drafts.
+    Every submission lands in the moderator queue with status "draft". This API cannot
+    publish, approve or change the status of any article; a human moderator reviews
+    each draft in the PawSattva admin dashboard before anything goes live.
+servers:
+  - url: https://pawsattva.com
+security:
+  - draftApiKey: []
+paths:
+  /api/integrations/ai/blog-drafts:
+    post:
+      operationId: submitBlogDraft
+      summary: Submit a blog article as an unpublished draft for moderator review
+      description: >-
+        Creates a draft. Submitting the same title again returns the existing draft
+        (created=false) instead of creating a duplicate. Content must be clean article
+        HTML (h2-h4, p, ul/ol/li, strong/em, a, img, blockquote, table). Scripts,
+        styles, iframes, forms, event handlers and javascript:/data: URLs are rejected.
+        Only send images whose license allows commercial reuse, and include
+        imageAttribution so the moderator can verify it.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: >-
+            Optional unique key per article (8-128 chars of letters, digits, . _ : -).
+            Retrying with the same key and body returns the original result.
+          schema:
+            type: string
+            pattern: "^[A-Za-z0-9._:-]{8,128}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BlogDraftRequest"
+      responses:
+        "201":
+          description: Draft created and queued for moderation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftCreated"
+        "200":
+          description: A draft with this title (or Idempotency-Key) already exists; nothing new was created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DraftDuplicate"
+        "400":
+          description: Invalid JSON, failed validation, or unsafe HTML (see error.details).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Missing or invalid API key.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "413":
+          description: Request body larger than 256 KB.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "415":
+          description: Content-Type is not application/json.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "422":
+          description: The Idempotency-Key was already used with a different body.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "429":
+          description: Rate limit reached (30 drafts per hour). Wait for Retry-After seconds.
+          headers:
+            Retry-After:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Server error; the draft was not saved. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: The integration is not configured on the server.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  securitySchemes:
+    draftApiKey:
+      type: http
+      scheme: bearer
+      description: The PawSattva draft API key, sent as "Authorization: Bearer <key>".
+  schemas:
+    BlogDraftRequest:
+      type: object
+      additionalProperties: false
+      required: [title, excerpt, keywords, seoTitle, image, content]
+      properties:
+        title:
+          type: string
+          minLength: 10
+          maxLength: 160
+          description: Article headline, plain text.
+          example: How to Brush Your Dog's Teeth at Home
+        excerpt:
+          type: string
+          minLength: 20
+          maxLength: 500
+          description: One or two sentence summary, plain text.
+          example: A practical guide to dog dental hygiene.
+        keywords:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: Target search keywords, one per item, no commas.
+          items:
+            type: string
+            minLength: 2
+            maxLength: 80
+          example: [dog dental care, how to brush dog teeth, dog oral hygiene]
+        seoTitle:
+          type: string
+          minLength: 10
+          maxLength: 120
+          description: Title tag for search results; aim for 60 characters or fewer.
+          example: How to Brush Dog Teeth Safely | PawSattva
+        seoDescription:
+          type: string
+          maxLength: 320
+          description: Optional meta description (about 150-160 characters). Defaults to the excerpt.
+        image:
+          type: string
+          format: uri
+          maxLength: 2048
+          description: >-
+            HTTPS URL of the featured image file (not a page). Images from
+            images.unsplash.com publish without re-uploading; other hosts must be
+            re-uploaded by the moderator.
+          example: https://images.unsplash.com/photo-1450778869180-41d0601e046e
+        content:
+          type: string
+          maxLength: 120000
+          description: >-
+            Article body as HTML. Start sections with <h2>; do not include an <h1>.
+            At least 200 characters of readable text.
+          example: "<h2>Introduction</h2><p>Article content...</p>"
+        imageAttribution:
+          $ref: "#/components/schemas/ImageAttribution"
+    ImageAttribution:
+      type: object
+      additionalProperties: false
+      description: Where the image came from and how it may be used. Strongly recommended.
+      properties:
+        sourceUrl:
+          type: string
+          format: uri
+          description: Page where the image was found.
+        creator:
+          type: string
+          maxLength: 300
+          description: Photographer or creator.
+        license:
+          type: string
+          maxLength: 120
+          description: License name, e.g. "Unsplash License" or "CC BY 4.0".
+        licenseUrl:
+          type: string
+          format: uri
+        attributionText:
+          type: string
+          maxLength: 300
+          description: Credit line to display, e.g. "Photo by Jane Doe on Unsplash".
+        attributionRequired:
+          type: boolean
+          description: True when the license requires a visible credit.
+        altText:
+          type: string
+          maxLength: 300
+          description: Alt text describing the image.
+    DraftCreated:
+      type: object
+      required: [success, id, status, created]
+      properties:
+        success:
+          type: boolean
+          const: true
+        id:
+          type: string
+          description: Draft document ID.
+        status:
+          type: string
+          const: draft
+        created:
+          type: boolean
+          const: true
+        warnings:
+          type: array
+          items:
+            type: string
+          description: Non-blocking issues the moderator will need to resolve.
+    DraftDuplicate:
+      type: object
+      required: [success, id, status, created]
+      properties:
+        success:
+          type: boolean
+          const: true
+        id:
+          type: string
+        status:
+          type: string
+          enum: [draft, in_review, changes_requested, approved, rejected, published]
+          description: Current moderation status of the existing draft.
+        created:
+          type: boolean
+          const: false
+        duplicate:
+          type: boolean
+          const: true
+        message:
+          type: string
+    Error:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - UNAUTHORIZED
+                - INVALID_JSON
+                - VALIDATION_FAILED
+                - UNSAFE_HTML
+                - UNSUPPORTED_MEDIA_TYPE
+                - PAYLOAD_TOO_LARGE
+                - RATE_LIMITED
+                - IDEMPOTENCY_KEY_REUSED
+                - NOT_CONFIGURED
+                - INTERNAL_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string

@@ -1,6 +1,6 @@
 "use client"
 
-import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck, Stethoscope } from "lucide-react"
+import { FileText, FolderPlus, Layers, Users, Mail, BarChart3, Target, SearchCheck, Stethoscope, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 import type { ReactNode } from "react"
@@ -52,6 +52,17 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
         activeBg: "bg-orange-500/10",
         activeBorder: "border-orange-500/20",
         dot: "bg-orange-500",
+      },
+      {
+        label: "AI Drafts",
+        primaryValue: "ai-drafts",
+        adminOnly: true,
+        relatedValues: [],
+        icon: Sparkles,
+        activeColor: "text-sky-600 dark:text-sky-400",
+        activeBg: "bg-sky-500/10",
+        activeBorder: "border-sky-500/20",
+        dot: "bg-sky-500",
       },
       {
         label: "Categories",
@@ -137,9 +148,11 @@ interface AdminNavProps {
   role?: "admin" | "author"
   /** Rendered above the menu groups in the desktop sidebar */
   header?: ReactNode
+  /** Counts shown next to nav items, keyed by primaryValue (e.g. pending AI drafts) */
+  badges?: Record<string, number>
 }
 
-export function AdminNav({ activeTab, onTabChange, role = "admin", header }: AdminNavProps) {
+export function AdminNav({ activeTab, onTabChange, role = "admin", header, badges = {} }: AdminNavProps) {
   const visibleGroups = NAV_GROUPS.map((group) => ({
     ...group,
     items: group.items.filter((item) => role === "admin" || !item.adminOnly),
@@ -191,6 +204,7 @@ export function AdminNav({ activeTab, onTabChange, role = "admin", header }: Adm
                   )}
                   <Icon className={cn("w-4 h-4 shrink-0", !active && "opacity-60")} />
                   <span className="truncate">{item.label}</span>
+                  <NavBadge count={badges[item.primaryValue]} />
                 </button>
               )
             })}
@@ -217,10 +231,20 @@ export function AdminNav({ activeTab, onTabChange, role = "admin", header }: Adm
             >
               <Icon className="w-3.5 h-3.5 shrink-0" />
               <span>{item.label}</span>
+              <NavBadge count={badges[item.primaryValue]} />
             </button>
           )
         })}
       </div>
     </>
+  )
+}
+
+function NavBadge({ count }: { count?: number }) {
+  if (!count) return null
+  return (
+    <span className="ml-auto rounded-full bg-sky-500 px-1.5 text-[10px] font-bold leading-4 tabular-nums text-white" aria-label={`${count} pending`}>
+      {count > 99 ? "99+" : count}
+    </span>
   )
 }

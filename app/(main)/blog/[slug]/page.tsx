@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShimmerImage } from '@/components/shimmer-image';
+import { ImageCredit } from '@/components/image-credit';
 import { safeImageSrc } from '@/lib/image-hosts';
 import Link from 'next/link';
 import { Source_Serif_4 } from 'next/font/google';
@@ -394,7 +395,7 @@ export default async function BlogPostPage({
             >
               <ShimmerImage
                 src={safeImageSrc(blog.image, defaultImage)}
-                alt={blog.title}
+                alt={blog.imageAttribution?.altText || blog.title}
                 caption={blog.title}
                 captionSize="lg"
                 fill
@@ -403,6 +404,7 @@ export default async function BlogPostPage({
                 sizes="(min-width: 1280px) 760px, (min-width: 1024px) 60vw, 100vw"
               />
             </figure>
+            <ImageCredit attribution={blog.imageAttribution} className="mt-2 px-1" />
 
             {toc.length > 0 && (
               <details className="group mt-8 rounded-2xl border border-border/70 bg-muted/40 p-4 text-sm lg:hidden">
