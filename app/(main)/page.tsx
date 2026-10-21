@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { NewsletterCTA } from "@/components/newsletter-cta";
 import { HomePetCarousel } from "@/components/home-pet-carousel";
 import { AuthDialogTrigger } from "@/components/auth-dialog-trigger";
+import { HomePawGptPrompt } from "@/components/home-paw-gpt-prompt";
 import { Blog, getBlogs, getCategories } from "@/firebase/firestore";
 
 const DEFAULT_BLOG_IMAGE = "https://images.unsplash.com/photo-1450778869180-41d0601e046e?q=80&w=1200&auto=format&fit=crop";
@@ -123,6 +124,9 @@ export default async function Home() {
                   Join the Pack
                 </AuthDialogTrigger>
               </div>
+
+              {/* Paw GPT ask box, beside the carousel */}
+              <HomePawGptPrompt />
             </div>
 
             {/* Multi-pet hero carousel */}

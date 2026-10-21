@@ -1,12 +1,14 @@
-import { Ticket } from "lucide-react"
+import { Crown, Ticket } from "lucide-react"
 
-import { PAW_GPT_DAILY_LIMIT } from "@/lib/paw-gpt"
+import { PAW_GPT_DAILY_LIMIT, PAW_GPT_SUBSCRIPTION } from "@/lib/paw-gpt"
 import { cn } from "@/lib/utils"
 
 /** Today's allowance for a pet parent (admins/authors have none: they're unlimited). */
 export interface PawGptQuota {
-  /** Daily Pass active: no question cap, a bigger token allowance */
+  /** Daily Pass or Paw GPT Plus active: no question cap, a bigger token allowance */
   hasPass: boolean
+  /** Paw GPT Plus (the monthly subscription) is active */
+  subscribed: boolean
   /** null with a Daily Pass (unlimited questions) */
   questionsLeft: number | null
   questionsUsed: number
@@ -31,7 +33,11 @@ export function UsageMeter({ quota, className, showNote = true }: { quota: PawGp
     <section aria-label="Today's Paw GPT usage" className={cn("rounded-2xl bg-black/[0.03] p-2.5 dark:bg-white/[0.04]", className)}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">Today&apos;s usage</p>
-        {quota.hasPass && (
+        {quota.subscribed ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">
+            <Crown className="h-3 w-3" /> {PAW_GPT_SUBSCRIPTION.name}
+          </span>
+        ) : quota.hasPass && (
           <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">
             <Ticket className="h-3 w-3" /> Daily Pass
           </span>

@@ -2,7 +2,17 @@
 
 import type { User } from "firebase/auth"
 import { app, appCheckEnabled } from "@/firebase/firebase"
-import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_PASS, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptUsagePath, type PawGptMessage, type PawGptPetContext } from "./paw-gpt"
+import {
+  PAW_GPT_DAILY_LIMIT,
+  PAW_GPT_DAILY_PASS,
+  PAW_GPT_DAILY_TOKEN_LIMIT,
+  PAW_GPT_GUEST_REMAINING_HEADER,
+  PAW_GPT_SUBSCRIPTION,
+  pawGptSubscriptionPath,
+  pawGptUsagePath,
+  type PawGptMessage,
+  type PawGptPetContext,
+} from "./paw-gpt"
 
 /**
  * Streams a Paw GPT answer from the configured backend.
@@ -26,10 +36,16 @@ const TEMPLATE_ID = process.env.NEXT_PUBLIC_PAW_GPT_TEMPLATE_ID || "paw-gpt-v1"
 
 /** An error whose message is safe to show the pet parent. */
 export class PawGptError extends Error {
-  constructor(message: string, readonly code?: "daily-limit" | "token-limit" | "pass-used-up") {
+  constructor(message: string, readonly code?: "daily-limit" | "token-limit" | "pass-used-up" | "sign-in-required") {
     super(message)
   }
 }
+
+const plusUsedUpError = () =>
+  new PawGptError(
+    `You've used today's ${PAW_GPT_SUBSCRIPTION.dailyTokenLimit.toLocaleString("en-IN")} ${PAW_GPT_SUBSCRIPTION.name} tokens. Paw GPT will be back for you after midnight.`,
+    "pass-used-up"
+  )
 
 const dailyLimitError = () =>
   new PawGptError(
@@ -50,27 +66,33 @@ const tokenLimitError = () =>
   )
 
 interface StreamRequest {
-  user: User
+  /** null: a visitor who isn't signed in (a few free questions through the server route) */
+  user: User | null
   context: PawGptPetContext
   /** Completed turns, oldest first, ending with the new user message. */
   messages: PawGptMessage[]
   signal: AbortSignal
   /** Admins and authors have no daily question limit. */
   exempt: boolean
+  /** Guests: free questions left after this one, once the server has counted it. */
+  onGuestRemaining?: (remaining: number) => void
 }
 
 export function streamPawGptAnswer(request: StreamRequest): AsyncGenerator<string> {
-  return PAW_GPT_PROVIDER === "firebase-ai" ? streamFromFirebaseAi(request) : streamFromRoute(request)
+  // Guests are always counted on the server, whichever backend signed-in users use.
+  return PAW_GPT_PROVIDER === "firebase-ai" && request.user
+    ? streamFromFirebaseAi({ ...request, user: request.user })
+    : streamFromRoute(request)
 }
 
 // ── Server route /api/paw-gpt (Gemini or Claude) ─────────────────────────────
 
-async function* streamFromRoute({ user, context, messages, signal }: StreamRequest) {
+async function* streamFromRoute({ user, context, messages, signal, onGuestRemaining }: StreamRequest) {
   const res = await fetch("/api/paw-gpt", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${await user.getIdToken()}`,
+      ...(user ? { Authorization: `Bearer ${await user.getIdToken()}` } : {}),
     },
     body: JSON.stringify({ context, messages }),
     signal,
@@ -80,8 +102,14 @@ async function* streamFromRoute({ user, context, messages, signal }: StreamReque
     if (data?.code === "DAILY_LIMIT") throw dailyLimitError()
     if (data?.code === "TOKEN_LIMIT") throw tokenLimitError()
     if (data?.code === "PASS_USED_UP") throw passUsedUpError()
+    if (data?.code === "PLUS_USED_UP") throw plusUsedUpError()
+    if (data?.code === "SIGN_IN_REQUIRED") {
+      throw new PawGptError(data.error || "Sign in to keep asking Paw GPT.", "sign-in-required")
+    }
     throw new PawGptError(data?.error || "Paw GPT could not answer right now. Please try again.")
   }
+  const remaining = Number(res.headers.get(PAW_GPT_GUEST_REMAINING_HEADER) ?? NaN)
+  if (!user && Number.isFinite(remaining)) onGuestRemaining?.(remaining)
   const reader = res.body.getReader()
   const decoder = new TextDecoder()
   while (true) {
@@ -119,10 +147,16 @@ async function consumeDailyQuestion(user: User, exempt: boolean) {
     )
     return
   }
-  const current = await getDoc(ref)
+  const [current, subscription] = await Promise.all([
+    getDoc(ref),
+    getDoc(doc(db, pawGptSubscriptionPath(user.uid))).catch(() => null),
+  ])
   const tokens = Number(current.get("tokens") ?? 0)
   const passTokenLimit = Number(current.get("passTokenLimit") ?? 0)
-  if (passTokenLimit > 0) {
+  const subscribed = (subscription?.get("activeUntil")?.toMillis?.() ?? 0) > Date.now()
+  if (subscribed) {
+    if (tokens >= Math.max(passTokenLimit, PAW_GPT_SUBSCRIPTION.dailyTokenLimit)) throw plusUsedUpError()
+  } else if (passTokenLimit > 0) {
     if (tokens >= passTokenLimit) throw passUsedUpError()
   } else {
     if (tokens >= PAW_GPT_DAILY_TOKEN_LIMIT) throw tokenLimitError()
@@ -157,7 +191,7 @@ async function recordTokens(user: User, usage: { totalTokenCount?: number; promp
   }
 }
 
-async function* streamFromFirebaseAi({ user, context, messages, signal, exempt }: StreamRequest) {
+async function* streamFromFirebaseAi({ user, context, messages, signal, exempt }: StreamRequest & { user: User }) {
   if (!appCheckEnabled()) {
     // Never call AI Logic unprotected: without App Check anyone could spend the quota.
     console.error("Paw GPT: NEXT_PUBLIC_RECAPTCHA_ENTERPRISE_SITE_KEY is not set, so App Check is off.")

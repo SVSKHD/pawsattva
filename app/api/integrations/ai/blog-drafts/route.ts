@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cert, getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "firebase-admin/firestore";
 import { createHash, timingSafeEqual } from "node:crypto";
+import { adminDb } from "@/lib/server/firebase-admin";
 
 export const runtime = "nodejs";
 
@@ -14,16 +14,12 @@ function authorized(request: NextRequest) {
   return timingSafeEqual(a, b);
 }
 
-function database() {
-  if (!getApps().length) {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
-    if (!projectId || !clientEmail || !privateKey) throw new Error("Firebase Admin credentials missing");
-    initializeApp({ credential: cert({ projectId, clientEmail, privateKey }) });
-  }
-  return getFirestore();
-}
+// Same rule the admin panel uses when it derives a slug from a title.
+const toSlug = (title: string) =>
+  title.toLowerCase().trim()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s_-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 export async function POST(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -48,21 +44,47 @@ export async function POST(request: NextRequest) {
         payload.keywords.length > 30) {
       return NextResponse.json({ error: "Field limit exceeded" }, { status: 400 });
     }
-    const fingerprint = createHash("sha256").update(payload.title.trim().toLowerCase()).digest("hex");
-    const ref = database().collection("aiBlogDrafts").doc(fingerprint);
-    const result = await database().runTransaction(async (transaction) => {
+
+    const title = payload.title.trim();
+    const excerpt = payload.excerpt.trim();
+    const seoTitle = payload.seoTitle.trim();
+    const image = payload.image.trim();
+    const keywords = payload.keywords.map((keyword: string) => keyword.trim()).filter(Boolean);
+    const fingerprint = createHash("sha256").update(title.toLowerCase()).digest("hex");
+
+    // AI posts land in /blogs as "pending_review": they show under the admin Review tab and stay
+    // off the public site (which only lists "published") until an admin approves them.
+    const db = adminDb();
+    const ref = db.collection("blogs").doc(`ai-${fingerprint.slice(0, 32)}`);
+    const result = await db.runTransaction(async (transaction) => {
       const existing = await transaction.get(ref);
-      if (existing.exists) return false;
+      if (existing.exists) return { created: false, slug: existing.get("slug") as string };
+      let slug = toSlug(title) || `ai-post-${fingerprint.slice(0, 8)}`;
+      const clash = await transaction.get(db.collection("blogs").where("slug", "==", slug).limit(1));
+      if (!clash.empty) slug = `${slug}-${fingerprint.slice(0, 6)}`;
       transaction.create(ref, {
-        title: payload.title.trim(), excerpt: payload.excerpt.trim(),
-        keywords: payload.keywords, seoTitle: payload.seoTitle.trim(),
-        image: payload.image.trim(), content: payload.content,
-        status: "draft", publishedAt: null, source: "ai-integration",
+        title, slug, excerpt, image, content: payload.content,
+        keywords: keywords.join(", "),
+        seo: {
+          title: seoTitle, description: excerpt, keywords,
+          canonicalUrl: `https://pawsattva.com/blog/${slug}`, robots: "index,follow", image,
+          ogTitle: seoTitle, ogDescription: excerpt, ogImage: image,
+          twitterTitle: seoTitle, twitterDescription: excerpt, twitterImage: image,
+        },
+        categoryId: "", categoryIds: [],
+        authorName: "Paw AI",
+        status: "pending_review", source: "ai-integration",
+        likes: 0, dislikes: 0, views: 0, commentsCount: 0,
+        reviewRequestedAt: FieldValue.serverTimestamp(),
+        date: FieldValue.serverTimestamp(),
         createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
       });
-      return true;
+      return { created: true, slug };
     });
-    return NextResponse.json({ id: ref.id, status: "draft", created: result }, { status: result ? 201 : 200 });
+    return NextResponse.json(
+      { id: ref.id, slug: result.slug, status: "pending_review", created: result.created },
+      { status: result.created ? 201 : 200 },
+    );
   } catch (error) {
     console.error("blog-drafts: failed to save draft", error);
     return NextResponse.json({ error: "Unable to save draft" }, { status: 500 });

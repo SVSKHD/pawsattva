@@ -70,6 +70,30 @@ export const PAW_GPT_DAILY_PASS = {
 } as const
 
 /**
+ * Questions a visitor who isn't signed in can ask in total (not per day). After that they're
+ * asked to sign in. Counted on the server only (pawGptGuests, Admin SDK).
+ */
+export const PAW_GPT_GUEST_LIMIT = 3
+
+/**
+ * Paw GPT Plus, the monthly subscription offered once a pet parent's free daily questions run
+ * out: unlimited questions, up to `dailyTokenLimit` tokens a day (fair use). Granted only by the
+ * server (lib/server/paw-gpt-subscription.ts) as `activeUntil` on pawGptSubscriptions/{uid}.
+ * Keep dailyTokenLimit in sync with firebase/firestore.rules.
+ */
+export const PAW_GPT_SUBSCRIPTION = {
+  name: "Paw GPT Plus",
+  priceInr: 300,
+  periodDays: 30,
+  dailyTokenLimit: 300_000,
+} as const
+
+export const pawGptSubscriptionPath = (uid: string) => `pawGptSubscriptions/${uid}`
+
+/** Response header with the guest questions left after this one. */
+export const PAW_GPT_GUEST_REMAINING_HEADER = "X-Paw-Gpt-Guest-Remaining"
+
+/**
  * Today's usage document id, by the India calendar day: "2026-10-14" → "2026-10-14",
  * but with unpadded month/day ("2026-1-5") so firestore.rules can build the same id.
  */

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, LogIn, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
 import { toast } from "sonner"
 
 import { doc, onSnapshot } from "firebase/firestore"
@@ -13,6 +13,7 @@ import { db } from "@/firebase/db"
 import { getUserPetFeeds, getUserProfile, type UserProfile } from "@/firebase/firestore"
 import { trackEvent } from "@/firebase/analytics"
 import { useAuth } from "@/components/auth-provider"
+import { useAuthDialog } from "@/components/auth-dialog-provider"
 import AdminLoader from "@/components/loader"
 import Paw from "../../pawsattva.png"
 import {
@@ -33,8 +34,11 @@ import {
 import {
   PAW_GPT_DAILY_LIMIT,
   PAW_GPT_DAILY_TOKEN_LIMIT,
+  PAW_GPT_GUEST_LIMIT,
   PAW_GPT_LIMITS,
+  PAW_GPT_SUBSCRIPTION,
   pawGptDayKey,
+  pawGptSubscriptionPath,
   pawGptUsagePath,
   type PawGptMessage,
 } from "@/lib/paw-gpt"
@@ -46,6 +50,9 @@ import { phaseCopy, useDayPhase, type DayPhase } from "@/components/pet-scene/da
 import { PetFriendsArt, SkyArt } from "@/components/pet-scene/scene-art"
 import {
   buildPetContext,
+  GUEST_PET_NAME,
+  GUEST_PROMPTS,
+  guestPet,
   isCatPet,
   isFoodRelated,
   isPlanningPet,
@@ -104,7 +111,7 @@ const compactTokens = (value: number) =>
 const petIcon = (pet: GptPet | null) =>
   isPlanningPet(pet) ? Heart : isCatPet(pet) ? Cat : pet?.profile || pet?.report ? Dog : PawPrint
 
-export function PawGptClient() {
+export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) {
   const router = useRouter()
   const { user, loading: authLoading, isAdmin } = useAuth()
   const phase = useDayPhase()
@@ -132,29 +139,36 @@ export function PawGptClient() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [chatsOwner, setChatsOwner] = useState<string | null>(null)
+  // Visitors who aren't signed in get a few free general questions, then sign in for more.
+  const guest = !authLoading && !user
+  const { requestSignIn } = useAuthDialog()
+  // Free guest questions left, as last reported by the server (null until the first answer).
+  const [guestLeft, setGuestLeft] = useState<number | null>(null)
+  // Whose chats these are in this browser: the account, or "guest" before signing in.
+  const owner = user?.uid ?? (guest ? "guest" : null)
 
-  // Restore this account's earlier chats from the browser
+  // Restore this account's (or this browser's guest) earlier chats
   useEffect(() => {
-    if (!user) return
-    setChats(loadChats(user.uid))
+    if (!owner) return
+    setChats(loadChats(owner))
     setActiveChatId(null)
-    setChatsOwner(user.uid)
-  }, [user])
+    setChatsOwner(owner)
+  }, [owner])
 
   // Save finished turns only, so a reload never shows a half-written answer
   useEffect(() => {
-    if (!user || chatsOwner !== user.uid || streaming) return
+    if (!owner || chatsOwner !== owner || streaming) return
     const finished = chats
       .map((chat) => ({ ...chat, items: chat.items.filter((item) => !item.pending).slice(-MAX_SAVED_PER_CHAT) }))
       .filter((chat) => chat.items.length > 0)
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, MAX_SAVED_CHATS)
     try {
-      window.localStorage.setItem(`${CHATS_KEY}:${user.uid}`, JSON.stringify(finished))
+      window.localStorage.setItem(`${CHATS_KEY}:${owner}`, JSON.stringify(finished))
     } catch {
       // storage unavailable; history just lasts for this visit
     }
-  }, [streaming, chats, chatsOwner, user])
+  }, [streaming, chats, chatsOwner, owner])
 
   // ── Daily question limit (admins and authors are exempt) ──────────────────
   const exempt = isAdmin
@@ -178,13 +192,27 @@ export function PawGptClient() {
       () => setUsageToday(null)
     )
   }, [user, exempt, dayKey])
+  // Paw GPT Plus: when it runs out (ms since epoch), 0 for none
+  const [plusUntil, setPlusUntil] = useState(0)
+  useEffect(() => {
+    if (!user || exempt) return
+    return onSnapshot(
+      doc(db, pawGptSubscriptionPath(user.uid)),
+      (snapshot) => setPlusUntil(snapshot.get("activeUntil")?.toMillis?.() ?? 0),
+      () => setPlusUntil(0)
+    )
+  }, [user, exempt])
   const quota: PawGptQuota | null = (() => {
     if (exempt || !usageToday) return null
-    const hasPass = usageToday.passTokenLimit > 0
-    const tokenLimit = hasPass ? usageToday.passTokenLimit : PAW_GPT_DAILY_TOKEN_LIMIT
+    const subscribed = plusUntil > Date.now()
+    const hasPass = usageToday.passTokenLimit > 0 || subscribed
+    const tokenLimit = subscribed
+      ? Math.max(usageToday.passTokenLimit, PAW_GPT_SUBSCRIPTION.dailyTokenLimit)
+      : hasPass ? usageToday.passTokenLimit : PAW_GPT_DAILY_TOKEN_LIMIT
     return {
       hasPass,
-      // A Daily Pass removes the question cap; only its tokens count.
+      subscribed,
+      // A Daily Pass or Plus removes the question cap; only its tokens count.
       questionsLeft: hasPass ? null : Math.max(0, PAW_GPT_DAILY_LIMIT - usageToday.questions),
       questionsUsed: usageToday.questions,
       tokensUsed: usageToday.tokens,
@@ -193,7 +221,9 @@ export function PawGptClient() {
     }
   })()
   const limitReached = Boolean(quota && (quota.questionsLeft === 0 || quota.tokensLeft === 0))
-  const limitMessage = quota?.hasPass
+  const limitMessage = quota?.subscribed
+    ? `You've used today's ${PAW_GPT_SUBSCRIPTION.name} tokens`
+    : quota?.hasPass
     ? "You've used today's Daily Pass"
     : quota?.tokensLeft === 0
       ? `You've used today's ${PAW_GPT_DAILY_TOKEN_LIMIT.toLocaleString("en-IN")} tokens`
@@ -207,13 +237,31 @@ export function PawGptClient() {
     if (limitReached) setLimitDialogOpen(true)
   }
 
-  useEffect(() => {
-    if (!authLoading && !user) router.replace("/login?returnTo=/paw-gpt")
-  }, [authLoading, router, user])
+  // Out of free guest questions: sign in (stays on this page) to keep asking.
+  const promptSignIn = useCallback(
+    () =>
+      requestSignIn({
+        title: "Sign in to keep asking Paw GPT",
+        description: `You've used your ${PAW_GPT_GUEST_LIMIT} free questions. Sign in with Google — it's free — for ${PAW_GPT_DAILY_LIMIT} questions a day, answered from your own pet's profile, meals and weigh-ins.`,
+        successMessage: "You're signed in. Ask away!",
+      }),
+    [requestSignIn]
+  )
+  const guestLimitReached = guest && guestLeft === 0
 
-  // Profile, saved assessments and recent food logs
+  // Profile, saved assessments and recent food logs. Guests have none: they ask in general.
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      setProfile(null)
+      setPets([])
+      setEntries([])
+      setWeightsByPet({})
+      setSelectedPet(authLoading ? "" : GUEST_PET_NAME)
+      setLoadingData(authLoading)
+      return
+    }
+    setSelectedPet("")
+    setLoadingData(true)
     let active = true
     const end = new Date()
     Promise.allSettled([
@@ -246,7 +294,7 @@ export function PawGptClient() {
     return () => {
       active = false
     }
-  }, [user])
+  }, [user, authLoading])
 
   // Weight history for the selected pet, fetched once per pet
   const loadWeights = useCallback(
@@ -272,10 +320,12 @@ export function PawGptClient() {
   )
 
   useEffect(() => {
-    if (selectedPet && selectedPet !== PLANNING_PET_NAME) void loadWeights(selectedPet)
+    if (selectedPet && selectedPet !== PLANNING_PET_NAME && selectedPet !== GUEST_PET_NAME) void loadWeights(selectedPet)
   }, [loadWeights, selectedPet])
 
-  const pet = selectedPet === PLANNING_PET_NAME ? planningPet : pets.find((item) => item.name === selectedPet) ?? null
+  const pet = guest
+    ? guestPet
+    : selectedPet === PLANNING_PET_NAME ? planningPet : pets.find((item) => item.name === selectedPet) ?? null
   // Stable reference: the meal dialog resets its form whenever `pets` changes.
   const loggerPets = useMemo(() => pets.map(toLoggerPet), [pets])
   const activeChat = useMemo(
@@ -324,7 +374,11 @@ export function PawGptClient() {
 
   const send = async (text: string, base?: ChatItem[]) => {
     const question = text.trim()
-    if (!user || streaming || !question) return
+    if ((!user && !guest) || streaming || !question) return
+    if (guestLimitReached) {
+      promptSignIn()
+      return
+    }
     if (!pet) {
       toast.message(pets.length ? "Select a pet first" : "Add a pet or start planning one", {
         description: pets.length ? "Paw GPT answers from your pet's own record." : 'Choose "Planning a pet" to ask about getting one.',
@@ -371,12 +425,19 @@ export function PawGptClient() {
 
     try {
       const weights = pet.planning ? [] : await loadWeights(petName)
-      const context = buildPetContext(pet, entries, weights, profile?.displayName || user.displayName || undefined)
+      const context = buildPetContext(pet, entries, weights, profile?.displayName || user?.displayName || undefined)
       let tracked = false
-      for await (const chunk of streamPawGptAnswer({ user, context, messages: history, signal: controller.signal, exempt })) {
+      for await (const chunk of streamPawGptAnswer({
+        user,
+        context,
+        messages: history,
+        signal: controller.signal,
+        exempt,
+        onGuestRemaining: setGuestLeft,
+      })) {
         if (!tracked) {
           tracked = true
-          void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER })
+          void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER, guest: !user })
         }
         updateItem(chatId, answerId, (item) => ({ content: item.content + chunk }))
       }
@@ -391,7 +452,10 @@ export function PawGptClient() {
           item.content.trim() ? { pending: false } : { pending: false, error: true, content: "Stopped." }
         )
       } else if (error instanceof PawGptError) {
-        if (error.code) setLimitDialogOpen(true)
+        if (error.code === "sign-in-required") {
+          setGuestLeft(0)
+          promptSignIn()
+        } else if (error.code) setLimitDialogOpen(true)
         // Keep whatever was already streamed and add the explanation after it.
         updateItem(chatId, answerId, (item) => ({
           pending: false,
@@ -411,6 +475,26 @@ export function PawGptClient() {
       setStreaming(false)
     }
   }
+
+  // A question from the home page (?q=): ask it as soon as a pet is chosen. With one pet
+  // that happens straight away; otherwise it waits in the composer while they pick.
+  const pendingQuestion = useRef(initialQuestion)
+  const [questionShown, setQuestionShown] = useState(false)
+  useEffect(() => {
+    const question = pendingQuestion.current
+    if (!question || (!user && !guest) || loadingData) return
+    if (!questionShown) {
+      setQuestionShown(true)
+      setInput(question)
+      // Drop ?q= so a reload doesn't ask it again
+      window.history.replaceState(null, "", "/paw-gpt")
+    }
+    if (!pet) return
+    pendingQuestion.current = undefined
+    void send(inputRef.current?.value || question)
+    // send is recreated every render; this should only react to the pet/data becoming ready
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, guest, loadingData, pet, questionShown])
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault()
@@ -479,18 +563,18 @@ export function PawGptClient() {
     setChats([])
     setActiveChatId(null)
     try {
-      if (user) window.localStorage.removeItem(`${CHATS_KEY}:${user.uid}`)
+      if (owner) window.localStorage.removeItem(`${CHATS_KEY}:${owner}`)
     } catch {
       // storage unavailable; nothing saved to clear
     }
     toast.success("Chat history cleared.")
   }
 
-  if (authLoading || !user) {
+  if (authLoading) {
     return <AdminLoader img={Paw} title="Opening Paw GPT" />
   }
 
-  const firstName = (profile?.displayName || user.displayName || "").split(" ")[0]
+  const firstName = (profile?.displayName || user?.displayName || "").split(" ")[0]
   const PetIcon = petIcon(pet)
 
   // What drifts by in the moving banner while an answer is on its way:
@@ -562,7 +646,7 @@ export function PawGptClient() {
         <div className="paw-liquid-glass pointer-events-auto mx-auto max-w-4xl overflow-hidden rounded-[1.75rem]">
         {/* Pet details on the left, New chat + profile on the right (phones add the pets menu first). */}
         <div className="flex h-14 items-center gap-2 px-2 sm:gap-3 sm:px-2.5">
-          <ProfileSidebar {...dockProps} />
+          {user && <ProfileSidebar {...dockProps} user={user} />}
 
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span
@@ -574,7 +658,7 @@ export function PawGptClient() {
             </span>
             <span className="min-w-0 leading-tight">
               <span className="block truncate text-[15px] font-bold tracking-tight">
-                {pet?.planning ? "Planning a pet" : pet?.name || "Paw GPT"}
+                {pet?.guest ? "Paw GPT" : pet?.planning ? "Planning a pet" : pet?.name || "Paw GPT"}
               </span>
               <span className={`block truncate text-xs ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
                 {streaming
@@ -599,6 +683,21 @@ export function PawGptClient() {
                 <span className="hidden sm:inline">New chat</span>
               </button>
             )}
+            {guest && (
+              <button
+                type="button"
+                onClick={() =>
+                  requestSignIn({
+                    title: "Sign in to Paw GPT",
+                    description: `Free with Google: ${PAW_GPT_DAILY_LIMIT} questions a day, answered from your own pet's profile, meals and weigh-ins.`,
+                  })
+                }
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500 px-3 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition hover:bg-orange-600 active:scale-95 sm:px-4"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline">Sign in</span>
+              </button>
+            )}
             <ChatHomeButton />
           </div>
         </div>
@@ -613,7 +712,7 @@ export function PawGptClient() {
       </header>
 
       {/* Floating dock from tablet width up (below the top bar); phones use the sidebar in the bar. */}
-      <ProfileDock {...dockProps} />
+      {user && <ProfileDock {...dockProps} user={user} />}
 
       {/* Greeting or conversation; padding clears the fixed top bar */}
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-[calc(5.5rem+env(safe-area-inset-top))] sm:px-6">
@@ -626,6 +725,8 @@ export function PawGptClient() {
             loading={loadingData}
             onSelectPet={selectPet}
             onPrompt={(prompt) => void send(prompt)}
+            guestLeft={guest ? guestLeft ?? PAW_GPT_GUEST_LIMIT : null}
+            onSignIn={promptSignIn}
           />
         ) : (
           <div className="mx-auto max-w-3xl pb-6">
@@ -658,7 +759,7 @@ export function PawGptClient() {
 
       {/* Composer */}
       <form onSubmit={handleSubmit} className="relative px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-6 md:pb-5">
-        {pet && (
+        {pet && !pet.guest && (
           <PromptDock
             pet={pet}
             open={promptsOpen}
@@ -687,6 +788,10 @@ export function PawGptClient() {
             placeholder={
               limitReached
                 ? `${limitMessage}. Ask again after midnight.`
+                : guestLimitReached
+                  ? "Sign in to keep asking Paw GPT…"
+                : pet?.guest
+                  ? "Ask anything about dogs and cats…"
                 : pet?.planning
                   ? "Ask anything about getting a new pet…"
                   : pet
@@ -697,6 +802,25 @@ export function PawGptClient() {
             className="block max-h-40 w-full resize-none bg-transparent px-3 py-2 text-[15px] outline-none placeholder:text-muted-foreground"
           />
           <div className="flex items-center justify-between gap-2 px-1 pt-1">
+            {guest ? (
+              // Guests: free questions left, and signing in for answers about their own pet
+              <button
+                type="button"
+                onClick={promptSignIn}
+                className={`inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${
+                  guestLimitReached
+                    ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-600"
+                    : "bg-orange-500/10 text-orange-700 hover:bg-orange-500/15 dark:text-orange-300"
+                }`}
+              >
+                <LogIn className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">
+                  {guestLimitReached
+                    ? "Sign in for more questions"
+                    : `${guestLeft ?? PAW_GPT_GUEST_LIMIT}/${PAW_GPT_GUEST_LIMIT} free questions · Sign in for more`}
+                </span>
+              </button>
+            ) : (
             <DropdownMenu open={pickerOpen} onOpenChange={setPickerOpen}>
               <DropdownMenuTrigger asChild>
                 <button
@@ -742,8 +866,9 @@ export function PawGptClient() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            )}
 
-            {pet && (
+            {pet && !pet.guest && (
               <button
                 type="button"
                 aria-pressed={promptsOpen}
@@ -845,6 +970,8 @@ function Greeting({
   loading,
   onSelectPet,
   onPrompt,
+  guestLeft,
+  onSignIn,
 }: {
   phase: DayPhase
   firstName: string
@@ -853,6 +980,9 @@ function Greeting({
   loading: boolean
   onSelectPet: (name: string) => void
   onPrompt: (prompt: string) => void
+  /** Not signed in: free questions left (null when signed in) */
+  guestLeft: number | null
+  onSignIn: () => void
 }) {
   const copy = phaseCopy[phase]
 
@@ -872,7 +1002,37 @@ function Greeting({
       </p>
 
       <div className="paw-gpt-anim-rise mt-6 w-full" style={{ animationDelay: "200ms" }}>
-        {loading ? (
+        {guestLeft !== null ? (
+          // Not signed in: general questions, a few for free
+          <>
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-600 dark:text-orange-400">
+              {guestLeft > 0
+                ? `Try Paw GPT · ${guestLeft} free question${guestLeft === 1 ? "" : "s"} left`
+                : "You've used your free questions"}
+            </p>
+            {guestLeft > 0 && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {GUEST_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => onPrompt(prompt)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-500/25 transition hover:bg-orange-500/10 dark:text-orange-300"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="mt-5 text-xs text-muted-foreground">
+              <button type="button" onClick={onSignIn} className="font-semibold text-orange-600 hover:underline">
+                Sign in
+              </button>{" "}
+              for {PAW_GPT_DAILY_LIMIT} free questions a day, answered from your own pet&apos;s profile, meals and weigh-ins.
+            </p>
+          </>
+        ) : loading ? (
           <p className="text-sm text-muted-foreground">Finding your pets…</p>
         ) : pets.length === 0 && !pet ? (
           // No pets yet: add one, or plan one with Paw GPT

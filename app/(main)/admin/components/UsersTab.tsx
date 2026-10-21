@@ -6,36 +6,27 @@ import {
   Ban,
   CalendarDays,
   Cat,
-  ChevronLeft,
-  ChevronRight,
+  CheckCircle2,
   Clock,
   Dog,
-  Edit,
   Mail,
   MessageCircle,
   PawPrint,
+  Pencil,
   Phone,
-  Save,
-  Search,
   ShieldCheck,
+  Sparkles,
   Trash2,
   UserRound,
   Users,
 } from "lucide-react"
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -56,7 +47,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import {
@@ -67,8 +57,15 @@ import {
 } from "@/firebase/firestore"
 import type { PetFeedEntry, RestrictedEmail, UserProfile } from "@/firebase/firestore"
 import { normalizeEmail } from "@/firebase/restricted-email"
+import { TablePagination, usePagination } from "./TablePagination"
+import {
+  ActionsCell, EmptyCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty,
+  TableHeading, TableSearch, TableToolbar, filterSelectClass, nextSort, rowClass, rowTitleClass,
+  thClass, theadRowClass, type SortState,
+} from "./DataTable"
 
-type UserAgeFilter = "all" | "new" | "old"
+type UserView = "all" | "new" | "pets" | "restricted" | "admins"
+type SortKey = "joined" | "name" | "pets"
 
 interface UsersTabProps {
   users: UserProfile[]
@@ -98,7 +95,6 @@ interface UsersTabProps {
   currentUserEmail?: string
 }
 
-const PAGE_SIZE = 5
 const NEW_USER_DAYS = 30
 
 const toDate = (value: unknown): Date | null => {
@@ -141,6 +137,19 @@ const daysSince = (value: unknown) => {
   )
 }
 
+const relativeAge = (value: unknown) => {
+  const days = daysSince(value)
+  if (days === null) return "No join date"
+  if (days === 0) return "Today"
+  if (days < 30) return `${days} day${days === 1 ? "" : "s"} ago`
+  if (days < 365) {
+    const months = Math.floor(days / 30)
+    return `${months} month${months === 1 ? "" : "s"} ago`
+  }
+  const years = Math.floor(days / 365)
+  return `${years} year${years === 1 ? "" : "s"} ago`
+}
+
 const isNewUser = (profile: UserProfile) => {
   const age = daysSince(profile.createdAt)
   return age !== null && age <= NEW_USER_DAYS
@@ -174,6 +183,26 @@ const getRole = (
     : profile.admin
       ? "admin"
       : "user"
+
+const whatsappNumber = (profile: UserProfile) =>
+  profile.whatsappSameAsPhone ? profile.phone : profile.whatsappPhone
+
+function Avatar({ profile, size = "h-9 w-9" }: { profile: UserProfile; size?: string }) {
+  return (
+    <div className={`relative flex ${size} shrink-0 items-center justify-center overflow-hidden rounded-full bg-orange-500/10 text-sm font-bold text-orange-600`}>
+      {profile.photoURL ? (
+        <NextImage
+          src={profile.photoURL}
+          alt={profile.displayName || "User"}
+          fill
+          className="object-cover"
+        />
+      ) : (
+        (profile.displayName || profile.email || "?")[0].toUpperCase()
+      )}
+    </div>
+  )
+}
 
 export function UsersTab({
   users,
@@ -230,6 +259,16 @@ export function UsersTab({
     [restrictedEmails]
   )
 
+  const admins = useMemo(
+    () => users.filter((profile) => getRole(profile) === "admin"),
+    [users]
+  )
+
+  const nonAdminUsers = useMemo(
+    () => users.filter((profile) => getRole(profile) !== "admin"),
+    [users]
+  )
+
   const handleRestrictEmail = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const email = normalizeEmail(newRestrictedEmail)
@@ -281,43 +320,13 @@ export function UsersTab({
     }
   }
 
-  const [ageFilter, setAgeFilter] = useState<UserAgeFilter>("all")
+  const [view, setView] = useState<UserView>("all")
   const [breedFilter, setBreedFilter] = useState("all")
-  const [currentPage, setCurrentPage] = useState(1)
-
-  const admins = useMemo(
-    () =>
-      users
-        .filter((profile) => getRole(profile) === "admin")
-        .sort((a, b) => {
-          const aDate = toDate(a.createdAt)?.getTime() ?? 0
-          const bDate = toDate(b.createdAt)?.getTime() ?? 0
-          return bDate - aDate
-        }),
-    [users]
-  )
-
-  const nonAdminUsers = useMemo(
-    () => users.filter((profile) => getRole(profile) !== "admin"),
-    [users]
-  )
-
-  const nonAdminFilteredUsers = useMemo(
-    () => filteredUsers.filter((profile) => getRole(profile) !== "admin"),
-    [filteredUsers]
-  )
-
-  const blacklistedCount = useMemo(
-    () => nonAdminUsers.filter(isRestricted).length,
-    [isRestricted, nonAdminUsers]
-  )
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: "joined", dir: "desc" })
+  const [pendingAction, setPendingAction] = useState<{ type: "blacklist" | "delete"; profile: UserProfile } | null>(null)
 
   const userPetCount = useMemo(
-    () =>
-      nonAdminUsers.reduce(
-        (sum, profile) => sum + (profile.petFeeds?.length ?? 0),
-        0
-      ),
+    () => nonAdminUsers.reduce((sum, profile) => sum + (profile.petFeeds?.length ?? 0), 0),
     [nonAdminUsers]
   )
 
@@ -335,138 +344,111 @@ export function UsersTab({
     [nonAdminUsers]
   )
 
-  const visibleUsers = useMemo(() => {
-    return [...nonAdminFilteredUsers]
-      .filter((profile) => {
-        if (ageFilter === "new") return isNewUser(profile)
-        if (ageFilter === "old") {
-          const age = daysSince(profile.createdAt)
-          return age !== null && age > NEW_USER_DAYS
-        }
-        return true
-      })
-      .filter((profile) => {
-        if (breedFilter === "all") return true
-        return (profile.petFeeds ?? []).some(
-          (feed) =>
-            feed.petBreed?.trim().toLowerCase() === breedFilter.toLowerCase()
-        )
-      })
-      .sort((a, b) => {
-        const aDate = toDate(a.createdAt)?.getTime() ?? 0
-        const bDate = toDate(b.createdAt)?.getTime() ?? 0
-        return bDate - aDate
-      })
-  }, [ageFilter, breedFilter, nonAdminFilteredUsers])
-
-  const totalPages = Math.max(1, Math.ceil(visibleUsers.length / PAGE_SIZE))
-  const pageUsers = useMemo(
-    () =>
-      visibleUsers.slice(
-        (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE
-      ),
-    [currentPage, visibleUsers]
+  // Search comes from the parent; tabs narrow it further. Admins only show on their own tab.
+  const inView = useCallback(
+    (profile: UserProfile, which: UserView) => {
+      const admin = getRole(profile) === "admin"
+      if (which === "admins") return admin
+      if (admin) return false
+      if (which === "new") return isNewUser(profile)
+      if (which === "pets") return Boolean(profile.petFeeds?.length)
+      if (which === "restricted") return isRestricted(profile)
+      return true
+    },
+    [isRestricted]
   )
+
+  const counts = useMemo(() => {
+    const tally = { all: 0, new: 0, pets: 0, restricted: 0, admins: 0 }
+    for (const profile of filteredUsers) {
+      for (const which of Object.keys(tally) as UserView[]) {
+        if (inView(profile, which)) tally[which]++
+      }
+    }
+    return tally
+  }, [filteredUsers, inView])
+
+  const rows = useMemo(() => {
+    const direction = sort.dir === "asc" ? 1 : -1
+    return filteredUsers
+      .filter((profile) => inView(profile, view))
+      .filter(
+        (profile) =>
+          breedFilter === "all" ||
+          (profile.petFeeds ?? []).some(
+            (feed) => feed.petBreed?.trim().toLowerCase() === breedFilter.toLowerCase()
+          )
+      )
+      .sort((a, b) => {
+        if (sort.key === "name") {
+          const aName = (a.displayName || a.email || "").toLowerCase()
+          const bName = (b.displayName || b.email || "").toLowerCase()
+          return aName.localeCompare(bName) * direction
+        }
+        if (sort.key === "pets") {
+          return ((a.petFeeds?.length ?? 0) - (b.petFeeds?.length ?? 0)) * direction
+        }
+        return ((toDate(a.createdAt)?.getTime() ?? 0) - (toDate(b.createdAt)?.getTime() ?? 0)) * direction
+      })
+  }, [breedFilter, filteredUsers, inView, sort, view])
+
+  const pagination = usePagination(rows, 10)
+
+  const onSort = (key: SortKey) => {
+    setSort((current) => nextSort(current, key, key === "name" ? "asc" : "desc"))
+    pagination.reset()
+  }
 
   const selectedUser = useMemo(
     () => users.find((profile) => profile.id === expandedUserId) ?? null,
     [expandedUserId, users]
   )
 
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [ageFilter, breedFilter, userSearchQuery])
+  const editingUser = useMemo(
+    () => users.find((profile) => profile.id === editingUserId) ?? null,
+    [editingUserId, users]
+  )
 
-  useEffect(() => {
-    if (currentPage > totalPages) setCurrentPage(totalPages)
-  }, [currentPage, totalPages])
+  const tabs: { id: UserView; label: string }[] = [
+    { id: "all", label: "All users" },
+    { id: "new", label: "New" },
+    { id: "pets", label: "With pets" },
+    { id: "restricted", label: "Restricted" },
+    { id: "admins", label: "Admins" },
+  ]
 
-  const openUser = (
-    event: React.MouseEvent<HTMLTableRowElement>,
-    profile: UserProfile
-  ) => {
-    const target = event.target as HTMLElement
-    if (
-      target.closest(
-        "button, input, a, [role='combobox'], [role='option'], [data-radix-collection-item]"
-      )
-    ) {
-      return
-    }
-    setExpandedUserId(profile.id)
-  }
-
-  const start = visibleUsers.length
-    ? (currentPage - 1) * PAGE_SIZE + 1
-    : 0
-  const end = Math.min(currentPage * PAGE_SIZE, visibleUsers.length)
+  const hasFilters = Boolean(userSearchQuery) || breedFilter !== "all"
 
   return (
     <>
-      <Card className="rounded-2xl border-white/40 bg-white/40 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-black/40 sm:rounded-[2rem]">
-        <CardHeader className="p-4 pb-4 sm:p-8 sm:pb-5">
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-              <div>
-                <CardTitle className="text-xl font-bold sm:text-2xl">
-                  Users
-                </CardTitle>
-                <CardDescription className="mt-1 text-xs sm:text-base">
-                  Search non-admin users, filter by join age or breed, and click any row to
-                  see the full profile and registered pets.
-                </CardDescription>
-              </div>
+      <div className="space-y-4">
+        <TableHeading
+          title="Users"
+          subtitle={
+            <>
+              {nonAdminUsers.length} users · {admins.length} {admins.length === 1 ? "admin" : "admins"} ·{" "}
+              {userPetCount} pets registered
+              {counts.restricted > 0 && (
+                <> · <span className="font-semibold text-red-600">{counts.restricted} restricted</span></>
+              )}
+            </>
+          }
+        />
 
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-600">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  {nonAdminUsers.length} users
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 text-xs font-bold text-violet-600">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  {admins.length} {admins.length === 1 ? "admin" : "admins"}
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/20 bg-orange-500/10 px-3 py-1.5 text-xs font-bold text-orange-600">
-                  <PawPrint className="h-3.5 w-3.5" />
-                  {userPetCount} user pets
-                </span>
-                {blacklistedCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-600">
-                    <Ban className="h-3.5 w-3.5" />
-                    {blacklistedCount} blacklisted
-                  </span>
-                )}
-              </div>
-            </div>
+        <TableCard>
+          <TableToolbar>
+            <FilterTabs
+              label="Filter users"
+              tabs={tabs}
+              value={view}
+              onChange={(next) => { setView(next); pagination.reset() }}
+              counts={counts}
+              alert={{ id: "restricted", className: "bg-red-500" }}
+            />
 
-            <div className="grid gap-3 md:grid-cols-[minmax(240px,1fr)_150px_minmax(180px,240px)]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search name, email, phone, pet or breed..."
-                  className="h-11 rounded-xl border-white/20 bg-white/50 pl-10 dark:border-white/10 dark:bg-black/50"
-                  value={userSearchQuery}
-                  onChange={(event) => setUserSearchQuery(event.target.value)}
-                />
-              </div>
-
-              <Select
-                value={ageFilter}
-                onValueChange={(value: UserAgeFilter) => setAgeFilter(value)}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-white/50 dark:bg-black/50">
-                  <SelectValue placeholder="User age" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All users</SelectItem>
-                  <SelectItem value="new">New · ≤30 days</SelectItem>
-                  <SelectItem value="old">Old · &gt;30 days</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={breedFilter} onValueChange={setBreedFilter}>
-                <SelectTrigger className="h-11 rounded-xl bg-white/50 dark:bg-black/50">
+            <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+              <Select value={breedFilter} onValueChange={(value) => { setBreedFilter(value); pagination.reset() }}>
+                <SelectTrigger className={`w-full sm:w-40 ${filterSelectClass}`} aria-label="Filter by breed">
                   <SelectValue placeholder="Breed" />
                 </SelectTrigger>
                 <SelectContent>
@@ -478,80 +460,202 @@ export function UsersTab({
                   ))}
                 </SelectContent>
               </Select>
+
+              <TableSearch
+                value={userSearchQuery}
+                onChange={(next) => { setUserSearchQuery(next); pagination.reset() }}
+                placeholder="Name, email, phone, pet…"
+                label="Search users"
+                className="sm:w-64 sm:flex-none"
+              />
             </div>
+          </TableToolbar>
 
-            <p className="text-[11px] font-medium text-muted-foreground">
-              “New” means joined within the last {NEW_USER_DAYS} days. Users
-              without a stored join date remain visible under All.
-            </p>
-          </div>
-        </CardHeader>
+          {rows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className={theadRowClass}>
+                    <SortHeader label="User" sortKey="name" sort={sort} onSort={onSort} />
+                    <th className={`hidden lg:table-cell ${thClass}`}>Contact</th>
+                    <SortHeader label="Pets" sortKey="pets" sort={sort} onSort={onSort} className="hidden md:table-cell" />
+                    <th className={`hidden sm:table-cell ${thClass}`}>Status</th>
+                    <SortHeader label="Joined" sortKey="joined" sort={sort} onSort={onSort} className="hidden xl:table-cell" />
+                    <th className={thClass}>Role</th>
+                    <th className={`w-px ${thClass}`}><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {pagination.rows.map((profile) => {
+                    const pets = profile.petFeeds ?? []
+                    const restricted = isRestricted(profile)
+                    const isSelf = profile.id === currentUserId
+                    const whatsapp = whatsappNumber(profile)
 
-        {admins.length > 0 && (
-          <div className="border-y border-border/40 bg-violet-500/[0.035] px-4 py-4 sm:px-8">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-violet-600">
-                  <ShieldCheck className="h-4 w-4" />
-                  Administrators
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Admin accounts are separated and are not included in the user count or pagination.
-                </p>
-              </div>
-              <span className="rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1 text-xs font-black text-violet-600">
-                {admins.length}
-              </span>
+                    return (
+                      <tr key={profile.id} onClick={() => setExpandedUserId(profile.id)} className={rowClass}>
+                        {/* User */}
+                        <td className="max-w-0 px-4 py-3 sm:w-[32%]">
+                          <div className="flex items-center gap-3">
+                            <Avatar profile={profile} />
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5">
+                                <span className={rowTitleClass}>{profile.displayName || "Unnamed user"}</span>
+                                {isSelf && (
+                                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">You</span>
+                                )}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">{profile.email}</p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Contact */}
+                        <td className="hidden whitespace-nowrap px-4 py-3 text-xs lg:table-cell">
+                          {profile.phone || whatsapp ? (
+                            <div className="space-y-1">
+                              {profile.phone && (
+                                <p className="flex items-center gap-1.5 text-foreground/80">
+                                  <Phone className="h-3 w-3 text-muted-foreground" />
+                                  {profile.phone}
+                                </p>
+                              )}
+                              {whatsapp && (
+                                <p className="flex items-center gap-1.5 text-foreground/80">
+                                  <MessageCircle className="h-3 w-3 text-emerald-600" />
+                                  {profile.whatsappSameAsPhone ? "Same as phone" : whatsapp}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <EmptyCell />
+                          )}
+                        </td>
+
+                        {/* Pets */}
+                        <td className="hidden px-4 py-3 md:table-cell">
+                          {pets.length ? (
+                            <div className="flex max-w-[260px] flex-wrap items-center gap-1">
+                              {pets.slice(0, 2).map((feed, index) => (
+                                <StatusPill
+                                  key={`${feed.petName}-${index}`}
+                                  tone={isCat(feed) ? "violet" : "orange"}
+                                  title={[feed.petName, feed.petBreed || feed.petType].filter(Boolean).join(" · ")}
+                                  className="max-w-[120px]"
+                                >
+                                  <PetTypeIcon feed={feed} className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{feed.petName || "Unnamed"}</span>
+                                </StatusPill>
+                              ))}
+                              {pets.length > 2 && (
+                                <span className="text-[11px] font-semibold text-muted-foreground">+{pets.length - 2}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <EmptyCell />
+                          )}
+                        </td>
+
+                        {/* Status */}
+                        <td className="hidden px-4 py-3 sm:table-cell">
+                          {restricted ? (
+                            <StatusPill tone="red" icon={Ban}>Restricted</StatusPill>
+                          ) : isNewUser(profile) ? (
+                            <StatusPill tone="sky" icon={Sparkles}>New</StatusPill>
+                          ) : (
+                            <StatusPill tone="emerald" icon={CheckCircle2}>Active</StatusPill>
+                          )}
+                        </td>
+
+                        {/* Joined */}
+                        <td className="hidden whitespace-nowrap px-4 py-3 xl:table-cell">
+                          <p className="text-foreground/80">{formatDate(profile.createdAt, "—")}</p>
+                          <p className="text-[11px] text-muted-foreground">{relativeAge(profile.createdAt)}</p>
+                        </td>
+
+                        {/* Role */}
+                        <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                          <Select
+                            value={getRole(profile)}
+                            onValueChange={(value: NonNullable<UserProfile["role"]>) =>
+                              handleChangeUserRole(profile.id, value)
+                            }
+                            disabled={isSelf}
+                          >
+                            <SelectTrigger
+                              aria-label={`Role for ${profile.displayName || profile.email}`}
+                              className="h-8 w-[100px] rounded-lg bg-white/70 text-xs font-semibold capitalize dark:bg-black/30"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">User</SelectItem>
+                              <SelectItem value="author">Author</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </td>
+
+                        <ActionsCell>
+                          <IconAction label="Edit details" tone="orange" onClick={() => handleEditUser(profile)}>
+                            <Pencil className="h-4 w-4" />
+                          </IconAction>
+                          <IconAction
+                            label={restricted ? "Remove restriction" : "Restrict user"}
+                            tone={restricted ? "emerald" : "red"}
+                            active={restricted}
+                            onClick={() => setPendingAction({ type: "blacklist", profile })}
+                            disabled={isSelf}
+                          >
+                            {restricted ? <ShieldCheck className="h-4 w-4" /> : <Ban className="h-4 w-4" />}
+                          </IconAction>
+                          <IconAction
+                            label="Delete account"
+                            tone="red"
+                            onClick={() => setPendingAction({ type: "delete", profile })}
+                            disabled={isSelf}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </IconAction>
+                        </ActionsCell>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {admins.map((admin) => (
-                <button
-                  key={admin.id}
-                  type="button"
-                  onClick={() => setExpandedUserId(admin.id)}
-                  className="flex min-h-[74px] items-center gap-3 rounded-2xl border border-violet-500/15 bg-background/70 p-3 text-left transition-colors hover:border-violet-500/30 hover:bg-violet-500/[0.05]"
+          ) : (
+            <TableEmpty
+              icon={Users}
+              title={hasFilters ? "No users match these filters" : view === "restricted" ? "No restricted users" : "No users here yet"}
+            >
+              {hasFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl"
+                  onClick={() => { setUserSearchQuery(""); setBreedFilter("all") }}
                 >
-                  <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-violet-500/20 bg-violet-500/10 font-bold text-violet-600">
-                    {admin.photoURL ? (
-                      <NextImage
-                        src={admin.photoURL}
-                        alt={admin.displayName || "Admin"}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <ShieldCheck className="h-5 w-5" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-black">
-                      {admin.displayName || "Administrator"}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {admin.email}
-                    </p>
-                    <p className="mt-0.5 text-[10px] font-semibold text-muted-foreground">
-                      Joined {formatDate(admin.createdAt, "Unknown")}
-                    </p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-violet-500" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+                  Clear filters
+                </Button>
+              )}
+            </TableEmpty>
+          )}
 
-        <div className="border-b border-border/40 bg-red-500/[0.03] px-4 py-4 sm:px-8">
-          <div className="mb-3 flex flex-col justify-between gap-3 md:flex-row md:items-start">
+          <TablePagination pagination={pagination} noun={rows.length === 1 ? "user" : "users"} />
+        </TableCard>
+
+        {/* Restricted emails: block addresses before or after they sign up */}
+        <TableCard>
+          <div className="flex flex-col justify-between gap-3 border-b border-border/50 p-4 md:flex-row md:items-center">
             <div>
-              <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-red-600">
-                <Ban className="h-4 w-4" />
+              <h3 className="flex items-center gap-2 text-sm font-bold">
+                <Ban className="h-4 w-4 text-red-600" />
                 Restricted emails
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Anyone who signs in with these emails is restricted instantly, even if their
-                account is new. Updates live, no refresh needed.
+                <span className="text-xs font-semibold tabular-nums text-muted-foreground">{sortedRestrictedEmails.length}</span>
+              </h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Anyone signing in with these emails is restricted instantly, even on a new account.
               </p>
             </div>
             <form onSubmit={handleRestrictEmail} className="flex w-full gap-2 md:w-auto">
@@ -560,22 +664,23 @@ export function UsersTab({
                 value={newRestrictedEmail}
                 onChange={(event) => setNewRestrictedEmail(event.target.value)}
                 placeholder="email@example.com"
-                className="h-9 rounded-lg bg-white/50 text-sm dark:bg-black/50 md:w-64"
+                aria-label="Email to restrict"
+                className="h-9 rounded-xl bg-white/70 text-sm dark:bg-black/30 md:w-64"
               />
               <Button
                 type="submit"
                 size="sm"
                 disabled={restrictingEmail || !newRestrictedEmail.trim()}
-                className="h-9 rounded-lg bg-red-600 text-white hover:bg-red-600/90"
+                className="h-9 rounded-xl bg-red-600 text-white hover:bg-red-600/90"
               >
-                <Ban className="mr-1.5 h-4 w-4" />
+                <Ban className="h-4 w-4" />
                 Restrict
               </Button>
             </form>
           </div>
 
           {sortedRestrictedEmails.length ? (
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="divide-y divide-border/40">
               {sortedRestrictedEmails.map((entry) => {
                 const linkedUser = users.find(
                   (profile) =>
@@ -584,25 +689,18 @@ export function UsersTab({
                 const attempts = entry.loginAttempts ?? 0
 
                 return (
-                  <div
-                    key={entry.id}
-                    className="flex items-center gap-3 rounded-2xl border border-red-500/15 bg-background/70 p-3"
-                  >
+                  <li key={entry.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black">{entry.email}</p>
+                      <p className="truncate font-semibold">{entry.email}</p>
                       <p className="truncate text-xs text-muted-foreground">
                         {linkedUser?.displayName || entry.displayName || "No account yet"}
                       </p>
-                      <p
-                        className={`mt-0.5 text-[10px] font-semibold ${
-                          entry.lastLoginAt ? "text-red-600" : "text-muted-foreground"
-                        }`}
-                      >
-                        {entry.lastLoginAt
-                          ? `Signed in ${formatDate(entry.lastLoginAt)} · ${attempts} ${attempts === 1 ? "session" : "sessions"}`
-                          : `Restricted ${formatDate(entry.createdAt, "recently")} · no sign-ins since`}
-                      </p>
                     </div>
+                    <p className={`hidden shrink-0 text-xs sm:block ${entry.lastLoginAt ? "font-semibold text-red-600" : "text-muted-foreground"}`}>
+                      {entry.lastLoginAt
+                        ? `Tried signing in ${formatDate(entry.lastLoginAt)} · ${attempts} ${attempts === 1 ? "time" : "times"}`
+                        : `Restricted ${formatDate(entry.createdAt, "recently")}`}
+                    </p>
                     <Button
                       type="button"
                       variant="outline"
@@ -612,435 +710,92 @@ export function UsersTab({
                     >
                       Unblock
                     </Button>
-                  </div>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           ) : (
-            <p className="text-xs italic text-muted-foreground">No restricted emails.</p>
+            <p className="px-4 py-6 text-center text-xs text-muted-foreground">No restricted emails.</p>
           )}
-        </div>
+        </TableCard>
+      </div>
 
-        <CardContent className="overflow-hidden p-0">
-          <div className="min-h-[430px] overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left">
-              <thead>
-                <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                  <th className="px-6 py-4 text-xs font-semibold sm:text-sm">
-                    User
-                  </th>
-                  <th className="px-5 py-4 text-xs font-semibold sm:text-sm">
-                    Joined
-                  </th>
-                  <th className="px-5 py-4 text-xs font-semibold sm:text-sm">
-                    Pets
-                  </th>
-                  <th className="px-5 py-4 text-center text-xs font-semibold sm:text-sm">
-                    Role
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold sm:text-sm">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+      {/* Edit details */}
+      <Dialog open={Boolean(editingUserId)} onOpenChange={(open) => !open && setEditingUserId(null)}>
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit user</DialogTitle>
+            <DialogDescription>
+              {editingUser ? `Update contact details for ${editingUser.displayName || editingUser.email}.` : "Update contact details."}
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            onSubmit={(event) => { event.preventDefault(); handleSaveUser() }}
+            className="space-y-3"
+          >
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">Display name</span>
+              <Input value={editUserName} onChange={(event) => setEditUserName(event.target.value)} className="rounded-xl" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">Email</span>
+              <Input type="email" value={editUserEmail} onChange={(event) => setEditUserEmail(event.target.value)} className="rounded-xl" />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-xs font-semibold text-muted-foreground">Phone</span>
+              <Input type="tel" value={editUserPhone} onChange={(event) => setEditUserPhone(event.target.value)} className="rounded-xl" />
+            </label>
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="ghost" className="rounded-xl" onClick={() => setEditingUserId(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="rounded-xl bg-orange-500 text-white hover:bg-orange-600">
+                Save changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-              <tbody className="divide-y divide-border/40">
-                {pageUsers.map((profile) => {
-                  const pets = profile.petFeeds ?? []
-                  const joinAge = daysSince(profile.createdAt)
-
-                  return (
-                    <tr
-                      key={profile.id}
-                      onClick={(event) => openUser(event, profile)}
-                      className="group h-[82px] cursor-pointer transition-colors hover:bg-orange-500/[0.04] dark:hover:bg-orange-500/[0.06]"
-                    >
-                      <td className="px-6 py-4">
-                        {editingUserId === profile.id ? (
-                          <div className="max-w-sm space-y-2">
-                            <Input
-                              value={editUserName}
-                              onChange={(event) =>
-                                setEditUserName(event.target.value)
-                              }
-                              placeholder="Display Name"
-                              className="h-9 rounded-lg bg-white/50 text-sm dark:bg-black/50"
-                            />
-                            <Input
-                              value={editUserEmail}
-                              onChange={(event) =>
-                                setEditUserEmail(event.target.value)
-                              }
-                              placeholder="Email"
-                              className="h-9 rounded-lg bg-white/50 text-sm dark:bg-black/50"
-                            />
-                            <Input
-                              value={editUserPhone}
-                              onChange={(event) =>
-                                setEditUserPhone(event.target.value)
-                              }
-                              placeholder="Phone"
-                              className="h-9 rounded-lg bg-white/50 text-sm dark:bg-black/50"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border border-orange-500/20 bg-orange-500/10 font-bold text-orange-600">
-                              {profile.photoURL ? (
-                                <NextImage
-                                  src={profile.photoURL}
-                                  alt={profile.displayName || "User"}
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <span>
-                                  {(profile.displayName || profile.email || "?")[0].toUpperCase()}
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="max-w-[220px] truncate font-bold group-hover:text-orange-600">
-                                  {profile.displayName || "Anonymous User"}
-                                </span>
-                                {isNewUser(profile) && (
-                                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-emerald-600">
-                                    New
-                                  </span>
-                                )}
-                                {isRestricted(profile) && (
-                                  <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-600">
-                                    Blacklisted
-                                  </span>
-                                )}
-                              </div>
-                              <p className="max-w-[280px] truncate text-xs text-muted-foreground">
-                                {profile.email}
-                              </p>
-                              {profile.phone && (
-                                <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Phone className="h-3 w-3" />
-                                  {profile.phone}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-2 text-sm font-bold">
-                            <CalendarDays className="h-4 w-4 text-orange-500" />
-                            {formatDate(profile.createdAt, "Unknown")}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {joinAge === null
-                              ? "Join date unavailable"
-                              : joinAge === 0
-                                ? "Joined today"
-                                : `${joinAge} day${joinAge === 1 ? "" : "s"} ago`}
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4">
-                        {pets.length ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <div className="flex -space-x-1">
-                                {pets.slice(0, 4).map((feed, index) => (
-                                  <span
-                                    key={`${feed.petName}-${index}`}
-                                    title={`${feed.petName} · ${feed.petBreed || feed.petType}`}
-                                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-background bg-orange-100 text-orange-600 dark:bg-orange-950"
-                                  >
-                                    <PetTypeIcon
-                                      feed={feed}
-                                      className="h-3.5 w-3.5"
-                                    />
-                                  </span>
-                                ))}
-                              </div>
-                              <span className="text-sm font-black">
-                                {pets.length} {pets.length === 1 ? "pet" : "pets"}
-                              </span>
-                            </div>
-
-                            <div className="flex max-w-[310px] flex-wrap gap-1">
-                              {Array.from(
-                                new Set(
-                                  pets
-                                    .map((feed) => feed.petBreed?.trim())
-                                    .filter(Boolean)
-                                )
-                              )
-                                .slice(0, 3)
-                                .map((breed) => (
-                                  <span
-                                    key={breed}
-                                    className="rounded-full bg-muted px-2 py-1 text-[10px] font-bold text-muted-foreground"
-                                  >
-                                    {breed}
-                                  </span>
-                                ))}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs italic text-muted-foreground/60">
-                            <PawPrint className="h-3.5 w-3.5" />
-                            No pets added
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <span
-                            className={`text-xs font-bold uppercase tracking-tight ${
-                              getRole(profile) !== "user"
-                                ? "text-orange-600"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {getRole(profile)}
-                          </span>
-                          <Select
-                            value={getRole(profile)}
-                            onValueChange={(
-                              value: NonNullable<UserProfile["role"]>
-                            ) =>
-                              handleChangeUserRole(profile.id, value)
-                            }
-                            disabled={profile.id === currentUserId}
-                          >
-                            <SelectTrigger className="h-9 w-[112px] rounded-xl bg-white/50 text-xs font-bold dark:bg-black/50">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="user">User</SelectItem>
-                              <SelectItem value="author">Author</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {editingUserId === profile.id ? (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-9 rounded-lg border-emerald-500/20 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white"
-                                onClick={handleSaveUser}
-                              >
-                                <Save className="mr-1.5 h-4 w-4" />
-                                Save
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-9 rounded-lg"
-                                onClick={() => setEditingUserId(null)}
-                              >
-                                Cancel
-                              </Button>
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-9 rounded-lg bg-white/50 text-orange-600 hover:bg-orange-600 hover:text-white dark:bg-black/50"
-                                onClick={() => handleEditUser(profile)}
-                              >
-                                <Edit className="mr-1.5 h-4 w-4" />
-                                Edit
-                              </Button>
-
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={profile.id === currentUserId}
-                                    title={isRestricted(profile) ? "Remove from blacklist" : "Blacklist user"}
-                                    className={
-                                      isRestricted(profile)
-                                        ? "h-9 rounded-lg border-red-500/30 bg-red-500/10 text-red-600 hover:bg-emerald-600 hover:text-white"
-                                        : "h-9 rounded-lg bg-white/50 text-red-600 hover:bg-red-600 hover:text-white dark:bg-black/50"
-                                    }
-                                  >
-                                    {isRestricted(profile) ? (
-                                      <>
-                                        <ShieldCheck className="mr-1.5 h-4 w-4" />
-                                        Unblock
-                                      </>
-                                    ) : (
-                                      <Ban className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="rounded-[2rem] border-white/30 bg-white/95 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-black/95">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      {isRestricted(profile)
-                                        ? "Remove from Blacklist?"
-                                        : "Blacklist User?"}
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      {isRestricted(profile)
-                                        ? `“${profile.displayName || profile.email}” will regain normal access to the web app.`
-                                        : `“${profile.displayName || profile.email}” will stay signed in but lose all access except reading blogs. Their email is restricted too, so a new login with it stays blocked.`}
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className={
-                                        isRestricted(profile)
-                                          ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
-                                          : "bg-destructive text-white hover:bg-destructive/90"
-                                      }
-                                      onClick={() =>
-                                        handleToggleUserBlacklist(
-                                          profile,
-                                          !isRestricted(profile)
-                                        )
-                                      }
-                                    >
-                                      {isRestricted(profile) ? "Unblock User" : "Blacklist User"}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={profile.id === currentUserId}
-                                    className="h-9 rounded-lg bg-white/50 text-destructive hover:bg-destructive hover:text-white dark:bg-black/50"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent className="rounded-[2rem] border-white/30 bg-white/95 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-black/95">
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Delete User Account?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Permanently delete “
-                                      {profile.displayName || profile.email}”?
-                                      This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>
-                                      Cancel
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      className="bg-destructive text-white hover:bg-destructive/90"
-                                      onClick={() =>
-                                        handleDeleteUserAccount(profile.id)
-                                      }
-                                    >
-                                      Delete User
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-
-                              <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-orange-500" />
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-
-                {pageUsers.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="px-8 py-20 text-center text-muted-foreground"
-                    >
-                      <div className="flex flex-col items-center gap-2">
-                        <Users className="h-8 w-8 opacity-20" />
-                        <p className="font-medium">
-                          No users match these filters.
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col gap-4 border-t border-border/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-          <div>
-            <p className="text-sm font-medium text-muted-foreground">
-              Showing{" "}
-              <span className="font-bold text-foreground">
-                {start}–{end}
-              </span>{" "}
-              of{" "}
-              <span className="font-bold text-foreground">
-                {visibleUsers.length}
-              </span>{" "}
-              matching users
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              5 users per page · {userPetCount} pet profiles from users
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl"
-              disabled={currentPage <= 1}
-              onClick={() =>
-                setCurrentPage((page) => Math.max(1, page - 1))
-              }
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              Previous
-            </Button>
-
-            <span className="min-w-20 text-center text-xs font-bold">
-              Page {currentPage} / {totalPages}
-            </span>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 rounded-xl"
-              disabled={currentPage >= totalPages}
-              onClick={() =>
-                setCurrentPage((page) => Math.min(totalPages, page + 1))
-              }
-            >
-              Next
-              <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
+      {/* Restrict / delete confirmation */}
+      <AlertDialog open={pendingAction !== null} onOpenChange={(open) => !open && setPendingAction(null)}>
+        <AlertDialogContent size="sm">
+          {pendingAction && (() => {
+            const { type, profile } = pendingAction
+            const name = profile.displayName || profile.email
+            const restricted = isRestricted(profile)
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {type === "delete" ? "Delete this account?" : restricted ? "Remove restriction?" : "Restrict this user?"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {type === "delete"
+                      ? `“${name}” will be permanently deleted. This can't be undone.`
+                      : restricted
+                        ? `“${name}” will regain normal access to the web app.`
+                        : `“${name}” will stay signed in but lose all access except reading blogs. Their email is restricted too, so a new login with it stays blocked.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant={type === "blacklist" && restricted ? "default" : "destructive"}
+                    onClick={() =>
+                      type === "delete"
+                        ? handleDeleteUserAccount(profile.id)
+                        : handleToggleUserBlacklist(profile, !restricted)
+                    }
+                  >
+                    {type === "delete" ? "Delete account" : restricted ? "Remove restriction" : "Restrict user"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </>
+            )
+          })()}
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={Boolean(selectedUser)}

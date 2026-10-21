@@ -1,19 +1,20 @@
 "use client"
 
-import { ArrowLeft, Download, Lightbulb, List, PlusCircle, Upload } from "lucide-react"
+import { ArrowLeft, Download, Lightbulb, List, Plus, PlusCircle, Upload } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 
 interface BlogToolbarProps {
   activeTab: "blog" | "blog-list"
   onNavigate: (tab: "blog" | "blog-list") => void
+  onNewPost: () => void
   onOpenTips: () => void
   onOpenImport: () => void
   onOpenExport: () => void
 }
 
-/** Always-visible action bar for the blog tabs: navigation, Tips & keys, JSON import/export */
-export function BlogToolbar({ activeTab, onNavigate, onOpenTips, onOpenImport, onOpenExport }: BlogToolbarProps) {
+/** Always-visible action bar for the blog tabs: navigation, new post, Tips & keys, JSON import/export */
+export function BlogToolbar({ activeTab, onNavigate, onNewPost, onOpenTips, onOpenImport, onOpenExport }: BlogToolbarProps) {
   const onEditor = activeTab === "blog"
 
   return (
@@ -28,6 +29,16 @@ export function BlogToolbar({ activeTab, onNavigate, onOpenTips, onOpenImport, o
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
+        {!onEditor && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={onNewPost}
+            className="rounded-xl border-0 bg-gradient-to-r from-orange-500 to-amber-500 font-bold text-white shadow-md shadow-orange-500/20 hover:from-orange-600 hover:to-amber-600"
+          >
+            <Plus className="h-3.5 w-3.5" /> New post
+          </Button>
+        )}
         <Button type="button" variant="outline" size="sm" onClick={onOpenImport} className="rounded-xl">
           <Upload className="h-3.5 w-3.5" /> Import JSON
         </Button>
