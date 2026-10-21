@@ -13,11 +13,24 @@ export interface GptPet {
   report?: PetFeed
   /** Not a real pet: the "planning a pet" chat for owners who don't have one yet */
   planning?: boolean
+  /** Not signed in: general questions with no pet record (also `planning`, so nothing is loaded) */
+  guest?: boolean
 }
 
 /** Chats about getting a new pet are filed under this name (chat history, prompt dock, picker). */
 export const PLANNING_PET_NAME = "Pet planning"
 export const planningPet: GptPet = { name: PLANNING_PET_NAME, planning: true }
+
+/** Visitors who aren't signed in ask about pets in general. */
+export const GUEST_PET_NAME = "Guest"
+export const guestPet: GptPet = { name: GUEST_PET_NAME, planning: true, guest: true }
+
+export const GUEST_PROMPTS = [
+  "How much should a puppy eat each day?",
+  "How do I know if my cat is at a healthy weight?",
+  "Which dog breeds suit a small apartment in India?",
+  "What vaccinations does a new kitten need?",
+]
 export const isPlanningPet = (pet?: GptPet | null) => Boolean(pet?.planning)
 
 export const isCatPet = (pet?: GptPet | null) =>
@@ -62,6 +75,7 @@ export function describeAge(pet: GptPet) {
 }
 
 export function petSubtitle(pet: GptPet) {
+  if (pet.guest) return "Ask anything about dogs and cats"
   if (pet.planning) return "Choosing and preparing for a new pet"
   const source = pet.profile ?? pet.report
   return [source?.petBreed, describeAge(pet), source?.weightKg ? `${source.weightKg} kg` : undefined]
@@ -86,6 +100,15 @@ export function buildPetContext(
   ownerName?: string
 ): PawGptPetContext {
   const today = new Date()
+  if (pet.guest) {
+    return {
+      today: format(today, "yyyy-MM-dd (EEEE)"),
+      pet: { mode: "guest", note: "The visitor isn't signed in, so there is no pet record." },
+      mealLogs: [],
+      weights: [],
+      summary: {},
+    }
+  }
   if (pet.planning) {
     // No pet yet: the prompt switches Paw GPT to helping the owner choose and prepare.
     return {

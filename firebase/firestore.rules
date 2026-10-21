@@ -82,15 +82,24 @@ service cloud.firestore {
       return data.get(field, 0);
     }
 
+    // Paw GPT Plus (pawGptSubscriptions/{uid}, written only by the server) is still active.
+    function hasPawGptPlus(userId) {
+      let path = /databases/$(database)/documents/pawGptSubscriptions/$(userId);
+      return exists(path) && get(path).data.activeUntil > request.time;
+    }
+
     // Starting a question adds 1 to count. Pet parents are capped at 5 questions and
     // 100000 tokens a day, or with a Daily Pass (passTokenLimit, set only by the server)
-    // unlimited questions up to the pass's tokens. Admins and authors are counted, never capped.
-    function startsQuestion() {
+    // unlimited questions up to the pass's tokens, or with Paw GPT Plus unlimited questions up
+    // to 300000 tokens a day. Admins and authors are counted, never capped.
+    // Keep 5 / 100000 / 300000 in sync with lib/paw-gpt.ts.
+    function startsQuestion(userId) {
       return request.resource.data.count == resource.data.count + 1 &&
         (
           (request.resource.data.count <= 5 && usageField(resource.data, 'tokens') < 100000) ||
           (usageField(resource.data, 'passTokenLimit') > 0 &&
             usageField(resource.data, 'tokens') < usageField(resource.data, 'passTokenLimit')) ||
+          (usageField(resource.data, 'tokens') < 300000 && hasPawGptPlus(userId)) ||
           isAdmin()
         ) &&
         usageField(request.resource.data, 'tokens') == usageField(resource.data, 'tokens') &&
@@ -202,10 +211,24 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['count', 'tokens', 'inputTokens', 'outputTokens', 'updatedAt']) &&
           request.resource.data.updatedAt == request.time &&
-          (startsQuestion() || recordsTokens());
+          (startsQuestion(userId) || recordsTokens());
 
         allow delete: if isFullAdmin();
       }
+    }
+
+
+    // ─────────────────────────────────────────
+    // PAW GPT PLUS SUBSCRIPTIONS
+    // pawGptSubscriptions/{uid}   { plan, activeUntil, ... }
+    // ─────────────────────────────────────────
+    // Granted only by the server (Admin SDK, lib/server/paw-gpt-subscription.ts) after a
+    // verified payment. Owners can read theirs to see their plan; nobody writes from a client.
+    // pawGptSubscriptionGrants, pawGptGuests and pawGptGuestIps are server-only (no rules → denied).
+
+    match /pawGptSubscriptions/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
     }
 
 
@@ -312,11 +335,9 @@ service cloud.firestore {
 
 
     // ─────────────────────────────────────────
-    // AI BLOG DRAFTS
-    // Submitted by the AI integration (/api/integrations/ai/blog-drafts) and moderated through
-    // /api/admin/ai-drafts/{id}. Both use the Admin SDK, so every client write is refused here:
-    // status, approval and publishing can only change through the server-verified workflow.
-    // Drafts never appear in /blogs until a moderator publishes them.
+    // AI BLOG DRAFTS (legacy)
+    // /api/integrations/ai/blog-drafts now writes straight into /blogs as "pending_review", so
+    // AI posts go through the normal admin Review tab. This collection only holds older drafts.
     // ─────────────────────────────────────────
 
     match /aiBlogDrafts/{draftId} {

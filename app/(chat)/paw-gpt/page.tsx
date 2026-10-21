@@ -11,6 +11,9 @@ export const metadata: Metadata = {
   },
 }
 
-export default function PawGptPage() {
-  return <PawGptClient />
+export default async function PawGptPage({ searchParams }: PageProps<"/paw-gpt">) {
+  // A question typed elsewhere (e.g. the home page) arrives as ?q=
+  const { q } = await searchParams
+  const initialQuestion = (Array.isArray(q) ? q[0] : q)?.trim() || undefined
+  return <PawGptClient initialQuestion={initialQuestion} />
 }

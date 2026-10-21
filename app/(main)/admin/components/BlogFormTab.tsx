@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import Editor from "@/components/editor"
 import { Category, UserProfile } from "@/firebase/firestore"
-import { useState } from "react"
+import { useRef, useState } from "react"
+import { BlogPublishCheck, blockingCount, runBlogChecks } from "./BlogPublishCheck"
 
 interface BlogFormTabProps {
   blogTitle: string
@@ -68,6 +69,8 @@ interface BlogFormTabProps {
   handleTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onLoadSoftWaterPetsTemplate: () => void
   onCancel: () => void
+  /** Signed-in user, offered as the author when the check auto-fixes a missing author */
+  currentUserId?: string
 }
 
 const fieldClass = "bg-white/60 dark:bg-black/40 border-black/10 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl"
@@ -97,9 +100,39 @@ export function BlogFormTab({
   savedDraft, hasDraftContent,
   restoreDraft, discardDraft, formatDraftTime,
   handleBlogSubmit, isSavingBlog, handleTitleChange, onLoadSoftWaterPetsTemplate, onCancel,
+  currentUserId,
 }: BlogFormTabProps) {
   const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
   const [panel, setPanel] = useState("publish")
+  const [checkOpen, setCheckOpen] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  const skipCheck = useRef(false)
+
+  const checkValues = {
+    title: blogTitle, slug: blogSlug, content: blogContent, excerpt: blogExcerpt, keywords: blogKeywords,
+    seoTitle: blogSeoTitle, seoDescription: blogSeoDescription, seoKeywords: blogSeoKeywords,
+    image: blogImage, categoryIds: blogCategories, authorId: blogAuthorId,
+  }
+  const checks = runBlogChecks(checkValues, { canSetAuthor: Boolean(currentUserId) })
+  const openIssues = checks.filter((c) => !c.ok).length
+  const blocking = blockingCount(checks)
+
+  // Publishing with open problems goes through the check first; drafts save straight away.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    if (blogStatus === "published" && blocking > 0 && !skipCheck.current) {
+      e.preventDefault()
+      setCheckOpen(true)
+      return
+    }
+    skipCheck.current = false
+    handleBlogSubmit(e)
+  }
+
+  const publishFromCheck = () => {
+    skipCheck.current = true
+    setCheckOpen(false)
+    formRef.current?.requestSubmit()
+  }
 
   const publishMissing = (blogCategories.length === 0 ? 1 : 0) + (blogAuthorId ? 0 : 1)
   const imageProblem = imageUrlProblem(blogImage)
@@ -128,7 +161,8 @@ export function BlogFormTab({
       )}
 
       <form
-        onSubmit={handleBlogSubmit}
+        ref={formRef}
+        onSubmit={onSubmit}
         className="flex flex-col overflow-hidden rounded-2xl sm:rounded-[1.75rem] border border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl xl:h-[calc(100dvh-11rem)] xl:min-h-[620px]"
       >
         {/* ── Action bar: always visible ── */}
@@ -164,6 +198,24 @@ export function BlogFormTab({
                 <span className="hidden md:inline">Soft-water template</span>
               </Button>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCheckOpen(true)}
+              title="Check the post before publishing"
+              className={`h-9 rounded-xl font-semibold ${
+                openIssues ? "border-violet-500/30 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300" : "text-emerald-700 dark:text-emerald-400"
+              }`}
+            >
+              {openIssues ? <Sparkles className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+              Check
+              {openIssues > 0 && (
+                <span className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${blocking ? "bg-red-500" : "bg-violet-500"}`}>
+                  {openIssues}
+                </span>
+              )}
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -508,6 +560,27 @@ export function BlogFormTab({
           </Tabs>
         </div>
       </form>
+
+      <BlogPublishCheck
+        open={checkOpen}
+        onOpenChange={setCheckOpen}
+        values={checkValues}
+        setters={{
+          setSlug: setBlogSlug,
+          setExcerpt: setBlogExcerpt,
+          setKeywords: setBlogKeywords,
+          setSeoTitle: setBlogSeoTitle,
+          setSeoDescription: setBlogSeoDescription,
+          setSeoKeywords: setBlogSeoKeywords,
+          setCategoryIds: setBlogCategories,
+          setAuthorId: setBlogAuthorId,
+        }}
+        categories={categories}
+        authors={authors}
+        currentUserId={currentUserId}
+        publishing={blogStatus === "published"}
+        onPublish={publishFromCheck}
+      />
 
       <AlertDialog open={confirmDeleteImage} onOpenChange={setConfirmDeleteImage}>
         <AlertDialogContent size="sm">

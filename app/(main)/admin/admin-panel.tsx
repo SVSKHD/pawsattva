@@ -1265,6 +1265,7 @@ export default function AdminPanel({
               <BlogToolbar
                 activeTab={activeTab}
                 onNavigate={handleTabChange}
+                onNewPost={() => { if (editingBlogId) resetBlogForm(); handleTabChange("blog") }}
                 onOpenTips={() => setBlogTipsOpen(true)}
                 onOpenImport={() => openBlogJson("import")}
                 onOpenExport={() => openBlogJson("export")}
@@ -1344,6 +1345,7 @@ export default function AdminPanel({
                 handleTitleChange={handleTitleChange}
                 onLoadSoftWaterPetsTemplate={loadSoftWaterPetsTemplate}
                 onCancel={() => { resetBlogForm(); handleTabChange("blog-list") }}
+                currentUserId={userId}
               />
             </div>
           )}

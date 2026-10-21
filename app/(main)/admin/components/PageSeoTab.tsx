@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { FormEvent } from "react"
 import {
   AlertTriangle,
@@ -12,6 +12,7 @@ import {
   SearchCheck,
   ShieldCheck,
   Sparkles,
+  WandSparkles,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -20,6 +21,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { auth } from "@/firebase/firebase"
 import {
   getBlogs,
   getPageSeoConfigs,
@@ -33,13 +45,28 @@ import {
 
 const SITE_URL = "https://pawsattva.com"
 
-const PAGE_OPTIONS: { key: PageSeoKey; label: string; pathname: string }[] = [
-  { key: "home", label: "Home", pathname: "/" },
-  { key: "blog", label: "Blogs", pathname: "/blog" },
-  { key: "pet-feed", label: "Pet Feed", pathname: "/pet-feed" },
-  { key: "consultation", label: "Consultation", pathname: "/consultation" },
-  { key: "walks", label: "Walks", pathname: "/walks" },
+// `about` tells the AI what each page is for when it drafts the page's SEO.
+const PAGE_OPTIONS: { key: PageSeoKey; label: string; pathname: string; about: string }[] = [
+  { key: "home", label: "Home", pathname: "/", about: "Home page of Paw Sattva, an Indian pet wellness platform for dogs and cats: expert nutrition and care articles, a pet body-condition and feeding assessment, a food logger, Paw GPT pet assistant, vet consultations and city walk guides." },
+  { key: "blog", label: "Blogs", pathname: "/blog", about: "Blog index listing Paw Sattva's articles on dog and cat nutrition, breeds, grooming, health warning signs, training and everyday care for pet parents in India." },
+  { key: "pet-feed", label: "Pet Feed", pathname: "/pet-feed", about: "Free pet assessment: add your dog or cat's breed, age, weight and activity, get a body-condition score and a personalised feeding plan with portions and meal timing." },
+  { key: "consultation", label: "Consultation", pathname: "/consultation", about: "Book an online consultation with a veterinarian or pet nutrition expert for diet plans, weight management and health concerns about your dog or cat." },
+  { key: "walks", label: "Walks", pathname: "/walks", about: "Pet-friendly walking spots, parks and approved vet hospitals and clinics in Indian cities such as Hyderabad, for dog owners planning walks and emergencies." },
 ]
+
+type AiSeo = Pick<SeoConfigFields, "title" | "description" | "keywords" | "ogTitle" | "ogDescription" | "twitterTitle" | "twitterDescription">
+
+/** What the AI is told about one page or post */
+type SeoSubject = {
+  kind: "page" | "blog"
+  url: string
+  title: string
+  summary: string
+  content: string
+  keywords: string[]
+  image?: string
+  blog?: Blog
+}
 
 const emptySeo = (canonicalUrl = ""): SeoConfigFields => ({
   title: "",
@@ -100,6 +127,98 @@ const statusFor = (seo: SeoConfigFields): SeoReadinessStatus => {
 const stripHtml = (value = "") =>
   value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
 
+const titleOk = (value: string) => value.trim().length >= 30 && value.trim().length <= 60
+const descriptionOk = (value: string) => value.trim().length >= 120 && value.trim().length <= 160
+
+const isoDate = (value: unknown) => {
+  const date = typeof value === "object" && value && "toDate" in value
+    ? (value as { toDate: () => Date }).toDate()
+    : value ? new Date(value as string) : null
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : undefined
+}
+
+/** JSON-LD built from the page data itself, so it is always valid (no AI needed) */
+const buildSchema = (subject: SeoSubject, seo: SeoConfigFields) => {
+  const publisher = { "@type": "Organization", name: "Paw Sattva", url: SITE_URL }
+  const image = seo.ogImage || seo.image || subject.image
+  const schema = subject.kind === "blog"
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: seo.title || subject.title,
+        description: seo.description,
+        ...(image ? { image } : {}),
+        url: subject.url,
+        mainEntityOfPage: { "@type": "WebPage", "@id": subject.url },
+        ...(isoDate(subject.blog?.date) ? { datePublished: isoDate(subject.blog?.date) } : {}),
+        ...(isoDate(subject.blog?.updatedAt) ? { dateModified: isoDate(subject.blog?.updatedAt) } : {}),
+        author: { "@type": "Organization", name: subject.blog?.authorName || "Paw Sattva" },
+        publisher,
+        keywords: seo.keywords.join(", "),
+      }
+    : {
+        "@context": "https://schema.org",
+        "@type": subject.url === `${SITE_URL}/` ? "WebSite" : "WebPage",
+        name: seo.title || subject.title,
+        description: seo.description,
+        url: subject.url,
+        ...(image ? { image } : {}),
+        publisher,
+      }
+  return JSON.stringify(schema, null, 2)
+}
+
+/**
+ * Merges AI copy into the current SEO. "missing" only touches fields that are empty or failing a
+ * readiness check; "all" rewrites the text fields too. URLs, images and schema are rule-based.
+ */
+const mergeSeo = (current: SeoConfigFields, ai: AiSeo | null, subject: SeoSubject, mode: "missing" | "all") => {
+  const replace = (value: string | undefined, ok: boolean) => mode === "all" || !value?.trim() || !ok
+  const next: SeoConfigFields = { ...current }
+  if (ai) {
+    if (replace(next.title, titleOk(next.title)) && ai.title) next.title = ai.title
+    if (replace(next.description, descriptionOk(next.description)) && ai.description) next.description = ai.description
+    if (mode === "all" || next.keywords.length < 3) {
+      next.keywords = [...new Set([...(mode === "all" ? [] : next.keywords), ...ai.keywords])].slice(0, 15)
+    }
+    for (const key of ["ogTitle", "ogDescription", "twitterTitle", "twitterDescription"] as const) {
+      if (replace(next[key], true) && ai[key]) next[key] = ai[key]
+    }
+  }
+  if (!next.canonicalUrl?.startsWith("http")) next.canonicalUrl = subject.url
+  if (!next.robots?.trim()) next.robots = "index,follow"
+  if (!next.image?.trim() && subject.image) next.image = subject.image
+  if (!next.ogImage?.trim() && next.image) next.ogImage = next.image
+  if (!next.twitterImage?.trim() && (next.ogImage || next.image)) next.twitterImage = next.ogImage || next.image
+  if (!validateSchema(next.schemaJson).valid) next.schemaJson = buildSchema(subject, next)
+  return next
+}
+
+/** Text fields the AI would change in "missing" mode; empty means rules alone can finish the job */
+const needsAi = (seo: SeoConfigFields) =>
+  !titleOk(seo.title) || !descriptionOk(seo.description) || seo.keywords.length < 3 ||
+  !seo.ogTitle?.trim() || !seo.ogDescription?.trim() || !seo.twitterTitle?.trim() || !seo.twitterDescription?.trim()
+
+async function draftSeoWithAi(subject: SeoSubject): Promise<AiSeo> {
+  const token = await auth.currentUser?.getIdToken()
+  if (!token) throw new Error("Sign in again to use AI.")
+  const res = await fetch("/api/admin/seo/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      kind: subject.kind,
+      url: subject.url,
+      title: subject.title,
+      summary: subject.summary,
+      content: subject.content,
+      keywords: subject.keywords,
+    }),
+  })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(body.error || "AI couldn't draft SEO right now.")
+  return body as AiSeo
+}
+
 export function PageSeoTab() {
   const [scope, setScope] = useState<"pages" | "blogs">("pages")
   const [configs, setConfigs] = useState<Partial<Record<PageSeoKey, PageSeoConfig>>>({})
@@ -112,6 +231,10 @@ export function PageSeoTab() {
   const [statusFilter, setStatusFilter] = useState<"all" | "ready" | "incomplete" | "critical">("all")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [aiBusy, setAiBusy] = useState<"missing" | "all" | null>(null)
+  const [bulkConfirm, setBulkConfirm] = useState(false)
+  const [bulk, setBulk] = useState<{ done: number; total: number; failed: number } | null>(null)
+  const bulkStop = useRef(false)
 
   useEffect(() => {
     Promise.all([getPageSeoConfigs(), getBlogs()])
@@ -199,6 +322,85 @@ export function PageSeoTab() {
     critical: summaryRows.filter((row) => row.status === "critical").length,
   }
 
+  const pageSubject = (page: (typeof PAGE_OPTIONS)[number]): SeoSubject => ({
+    kind: "page",
+    url: `${SITE_URL}${page.pathname}`,
+    title: `${page.label} | Paw Sattva`,
+    summary: page.about,
+    content: "",
+    keywords: configs[page.key]?.keywords ?? [],
+  })
+
+  const blogSubject = (blog: Blog): SeoSubject => ({
+    kind: "blog",
+    url: `${SITE_URL}/blog/${blog.slug}`,
+    title: blog.title,
+    summary: blog.excerpt || "",
+    content: stripHtml(blog.content).slice(0, 8000),
+    keywords: normalizeKeywords(blog.keywords || ""),
+    image: blog.image,
+    blog,
+  })
+
+  const currentSubject = scope === "pages" ? pageSubject(selectedPageOption) : selectedBlog ? blogSubject(selectedBlog) : null
+
+  /** Fills the editor only; the admin reviews and presses Save */
+  const fillWithAi = async (mode: "missing" | "all") => {
+    if (!currentSubject) return
+    setAiBusy(mode)
+    try {
+      const ai = mode === "all" || needsAi(workingSeo) ? await draftSeoWithAi(currentSubject) : null
+      const next = mergeSeo(workingSeo, ai, currentSubject, mode)
+      setDraft(next)
+      setKeywordText(next.keywords.join(", "))
+      toast.success(`${mode === "all" ? "AI rewrite" : "Missing fields filled"} — now at ${seoScore(next)}%. Review, then Save SEO.`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "AI couldn't draft SEO right now.")
+    } finally {
+      setAiBusy(null)
+    }
+  }
+
+  const incompleteCount = (scope === "pages" ? pageRows : blogRows).filter((row) => row.status !== "ready").length
+
+  /** Drafts and saves every page or post that isn't Ready, one at a time */
+  const fixAllIncomplete = async () => {
+    const runScope = scope
+    const targets = runScope === "pages"
+      ? pageRows.filter((row) => row.status !== "ready").map((row) => ({ id: row.key as string, seo: row.seo, subject: pageSubject(row) }))
+      : blogRows.filter((row) => row.status !== "ready").map((row) => ({ id: row.blog.id, seo: row.seo, subject: blogSubject(row.blog) }))
+    if (!targets.length) return
+
+    bulkStop.current = false
+    let done = 0
+    let failed = 0
+    setBulk({ done, total: targets.length, failed })
+    for (const target of targets) {
+      if (bulkStop.current) break
+      try {
+        const ai = needsAi(target.seo) ? await draftSeoWithAi(target.subject) : null
+        const next = mergeSeo(target.seo, ai, target.subject, "missing")
+        if (runScope === "pages") {
+          const config: PageSeoConfig = { key: target.id as PageSeoKey, ...next }
+          await savePageSeoConfig(config)
+          setConfigs((current) => ({ ...current, [target.id]: config }))
+        } else {
+          await updateBlog(target.id, { seo: next })
+          setBlogs((current) => current.map((blog) => (blog.id === target.id ? { ...blog, seo: next } : blog)))
+        }
+      } catch (error) {
+        failed++
+        console.error(`AI SEO failed for ${target.subject.url}:`, error)
+      }
+      done++
+      setBulk({ done, total: targets.length, failed })
+    }
+    setBulk(null)
+    const saved = done - failed
+    if (failed) toast.error(`Saved ${saved} of ${targets.length}. ${failed} failed — try those again.`)
+    else toast.success(`${bulkStop.current ? "Stopped. " : ""}AI SEO saved for ${saved} ${saved === 1 ? "item" : "items"}.`)
+  }
+
   const save = async (event: FormEvent) => {
     event.preventDefault()
     if (!workingSeo.title.trim() || !workingSeo.description.trim()) {
@@ -250,10 +452,10 @@ export function PageSeoTab() {
         </div>
 
         <div className="inline-flex rounded-2xl border bg-background p-1 shadow-sm">
-          <Button type="button" variant={scope === "pages" ? "default" : "ghost"} onClick={() => setScope("pages")} className="rounded-xl">
+          <Button type="button" variant={scope === "pages" ? "default" : "ghost"} onClick={() => setScope("pages")} disabled={Boolean(bulk)} className="rounded-xl">
             <Globe2 className="mr-2 h-4 w-4" /> Pages
           </Button>
-          <Button type="button" variant={scope === "blogs" ? "default" : "ghost"} onClick={() => setScope("blogs")} className="rounded-xl">
+          <Button type="button" variant={scope === "blogs" ? "default" : "ghost"} onClick={() => setScope("blogs")} disabled={Boolean(bulk)} className="rounded-xl">
             <FileText className="mr-2 h-4 w-4" /> Blogs
           </Button>
         </div>
@@ -264,6 +466,59 @@ export function PageSeoTab() {
         <StatCard label="Incomplete" value={counts.incomplete} tone="amber" />
         <StatCard label="Critical" value={counts.critical} tone="rose" />
       </div>
+
+      {/* Bulk AI fix for everything in this scope that isn't Ready */}
+      {(incompleteCount > 0 || bulk) && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+          {bulk ? (
+            <>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+                  Fixing {Math.min(bulk.done + 1, bulk.total)} of {bulk.total}…
+                  {bulk.failed > 0 && <span className="text-xs text-rose-600">{bulk.failed} failed</span>}
+                </p>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-500/10">
+                  <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(bulk.done / bulk.total) * 100}%` }} />
+                </div>
+              </div>
+              <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => { bulkStop.current = true }}>
+                Stop
+              </Button>
+            </>
+          ) : (
+            <>
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold">
+                  <WandSparkles className="h-4 w-4 text-violet-600" />
+                  {incompleteCount} {scope === "pages" ? (incompleteCount === 1 ? "page" : "pages") : incompleteCount === 1 ? "post" : "posts"} not ready
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  AI drafts the missing titles, descriptions, keywords and social copy; URLs, images and Schema.org are filled from the page itself. Fields that already pass are kept.
+                </p>
+              </div>
+              <Button type="button" onClick={() => setBulkConfirm(true)} className="shrink-0 rounded-xl bg-violet-600 text-white hover:bg-violet-700">
+                <WandSparkles className="h-4 w-4" /> Fix all with AI
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      <AlertDialog open={bulkConfirm} onOpenChange={setBulkConfirm}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Fix {incompleteCount} with AI and save?</AlertDialogTitle>
+            <AlertDialogDescription>
+              AI fills the failing fields on every {scope === "pages" ? "page" : "blog post"} that isn&apos;t Ready, and each one is saved as it finishes. Fields that already pass stay as they are. You can stop at any time.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void fixAllIncomplete()}>Fix and save</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {scope === "pages" ? (
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
@@ -329,6 +584,34 @@ export function PageSeoTab() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-3">
+              <WandSparkles className="h-4 w-4 shrink-0 text-violet-600" />
+              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+                Let AI draft this {scope === "pages" ? "page's" : "post's"} SEO. Nothing is saved until you press Save SEO.
+              </p>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void fillWithAi("missing")}
+                disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
+                className="rounded-xl bg-violet-600 text-white hover:bg-violet-700"
+              >
+                {aiBusy === "missing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                Fill missing
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void fillWithAi("all")}
+                disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
+                className="rounded-xl"
+              >
+                {aiBusy === "all" && <Loader2 className="h-4 w-4 animate-spin" />}
+                Rewrite all
+              </Button>
+            </div>
+
             <Field label="SEO title" hint={`${workingSeo.title.trim().length}/60`}>
               <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
             </Field>

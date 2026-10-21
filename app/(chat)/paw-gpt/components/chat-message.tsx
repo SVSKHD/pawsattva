@@ -4,11 +4,13 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils } from "lucide-react"
+import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils, Volume2, Square, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 
+import { useAuth } from "@/components/auth-provider"
 import { MiniRunner } from "@/components/pet-scene/running-pets"
 import { QuickReads, type QuickRead } from "./quick-reads"
+import { useReadAloud } from "./read-aloud"
 
 export interface ChatItem {
   id: string
@@ -118,7 +120,7 @@ export function ChatMessage({ item, petName, petKind = "dog", planning = false, 
             {item.pending && <span aria-hidden className="ml-0.5 inline-block h-4 w-[3px] translate-y-0.5 animate-pulse rounded-full bg-orange-500" />}
           </div>
         </div>
-        {!item.pending && <AnswerActions text={item.content} petName={petName} onLogFood={onLogFood} />}
+        {!item.pending && <AnswerActions id={item.id} text={item.content} petName={petName} onLogFood={onLogFood} />}
       </div>
     </div>
   )
@@ -134,9 +136,11 @@ function DelayedQuickReads({ reads, onOpen }: { reads: QuickRead[]; onOpen: (rea
   return visible ? <QuickReads reads={reads} onOpen={onOpen} /> : null
 }
 
-/** Actions under a finished answer, as one segmented group: Copy, and Log food when relevant. */
-function AnswerActions({ text, petName, onLogFood }: { text: string; petName?: string; onLogFood?: () => void }) {
+/** Actions under a finished answer, as one segmented group: Copy, Read aloud, and Log food when relevant. */
+function AnswerActions({ id, text, petName, onLogFood }: { id: string; text: string; petName?: string; onLogFood?: () => void }) {
   const [copied, setCopied] = useState(false)
+  const { user } = useAuth()
+  const readAloud = useReadAloud(id, text, user)
   const button =
     "inline-flex h-8 items-center gap-1.5 px-3 text-xs font-semibold text-muted-foreground transition hover:bg-black/5 hover:text-foreground active:scale-95 dark:hover:bg-white/10"
 
@@ -158,6 +162,23 @@ function AnswerActions({ text, petName, onLogFood }: { text: string; petName?: s
         {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
         {copied ? "Copied" : "Copy"}
       </button>
+      {readAloud.available && (
+        <button
+          type="button"
+          onClick={readAloud.toggle}
+          aria-pressed={readAloud.status !== "idle"}
+          className={`${button} ${readAloud.status !== "idle" ? "text-orange-700 dark:text-orange-300" : ""}`}
+        >
+          {readAloud.status === "loading" ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : readAloud.status === "speaking" ? (
+            <Square className="h-3 w-3 fill-current" />
+          ) : (
+            <Volume2 className="h-3.5 w-3.5" />
+          )}
+          {readAloud.status === "loading" ? "Preparing…" : readAloud.status === "speaking" ? "Stop" : "Read aloud"}
+        </button>
+      )}
       {onLogFood && (
         <button type="button" onClick={onLogFood} className={`${button} text-orange-700 hover:text-orange-800 dark:text-orange-300`}>
           <Utensils className="h-3.5 w-3.5" />

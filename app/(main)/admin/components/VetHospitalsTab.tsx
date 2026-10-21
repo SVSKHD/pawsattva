@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 import {
   CheckCircle2,
   Clock,
-  Edit,
   MapPin,
+  Pencil,
   Phone,
   Plus,
   Save,
@@ -45,7 +45,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
   addVetHospital,
@@ -57,6 +56,11 @@ import {
   type VetHospitalStatus,
 } from "@/firebase/firestore"
 import { WALK_CITIES, type HospitalType } from "@/lib/walks"
+import { TablePagination, usePagination } from "./TablePagination"
+import {
+  ActionsCell, FilterTabs, IconAction, StatusPill, TableCard, TableEmpty, TableHeading, TableSearch,
+  TableToolbar, filterSelectClass, rowClass, rowTitleClass, thClass, theadRowClass,
+} from "./DataTable"
 
 const HOSPITAL_TYPES: HospitalType[] = ["Vet hospital", "Vet clinic", "Animal shelter clinic"]
 const ZONES = ["Central", "North", "South", "East", "West", "Outskirts"]
@@ -117,6 +121,8 @@ export function VetHospitalsTab() {
   const [saving, setSaving] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [cityFilter, setCityFilter] = useState("hyderabad")
+  const [query, setQuery] = useState("")
+  const [pendingDelete, setPendingDelete] = useState<VetHospital | null>(null)
 
   useEffect(
     () =>
@@ -127,10 +133,22 @@ export function VetHospitalsTab() {
     []
   )
 
+  // City and search narrow the list first; the status tabs and their counts work on that.
+  const matchingHospitals = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return hospitals
+      .filter((hospital) => cityFilter === "all" || hospital.cityId === cityFilter)
+      .filter(
+        (hospital) =>
+          !q ||
+          [hospital.name, hospital.area, hospital.zone, hospital.phone, hospital.summary]
+            .some((field) => field?.toLowerCase().includes(q))
+      )
+  }, [cityFilter, hospitals, query])
+
   const visibleHospitals = useMemo(
     () =>
-      hospitals
-        .filter((hospital) => cityFilter === "all" || hospital.cityId === cityFilter)
+      matchingHospitals
         .filter((hospital) => statusFilter === "all" || hospital.status === statusFilter)
         .sort(
           (a, b) =>
@@ -138,11 +156,18 @@ export function VetHospitalsTab() {
             a.zone.localeCompare(b.zone) ||
             a.name.localeCompare(b.name)
         ),
-    [cityFilter, hospitals, statusFilter]
+    [matchingHospitals, statusFilter]
   )
+
+  const pagination = usePagination(visibleHospitals)
 
   const approvedCount = hospitals.filter((hospital) => hospital.status === "approved").length
   const pendingCount = hospitals.length - approvedCount
+  const statusCounts: Record<StatusFilter, number> = {
+    all: matchingHospitals.length,
+    approved: matchingHospitals.filter((hospital) => hospital.status === "approved").length,
+    pending: matchingHospitals.filter((hospital) => hospital.status !== "approved").length,
+  }
 
   const update = <K extends keyof HospitalForm>(key: K, value: HospitalForm[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
@@ -422,183 +447,175 @@ export function VetHospitalsTab() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-2xl border-white/40 bg-white/40 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-black/40 sm:rounded-[2rem]">
-        <CardHeader className="p-4 pb-3 sm:p-8 sm:pb-4">
-          <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-            <div>
-              <CardTitle className="text-xl font-bold sm:text-2xl">Vet hospitals</CardTitle>
-              <CardDescription className="mt-1 text-xs sm:text-base">
-                Approve, edit or remove listings. Pending ones stay hidden from visitors.
-              </CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Select value={cityFilter} onValueChange={setCityFilter}>
-                <SelectTrigger className="h-10 w-[140px] rounded-xl bg-white/50 dark:bg-black/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All cities</SelectItem>
-                  {WALK_CITIES.map((city) => (
-                    <SelectItem key={city.id} value={city.id}>
-                      {city.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter} onValueChange={(value: StatusFilter) => setStatusFilter(value)}>
-                <SelectTrigger className="h-10 w-[130px] rounded-xl bg-white/50 dark:bg-black/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+      <TableHeading
+        title="Vet hospitals"
+        subtitle={
+          <>
+            {approvedCount} approved
+            {pendingCount > 0 && <> · <span className="font-semibold text-amber-600">{pendingCount} pending</span></>}
+            {" "}· Pending listings stay hidden from visitors.
+          </>
+        }
+      />
+
+      <TableCard>
+        <TableToolbar>
+          <FilterTabs
+            label="Filter by status"
+            tabs={[{ id: "all", label: "All" }, { id: "approved", label: "Approved" }, { id: "pending", label: "Pending" }]}
+            value={statusFilter}
+            onChange={(next) => { setStatusFilter(next); pagination.reset() }}
+            counts={statusCounts}
+            alert={{ id: "pending", className: "bg-amber-500" }}
+          />
+          <div className="ml-auto flex w-full flex-wrap items-center gap-2 sm:w-auto">
+            <Select value={cityFilter} onValueChange={(value) => { setCityFilter(value); pagination.reset() }}>
+              <SelectTrigger className={`w-full sm:w-40 ${filterSelectClass}`} aria-label="Filter by city">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All cities</SelectItem>
+                {WALK_CITIES.map((city) => (
+                  <SelectItem key={city.id} value={city.id}>
+                    {city.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <TableSearch
+              value={query}
+              onChange={(next) => { setQuery(next); pagination.reset() }}
+              placeholder="Name, area, phone…"
+              label="Search hospitals"
+              className="sm:w-64 sm:flex-none"
+            />
           </div>
-        </CardHeader>
+        </TableToolbar>
 
-        <CardContent className="p-4 pt-0 sm:p-8 sm:pt-0">
-          {loading ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Loading hospitals…</p>
-          ) : visibleHospitals.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
-              <Stethoscope className="h-8 w-8 opacity-30" />
-              <p className="font-medium">No hospitals match these filters yet.</p>
-            </div>
-          ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
-              {visibleHospitals.map((hospital) => {
-                const approved = hospital.status === "approved"
-                return (
-                  <article
-                    key={hospital.id}
-                    className={`flex flex-col gap-3 rounded-2xl border bg-background/70 p-4 ${
-                      approved ? "border-emerald-500/20" : "border-amber-500/30"
-                    } ${editingId === hospital.id ? "ring-2 ring-orange-400" : ""}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600">
-                        <Stethoscope className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-bold leading-snug">{hospital.name}</h3>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                              approved
-                                ? "bg-emerald-500/10 text-emerald-600"
-                                : "bg-amber-500/10 text-amber-600"
-                            }`}
-                          >
-                            {hospital.status}
+        {loading ? (
+          <p className="py-14 text-center text-sm text-muted-foreground">Loading hospitals…</p>
+        ) : visibleHospitals.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className={theadRowClass}>
+                  <th className={thClass}>Hospital</th>
+                  <th className={`hidden md:table-cell ${thClass}`}>Location</th>
+                  <th className={`hidden lg:table-cell ${thClass}`}>Details</th>
+                  <th className={`hidden sm:table-cell ${thClass}`}>Status</th>
+                  <th className={`w-px ${thClass}`}><span className="sr-only">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {pagination.rows.map((hospital) => {
+                  const approved = hospital.status === "approved"
+                  return (
+                    <tr
+                      key={hospital.id}
+                      onClick={() => handleEdit(hospital)}
+                      className={`${rowClass} ${editingId === hospital.id ? "bg-orange-500/[0.06]" : ""}`}
+                    >
+                      <td className="max-w-0 px-4 py-3 sm:w-[38%]">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600">
+                            <Stethoscope className="h-4 w-4" />
                           </span>
+                          <div className="min-w-0">
+                            <p className={rowTitleClass}>{hospital.name}</p>
+                            <p className="truncate text-xs text-muted-foreground" title={hospital.summary}>
+                              {hospital.type} · {hospital.summary}
+                            </p>
+                          </div>
                         </div>
-                        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3.5 w-3.5" />
-                          {hospital.area} · {hospital.zone} · {cityName(hospital.cityId)} · {hospital.type}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-4 py-3 text-xs md:table-cell">
+                        <p className="flex items-center gap-1.5 text-foreground/80">
+                          <MapPin className="h-3 w-3 text-muted-foreground" />
+                          {hospital.area}
                         </p>
-                      </div>
-                    </div>
+                        <p className="mt-1 text-muted-foreground">
+                          {hospital.zone} · {cityName(hospital.cityId)}
+                        </p>
+                      </td>
+                      <td className="hidden px-4 py-3 lg:table-cell">
+                        <div className="flex flex-wrap items-center gap-1">
+                          {hospital.phone && (
+                            <StatusPill tone="muted" icon={Phone}>{hospital.phone}</StatusPill>
+                          )}
+                          {hospital.open24h && <StatusPill tone="sky" icon={Clock}>24×7</StatusPill>}
+                          {hospital.verifiedOn ? (
+                            <StatusPill tone="emerald" icon={ShieldCheck}>Verified {hospital.verifiedOn}</StatusPill>
+                          ) : (
+                            <StatusPill tone="amber">Not verified</StatusPill>
+                          )}
+                        </div>
+                      </td>
+                      <td className="hidden px-4 py-3 sm:table-cell">
+                        <StatusPill tone={approved ? "emerald" : "amber"} icon={approved ? CheckCircle2 : Clock}>
+                          {approved ? "Approved" : "Pending"}
+                        </StatusPill>
+                      </td>
+                      <ActionsCell>
+                        <IconAction
+                          label={approved ? "Move to pending" : "Approve"}
+                          tone={approved ? "amber" : "emerald"}
+                          onClick={() => handleToggleStatus(hospital)}
+                        >
+                          {approved ? <Clock className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                        </IconAction>
+                        <IconAction label="Edit" tone="orange" onClick={() => handleEdit(hospital)}>
+                          <Pencil className="h-4 w-4" />
+                        </IconAction>
+                        <IconAction label="Delete" tone="red" onClick={() => setPendingDelete(hospital)}>
+                          <Trash2 className="h-4 w-4" />
+                        </IconAction>
+                      </ActionsCell>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <TableEmpty icon={Stethoscope} title="No hospitals match these filters">
+            {(query || statusFilter !== "all" || cityFilter !== "all") && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                onClick={() => { setQuery(""); setStatusFilter("all"); setCityFilter("all") }}
+              >
+                Clear filters
+              </Button>
+            )}
+          </TableEmpty>
+        )}
 
-                    <p className="text-sm leading-6 text-muted-foreground">{hospital.summary}</p>
+        <TablePagination pagination={pagination} noun={visibleHospitals.length === 1 ? "hospital" : "hospitals"} />
+      </TableCard>
 
-                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold">
-                      {hospital.phone && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
-                          <Phone className="h-3 w-3" /> {hospital.phone}
-                        </span>
-                      )}
-                      {hospital.open24h && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/10 px-2.5 py-1 text-sky-700">
-                          <Clock className="h-3 w-3" /> 24×7
-                        </span>
-                      )}
-                      {hospital.verifiedOn ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700">
-                          <ShieldCheck className="h-3 w-3" /> Verified {hospital.verifiedOn}
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-amber-700">
-                          Not verified
-                        </span>
-                      )}
-                      {hospital.createdByName && (
-                        <span className="rounded-full px-1 py-1 text-muted-foreground">
-                          Added by {hospital.createdByName}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="mt-auto flex flex-wrap justify-end gap-2 border-t pt-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleStatus(hospital)}
-                        className={`h-8 rounded-lg text-xs ${
-                          approved
-                            ? "text-amber-600 hover:bg-amber-500 hover:text-white"
-                            : "text-emerald-600 hover:bg-emerald-600 hover:text-white"
-                        }`}
-                      >
-                        {approved ? (
-                          <>
-                            <Clock className="mr-1.5 h-3.5 w-3.5" /> Move to pending
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Approve
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(hospital)}
-                        className="h-8 rounded-lg text-xs text-orange-600 hover:bg-orange-600 hover:text-white"
-                      >
-                        <Edit className="mr-1.5 h-3.5 w-3.5" /> Edit
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-8 rounded-lg text-xs text-destructive hover:bg-destructive hover:text-white"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-[2rem]">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete hospital?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Remove “{hospital.name}” from the list. This cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-white hover:bg-destructive/90"
-                              onClick={() => handleDelete(hospital)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </article>
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && setPendingDelete(null)}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this hospital?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{pendingDelete?.name}” will be removed from the list. This can&apos;t be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingDelete) void handleDelete(pendingDelete)
+                setPendingDelete(null)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
