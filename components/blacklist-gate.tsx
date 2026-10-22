@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import NextImage from "next/image"
-import { usePathname } from "next/navigation"
+import { useAppPathname } from "@/lib/use-app-pathname"
 import { BookOpen, Mail, ShieldOff, UserRound } from "lucide-react"
 
 import { useAuth } from "@/components/auth-provider"
@@ -14,7 +14,7 @@ const isBlogPath = (pathname: string | null) =>
 
 export function BlacklistGate({ children }: { children: React.ReactNode }) {
   const { user, isBlacklisted } = useAuth()
-  const pathname = usePathname()
+  const pathname = useAppPathname()
 
   if (!user || !isBlacklisted || isBlogPath(pathname)) return <>{children}</>
 

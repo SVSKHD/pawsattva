@@ -286,7 +286,7 @@ export function LoggerClient() {
   const monthDays = isSameMonth(visibleMonth, new Date()) ? new Date().getDate() : getDaysInMonth(visibleMonth)
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-28 sm:px-6 md:pt-32 lg:px-8">
+    <div className="mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-6 md:pt-32 lg:px-8">
       {/* Header: title, pet switcher, primary action */}
       <header className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>

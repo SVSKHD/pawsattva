@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, LogIn, PawPrint, Plus, Sparkles, SquarePen, Square } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, Home, LogIn, PawPrint, Plus, Sparkles, SquarePen, Square, User } from "lucide-react"
 import { toast } from "sonner"
 
 import { doc, onSnapshot } from "firebase/firestore"
@@ -13,6 +14,7 @@ import { db } from "@/firebase/db"
 import { getUserPetFeeds, getUserProfile, type UserProfile } from "@/firebase/firestore"
 import { trackEvent } from "@/firebase/analytics"
 import { useAuth } from "@/components/auth-provider"
+import { imageUrlProblem } from "@/lib/image-hosts"
 import { useAuthDialog } from "@/components/auth-dialog-provider"
 import AdminLoader from "@/components/loader"
 import Paw from "../../pawsattva.png"
@@ -68,6 +70,7 @@ import {
 } from "./components/pet-data"
 import { MealDialog, type MealDraft } from "@/app/(main)/logger/components/meal-dialog"
 import { mealLabels } from "@/app/(main)/logger/components/shared"
+import { FloatingRail } from "./components/floating-rail"
 import { ProfileDock, ProfileSidebar, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
@@ -631,6 +634,64 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
   // Before the first words arrive the thinking card carries the banner; after that, the header does
   const writing = streaming && Boolean(messages.at(-1)?.content)
 
+  // Who we're talking about (left) and New chat / Sign in / Home (right): the top bar on wider screens,
+  // the bar above the composer on phones
+  const barIdentity = (
+    <div className="flex min-w-0 flex-1 items-center gap-2.5">
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
+          streaming ? "paw-gpt-anim-breathe" : ""
+        }`}
+      >
+        {pet ? <PetIcon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+      </span>
+      <span className="min-w-0 leading-tight">
+        <span className="block truncate text-[15px] font-bold tracking-tight">
+          {pet?.guest ? "Paw GPT" : pet?.planning ? "Planning a pet" : pet?.name || "Paw GPT"}
+        </span>
+        <span className={`block truncate text-xs ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
+          {streaming
+            ? "Paw GPT is answering…"
+            : pet
+              ? petSubtitle(pet) || "Paw GPT"
+              : loadingData ? "Finding your pets…" : "Your pet's AI care companion"}
+        </span>
+      </span>
+    </div>
+  )
+  const barActions = (
+    <div className="ml-auto flex shrink-0 items-center gap-2">
+      {messages.length > 0 && (
+        <button
+          type="button"
+          onClick={startNewChat}
+          aria-label="New chat"
+          title="New chat"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
+        >
+          <SquarePen className="h-4 w-4" />
+          <span className="hidden sm:inline">New chat</span>
+        </button>
+      )}
+      {guest && (
+        <button
+          type="button"
+          onClick={() =>
+            requestSignIn({
+              title: "Sign in to Paw GPT",
+              description: `Free with Google: ${PAW_GPT_DAILY_LIMIT} questions a day, answered from your own pet's profile, meals and weigh-ins.`,
+            })
+          }
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500 px-3 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition hover:bg-orange-600 active:scale-95 sm:px-4"
+        >
+          <LogIn className="h-4 w-4" />
+          <span className="hidden sm:inline">Sign in</span>
+        </button>
+      )}
+      <ChatHomeButton />
+    </div>
+  )
+
   return (
     <div className="relative flex h-dvh flex-col">
       {/* Sky tint for the time of day */}
@@ -639,67 +700,13 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
         className={`pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b ${phaseCopy[phase].sky} to-transparent transition-colors duration-700`}
       />
 
-      {/* Floating liquid-glass top bar, fixed at the top: the conversation scrolls underneath it
-          (blurred through the glass) instead of a pill sitting in the middle of an answer.
-          Phones: pets menu · pet · New chat · Home. Wider screens: the pets dock floats below it. */}
-      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 px-3 pt-[calc(0.75rem+env(safe-area-inset-top))] sm:px-5">
+      {/* Wider screens: floating liquid-glass top bar; the conversation scrolls underneath it (blurred
+          through the glass), and the pets dock floats below it. Phones keep their controls at the bottom instead. */}
+      <header className="pointer-events-none fixed inset-x-0 top-0 z-30 hidden px-5 pt-[calc(0.75rem+env(safe-area-inset-top))] md:block">
         <div className="paw-liquid-glass pointer-events-auto mx-auto max-w-4xl overflow-hidden rounded-[1.75rem]">
-        {/* Pet details on the left, New chat + profile on the right (phones add the pets menu first). */}
-        <div className="flex h-14 items-center gap-2 px-2 sm:gap-3 sm:px-2.5">
-          {user && <ProfileSidebar {...dockProps} user={user} />}
-
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
-                streaming ? "paw-gpt-anim-breathe" : ""
-              }`}
-            >
-              {pet ? <PetIcon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            </span>
-            <span className="min-w-0 leading-tight">
-              <span className="block truncate text-[15px] font-bold tracking-tight">
-                {pet?.guest ? "Paw GPT" : pet?.planning ? "Planning a pet" : pet?.name || "Paw GPT"}
-              </span>
-              <span className={`block truncate text-xs ${streaming ? "paw-gpt-anim-shimmer font-medium text-foreground/60" : "text-muted-foreground"}`}>
-                {streaming
-                  ? "Paw GPT is answering…"
-                  : pet
-                    ? petSubtitle(pet) || "Paw GPT"
-                    : loadingData ? "Finding your pets…" : "Your pet's AI care companion"}
-              </span>
-            </span>
-          </div>
-
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {messages.length > 0 && (
-              <button
-                type="button"
-                onClick={startNewChat}
-                aria-label="New chat"
-                title="New chat"
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
-              >
-                <SquarePen className="h-4 w-4" />
-                <span className="hidden sm:inline">New chat</span>
-              </button>
-            )}
-            {guest && (
-              <button
-                type="button"
-                onClick={() =>
-                  requestSignIn({
-                    title: "Sign in to Paw GPT",
-                    description: `Free with Google: ${PAW_GPT_DAILY_LIMIT} questions a day, answered from your own pet's profile, meals and weigh-ins.`,
-                  })
-                }
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500 px-3 text-sm font-semibold text-white shadow-sm shadow-orange-500/25 transition hover:bg-orange-600 active:scale-95 sm:px-4"
-              >
-                <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">Sign in</span>
-              </button>
-            )}
-            <ChatHomeButton />
-          </div>
+        <div className="flex h-14 items-center gap-3 px-2.5">
+          {barIdentity}
+          {barActions}
         </div>
 
         {/* While an answer is being written: earlier questions and record facts drift by */}
@@ -711,11 +718,64 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
         </div>
       </header>
 
+      {/* Phones: nothing sits under the status bar / Dynamic Island; the conversation just softly blurs out there */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[calc(env(safe-area-inset-top)+1.5rem)] bg-white/40 backdrop-blur-md [mask-image:linear-gradient(to_bottom,black_55%,transparent)] md:hidden dark:bg-zinc-950/40"
+      />
+
+      {/* Phones: a small draggable floating rail instead of a top bar (which would sit under the
+          Dynamic Island). Home, New chat, and your avatar, which opens your pets, chats and usage. */}
+      <FloatingRail label="Paw GPT">
+        <Link
+          href="/"
+          aria-label="Back to PawSattva home"
+          className="flex size-10 items-center justify-center rounded-full text-foreground/75 transition active:scale-90 active:bg-orange-500/10"
+        >
+          <Home className="size-[19px]" />
+        </Link>
+        {messages.length > 0 && (
+          <button
+            type="button"
+            onClick={startNewChat}
+            aria-label="New chat"
+            className="flex size-10 items-center justify-center rounded-full text-foreground/75 transition active:scale-90 active:bg-orange-500/10"
+          >
+            <SquarePen className="size-[18px]" />
+          </button>
+        )}
+        {user ? (
+          <ProfileSidebar
+            {...dockProps}
+            user={user}
+            triggerClassName="relative flex size-10 items-center justify-center rounded-full transition active:scale-90"
+            trigger={
+              <span className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white ring-2 ring-white shadow-[0_0_14px_rgba(249,115,22,0.35)] dark:ring-zinc-900">
+                {user.photoURL && !imageUrlProblem(user.photoURL) ? (
+                  <Image src={user.photoURL} alt="" width={36} height={36} className="size-full object-cover" />
+                ) : (
+                  <User className="size-4" />
+                )}
+              </span>
+            }
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={promptSignIn}
+            aria-label="Sign in"
+            className="flex size-10 items-center justify-center rounded-full bg-orange-500 text-white shadow-[0_0_14px_rgba(249,115,22,0.45)] transition active:scale-90"
+          >
+            <LogIn className="size-[18px]" />
+          </button>
+        )}
+      </FloatingRail>
+
       {/* Floating dock from tablet width up (below the top bar); phones use the sidebar in the bar. */}
       {user && <ProfileDock {...dockProps} user={user} />}
 
       {/* Greeting or conversation; padding clears the fixed top bar */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-[calc(5.5rem+env(safe-area-inset-top))] sm:px-6">
+      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-6 md:pt-[calc(5.5rem+env(safe-area-inset-top))]">
         {messages.length === 0 ? (
           <Greeting
             phase={phase}
@@ -729,7 +789,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             onSignIn={promptSignIn}
           />
         ) : (
-          <div className="mx-auto max-w-3xl pb-6">
+          <div className="mx-auto max-w-3xl pb-6 pr-12 md:pr-0">
             <div className="space-y-5">
               {messages.map((item, index) => (
                 <ChatMessage

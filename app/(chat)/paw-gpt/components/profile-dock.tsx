@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react"
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { User as FirebaseUser } from "firebase/auth"
@@ -498,7 +498,16 @@ function DockBody({
  * Phones get the dock's contents as a left sidebar instead of a floating panel.
  * Choosing a pet or a chat closes it, so the conversation is right there.
  */
-export function ProfileSidebar(props: ProfileDockProps) {
+export function ProfileSidebar({
+  trigger,
+  triggerClassName,
+  ...props
+}: ProfileDockProps & {
+  /** Button contents; defaults to a menu icon */
+  trigger?: ReactNode
+  /** Replaces the default round menu-button styling */
+  triggerClassName?: string
+}) {
   const { user, profile, selectedPet } = props
   const [open, setOpen] = useState(false)
   const name = profile?.displayName || user.displayName || user.email?.split("@")[0] || "Pet parent"
@@ -514,10 +523,13 @@ export function ProfileSidebar(props: ProfileDockProps) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open your pets, chats and usage"
-        // Lives in the chat's top bar; phones only (wider screens have the floating dock).
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground/80 ring-1 ring-black/5 transition hover:bg-black/[0.04] active:scale-95 md:hidden dark:ring-white/10 dark:hover:bg-white/10"
+        // Phones only (wider screens have the floating dock).
+        className={
+          triggerClassName ??
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground/80 ring-1 ring-black/5 transition hover:bg-black/[0.04] active:scale-95 md:hidden dark:ring-white/10 dark:hover:bg-white/10"
+        }
       >
-        <Menu className="h-[18px] w-[18px]" />
+        {trigger ?? <Menu className="h-[18px] w-[18px]" />}
       </button>
       <SheetContent side="left" className="w-[min(22rem,88vw)] gap-0 overflow-y-auto p-0">
         <SheetHeader className="border-b border-black/5 p-4 dark:border-white/10">

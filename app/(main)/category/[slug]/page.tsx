@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { SubscriptionForm } from "@/components/subscription-form";
 import { getCategories, getBlogs, Blog, Category } from "@/firebase/firestore";
 import { categorySlug } from "@/lib/category-slug";
-import { siteConfig } from "@/lib/metadata";
+import { brandedTitle, siteConfig } from "@/lib/metadata";
 import type { Metadata } from "next";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export async function generateMetadata({
   const url = `${siteConfig.url}/category/${slug}`;
 
   return {
-    title: `${title} | ${siteConfig.name}`,
+    title: brandedTitle(title),
     description,
     keywords: [
       category.name.toLowerCase(),

@@ -411,31 +411,6 @@ a {
   outline-offset: -3px;
 }
 
-.nav-pending-hint {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.7rem;
-  width: 0.35rem;
-  height: 0.35rem;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0;
-  visibility: hidden;
-}
-
-.nav-pending-hint.is-pending {
-  visibility: visible;
-  animation: nav-pending-in 180ms ease 100ms forwards, nav-pending-pulse 850ms ease-in-out 100ms infinite;
-}
-
-@keyframes nav-pending-in {
-  to { opacity: 0.7; }
-}
-
-@keyframes nav-pending-pulse {
-  50% { transform: scale(1.75); opacity: 0.25; }
-}
-
 .pet-cursor-aura {
   display: none;
 }

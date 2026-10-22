@@ -96,7 +96,7 @@ export function LoginClient() {
 
       <Header />
 
-      <main className="relative flex flex-1 items-center justify-center px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-22 sm:px-6 md:pb-10 md:pt-28">
+      <main className="relative flex flex-1 items-center justify-center px-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-[calc(2rem+env(safe-area-inset-top))] sm:px-6 md:pb-10 md:pt-28">
         {/* Frosted glass panel */}
         <div
           onPointerMove={followPointer}

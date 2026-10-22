@@ -3,7 +3,8 @@ import type { Metadata } from "next"
 import { LoggerClient } from "./logger-client"
 
 export const metadata: Metadata = {
-  title: "Pet Food Logger | PawSattva",
+  // The root layout's template adds " | Paw Sattva".
+  title: "Pet Food Logger",
   description: "Private calendar-based food diary for your pets.",
   robots: {
     index: false,

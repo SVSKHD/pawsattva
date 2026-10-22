@@ -43,7 +43,7 @@ const reusePoints = [
 
 export default function ConsultationPage() {
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_45%,#f6f8f3_100%)] pb-20 pt-32">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_45%,#f6f8f3_100%)] pb-20 pt-12 md:pt-32">
       <ManagedJsonLd pageKey="consultation" />
       <section className="container mx-auto px-4">
         <div className="mx-auto max-w-5xl">
