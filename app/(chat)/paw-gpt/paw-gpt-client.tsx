@@ -75,7 +75,9 @@ import { ProfileDock, ProfileSidebar, type ChatSummary, type PawGptQuota } from 
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
 import { ChatHomeButton } from "../chat-home-button"
-import { pickQuickReads, QuickViewDialog, useQuickReads, type QuickRead } from "./components/quick-reads"
+import { pickQuickReads, QuickViewDialog, relatedReads, useQuickReads, type QuickRead } from "./components/quick-reads"
+import { ReadsPanel, type ReadsPanelContent } from "./components/reads-panel"
+import { ScrollArrows } from "./components/scroll-arrows"
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()))
 
@@ -337,6 +339,23 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
   )
   const messages = useMemo(() => activeChat?.items ?? [], [activeChat])
 
+  // ── Reading panel (laptops and up) ───────────────────────────────────────────
+  // When an answer is slow, related blog posts open on the right half like an artifact, and
+  // stay until the person closes them. A later slow question refreshes the list.
+  const lastItem = messages.at(-1)
+  const waitingForAnswer = streaming && lastItem?.role === "assistant" && Boolean(lastItem.pending) && !lastItem.content
+  const waitingQuestion = waitingForAnswer ? messages.at(-2)?.content ?? "" : ""
+  const readsKind: "dog" | "cat" | null = pet && !pet.planning ? (isCatPet(pet) ? "cat" : "dog") : null
+  const [readsPanel, setReadsPanel] = useState<ReadsPanelContent | null>(null)
+  useEffect(() => {
+    if (!waitingForAnswer || !allQuickReads.length) return
+    const timer = window.setTimeout(() => {
+      setReadsPanel({ question: waitingQuestion, ...relatedReads(allQuickReads, waitingQuestion, readsKind) })
+    }, 1500)
+    return () => window.clearTimeout(timer)
+  }, [waitingForAnswer, waitingQuestion, allQuickReads, readsKind])
+  const closeReadsPanel = () => setReadsPanel(null)
+
   // Keep the newest message in view while answers stream in
   useEffect(() => {
     const el = scrollRef.current
@@ -344,6 +363,29 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160
     if (nearBottom || streaming) el.scrollTo({ top: el.scrollHeight })
   }, [messages, streaming])
+
+  // Answers keep revealing for a moment after the stream ends; stay pinned to the bottom while they
+  // grow, unless you've scrolled up to read something.
+  const contentRef = useRef<HTMLDivElement>(null)
+  const hasMessages = messages.length > 0
+  useEffect(() => {
+    const el = scrollRef.current
+    const content = contentRef.current
+    if (!el || !content) return
+    let pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 160
+    const onScroll = () => {
+      pinned = el.scrollHeight - el.scrollTop - el.clientHeight < 160
+    }
+    const observer = new ResizeObserver(() => {
+      if (pinned) el.scrollTo({ top: el.scrollHeight })
+    })
+    el.addEventListener("scroll", onScroll, { passive: true })
+    observer.observe(content)
+    return () => {
+      el.removeEventListener("scroll", onScroll)
+      observer.disconnect()
+    }
+  }, [hasMessages, authLoading])
 
   // Grow the textarea with its content, up to a limit
   useEffect(() => {
@@ -775,7 +817,16 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
       {user && <ProfileDock {...dockProps} user={user} />}
 
       {/* Greeting or conversation; padding clears the fixed top bar */}
-      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 pt-[calc(1rem+env(safe-area-inset-top))] sm:px-6 md:pt-[calc(5.5rem+env(safe-area-inset-top))]">
+      {/* Not keyed by question: a new list must not close the article being read */}
+      {readsPanel && <ReadsPanel content={readsPanel} waiting={waitingForAnswer} onClose={closeReadsPanel} />}
+
+      <div
+        ref={scrollRef}
+        // No visible scrollbar (wheel, trackpad and touch still scroll); the arrows above the composer navigate.
+        className={`relative flex-1 overflow-y-auto px-3 pt-[calc(1rem+env(safe-area-inset-top))] transition-[padding] duration-300 [scrollbar-width:none] sm:px-6 md:pt-[calc(5.5rem+env(safe-area-inset-top))] [&::-webkit-scrollbar]:hidden ${
+          readsPanel ? "lg:pr-[50vw]" : ""
+        }`}
+      >
         {messages.length === 0 ? (
           <Greeting
             phase={phase}
@@ -789,15 +840,18 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             onSignIn={promptSignIn}
           />
         ) : (
-          <div className="mx-auto max-w-3xl pb-6 pr-12 md:pr-0">
+          // Full width on phones: the floating rail tucks away while you scroll instead of reserving a lane
+          <div ref={contentRef} className="mx-auto max-w-3xl pb-16 md:pb-6">
             <div className="space-y-5">
               {messages.map((item, index) => (
                 <ChatMessage
                   key={item.id}
                   item={item}
-                  petName={pet?.name}
+                  question={item.role === "assistant" ? messages[index - 1]?.content : undefined}
+                  petName={pet?.planning ? undefined : pet?.name}
                   petKind={isCatPet(pet) ? "cat" : "dog"}
                   planning={Boolean(pet?.planning)}
+                  general={Boolean(pet?.guest)}
                   onRetry={item.error && !streaming ? () => retry(item.id) : undefined}
                   onLogFood={
                     pet && !pet.planning && item.role === "assistant" && !item.error && isFoodRelated(item.content, messages[index - 1]?.content)
@@ -818,7 +872,19 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
       </div>
 
       {/* Composer */}
-      <form onSubmit={handleSubmit} className="relative px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-6 md:pb-5">
+      <form
+        onSubmit={handleSubmit}
+        className={`relative px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 transition-[padding] duration-300 sm:px-6 md:pb-5 ${
+          readsPanel ? "lg:pr-[50vw]" : ""
+        }`}
+      >
+        {messages.length > 0 && (
+          <ScrollArrows
+            scrollRef={scrollRef}
+            watch={messages}
+            className={`absolute bottom-full right-3 z-10 mb-2 sm:right-6 ${readsPanel ? "lg:right-[calc(50vw+0.75rem)]" : ""}`}
+          />
+        )}
         {pet && !pet.guest && (
           <PromptDock
             pet={pet}

@@ -10,6 +10,7 @@ import { FirebaseAnalytics } from "@/components/firebase-analytics";
 import PetCursorAura from "@/components/pet-cursor-aura";
 import { ProfileOnboardingGate } from "@/components/profile-onboarding-gate";
 import { BlacklistGate } from "@/components/blacklist-gate";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -62,6 +63,7 @@ export default function RootLayout({
             </TooltipProvider>
           </AuthDialogProvider>
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
