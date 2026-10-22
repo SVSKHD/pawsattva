@@ -27,7 +27,7 @@ export default async function BlogPage() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="relative overflow-hidden px-4 pb-10 pt-28 sm:pt-32">
+      <header className="relative overflow-hidden px-4 pb-10 pt-10 md:pt-32">
         <div className="pointer-events-none absolute left-[-10%] top-0 h-72 w-72 rounded-full bg-orange-200/40 blur-[110px] dark:bg-orange-500/10" />
         <div className="pointer-events-none absolute right-[-10%] top-10 h-72 w-72 rounded-full bg-amber-200/30 blur-[110px] dark:bg-amber-500/10" />
         <div className="container relative mx-auto max-w-7xl">

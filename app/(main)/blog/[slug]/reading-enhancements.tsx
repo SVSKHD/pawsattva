@@ -194,7 +194,7 @@ function ReadingEnhancements({ toc, readTime }: { toc: TocItem[]; readTime: numb
         type="button"
         onClick={scrollToTop}
         aria-label="Back to top"
-        className={`fixed bottom-[calc(6.5rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-white shadow-xl shadow-orange-500/30 transition-all duration-300 hover:bg-orange-600 md:bottom-8 md:right-8 ${
+        className={`fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-white shadow-xl shadow-orange-500/30 transition-all duration-300 hover:bg-orange-600 md:bottom-8 md:right-8 ${
           showTop ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'
         }`}
       >

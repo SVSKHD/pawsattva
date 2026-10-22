@@ -12,6 +12,16 @@ export const siteConfig = {
   },
 };
 
+/**
+ * "<title> | Paw Sattva" exactly once. The root layout's title template already appends the
+ * brand, so pages that build the full title themselves must use this (`absolute`) or it doubles.
+ * A brand suffix already typed into an admin SEO title is dropped first.
+ */
+export function brandedTitle(title: string) {
+  const bare = title.replace(/\s*[|–—-]\s*paw\s?sattva\s*$/i, "").trim() || siteConfig.name;
+  return { absolute: bare === siteConfig.name ? bare : `${bare} | ${siteConfig.name}` };
+}
+
 interface MetadataProps {
   title?: string;
   description?: string;
@@ -47,9 +57,9 @@ export function constructMetadata({
   twitterDescription,
   twitterImage,
 }: MetadataProps = {}): Metadata {
-  const fullTitle = title
-    ? `${title} | ${siteConfig.name}`
-    : siteConfig.name;
+  // A page's own title gets the brand exactly once (even if an admin SEO title already ends
+  // with it); only the root default sets the template that child pages fill in.
+  const fullTitle = title ? brandedTitle(title).absolute : siteConfig.name;
 
   const canonical = canonicalUrl || (pathname ? `${siteConfig.url}${pathname}` : undefined);
   const robotsValue = (robots || "").toLowerCase();
@@ -58,10 +68,9 @@ export function constructMetadata({
 
   return {
     metadataBase: new URL(siteConfig.url),
-    title: {
-      default: fullTitle,
-      template: `%s | ${siteConfig.name}`,
-    },
+    title: title
+      ? { absolute: fullTitle }
+      : { default: fullTitle, template: `%s | ${siteConfig.name}` },
     description,
     keywords: [
       "pet care",

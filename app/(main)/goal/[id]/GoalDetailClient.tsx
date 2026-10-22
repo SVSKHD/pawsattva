@@ -214,7 +214,7 @@ export function GoalDetailClient({ goalId }: { goalId: string }) {
   const TypeIcon = goal.type === "blog" ? BookOpen : FaInstagram
 
   return (
-    <main className="relative overflow-hidden px-4 pb-24 pt-28 sm:px-6 sm:pt-32">
+    <main className="relative overflow-hidden px-4 pb-24 pt-10 sm:px-6 md:pt-32">
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-[-8rem] top-16 h-80 w-80 rounded-full bg-emerald-300/15 blur-3xl" />
         <div className="absolute right-[-8rem] top-1/3 h-96 w-96 rounded-full bg-orange-300/15 blur-3xl" />

@@ -33,6 +33,14 @@ export const GUEST_PROMPTS = [
 ]
 export const isPlanningPet = (pet?: GptPet | null) => Boolean(pet?.planning)
 
+/** "dog" or "cat" when the question itself names one ("how about my dog's weight"), else null. */
+export function speciesInQuestion(question: string | undefined): "dog" | "cat" | null {
+  const text = question?.toLowerCase() ?? ""
+  const cat = /\b(cat|cats|kitten|kittens|kitty|feline|meow)\b/.test(text)
+  const dog = /\b(dog|dogs|puppy|puppies|pup|pups|canine|doggo|woof)\b/.test(text)
+  return cat === dog ? null : cat ? "cat" : "dog"
+}
+
 export const isCatPet = (pet?: GptPet | null) =>
   Boolean((pet?.profile?.petType ?? pet?.report?.petType)?.toLowerCase().includes("cat"))
 

@@ -1202,7 +1202,7 @@ export default function AdminPanel({
   }
 
   return (
-    <div className={`flex-1 w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-8 pt-24 ${activeTab === "blog" ? "pb-4" : "pb-6 md:pb-12"}`}>
+    <div className={`flex-1 w-full max-w-7xl mx-auto px-3 sm:px-4 md:px-8 pt-6 md:pt-24 ${activeTab === "blog" ? "pb-4" : "pb-6 md:pb-12"}`}>
 
       {/* ── Mobile page header (desktop shows it above the sidebar menu; hidden on the editor) ── */}
       <div className={`mb-6 flex-col gap-2 md:hidden ${activeTab === "blog" ? "hidden" : "flex"}`}>

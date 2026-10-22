@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useAppPathname } from "@/lib/use-app-pathname"
 import { Copy, ExternalLink, MessageCircle, Share2, X } from "lucide-react"
 import { FaInstagram } from "react-icons/fa"
 import { toast } from "sonner"
@@ -12,7 +12,7 @@ import { siteConfig } from "@/lib/metadata"
 import { PetMascot, type Mascot } from "@/components/pet-mascot"
 
 export function SocialPetGuide() {
-  const pathname = usePathname()
+  const pathname = useAppPathname()
   const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [mascot, setMascot] = useState<Mascot>("dog")
@@ -88,7 +88,7 @@ export function SocialPetGuide() {
     <aside
       aria-label="Paw Sattva greeting guide"
       data-open={open}
-      className="pet-guide-shell fixed bottom-[calc(6.25rem+env(safe-area-inset-bottom))] right-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-end md:bottom-6 md:right-6"
+      className="pet-guide-shell fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 z-[70] flex max-w-[calc(100vw-1.5rem)] flex-col items-end md:bottom-6 md:right-6"
     >
       <style>{`
         @keyframes pet-guide-walk {

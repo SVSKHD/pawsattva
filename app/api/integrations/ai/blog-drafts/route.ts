@@ -6,7 +6,9 @@ import { adminDb } from "@/lib/server/firebase-admin";
 export const runtime = "nodejs";
 
 function authorized(request: NextRequest) {
-  const secret = process.env.PAWSATTVA_DRAFT_API_KEY;
+  // Keys pasted into a hosting dashboard often pick up quotes or a trailing newline.
+  const secret = process.env.PAWSATTVA_DRAFT_API_KEY?.trim().replace(/^(["'])(.*)\1$/, "$2");
+  if (!secret) console.error("blog-drafts: PAWSATTVA_DRAFT_API_KEY is not set on the server");
   const supplied = /^Bearer[ \t]+(\S+)$/i.exec(request.headers.get("authorization")?.trim() ?? "")?.[1] ?? "";
   if (!secret || !supplied) return false;
   const a = createHash("sha256").update(secret).digest();

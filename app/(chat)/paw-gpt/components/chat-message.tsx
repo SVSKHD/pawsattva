@@ -8,8 +8,9 @@ import { Check, Copy, History, RotateCcw, Sparkles, AlertTriangle, Utensils, Vol
 import { toast } from "sonner"
 
 import { useAuth } from "@/components/auth-provider"
-import { MiniRunner } from "@/components/pet-scene/running-pets"
+import { speciesInQuestion } from "./pet-data"
 import { QuickReads, type QuickRead } from "./quick-reads"
+import { ThinkingSteps } from "./thinking-steps"
 import { useReadAloud } from "./read-aloud"
 
 export interface ChatItem {
@@ -32,9 +33,13 @@ export interface Conversation {
 
 interface ChatMessageProps {
   item: ChatItem
+  /** For an answer: the question it answers (picks dogs or cats for the thinking steps) */
+  question?: string
   petName?: string
   /** "Planning a pet" chats get planning-themed thinking steps */
   planning?: boolean
+  /** Visitor not signed in: no pet record, so general thinking steps */
+  general?: boolean
   /** The selected pet's kind leads the running pets while Paw GPT thinks */
   petKind?: "dog" | "cat"
   onRetry?: () => void
@@ -45,10 +50,10 @@ interface ChatMessageProps {
   onOpenQuickRead?: (read: QuickRead) => void
 }
 
-export function ChatMessage({ item, petName, petKind = "dog", planning = false, onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
+export function ChatMessage({ item, question, petName, petKind = "dog", planning = false, general = false, onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
   if (item.role === "user") {
     return (
-      <div id={`msg-${item.id}`} className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
+      <div id={`msg-${item.id}`} data-question className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
         <p className="max-w-[85%] whitespace-pre-wrap rounded-[1.4rem] rounded-br-md bg-gradient-to-b from-orange-400 to-orange-500 px-4 py-2.5 text-[15px] leading-snug text-white shadow-[0_6px_18px_-6px_rgba(249,115,22,0.55),inset_0_1px_0_rgba(255,255,255,0.3)]">
           {item.content}
         </p>
@@ -84,21 +89,87 @@ export function ChatMessage({ item, petName, petKind = "dog", planning = false, 
       <div className="paw-gpt-anim-pop flex gap-3">
         <Avatar thinking />
         <div className="min-w-0 flex-1 space-y-3">
-          <ThinkingPill petName={petName} petKind={petKind} planning={planning} />
+          {(() => {
+            // A question that names a species ("how about my dog's weight") gets that species;
+            // the selected pet's name is used only when it's the same kind.
+            const kind = speciesInQuestion(question) ?? petKind
+            return <ThinkingSteps petName={kind === petKind ? petName : undefined} kind={kind} planning={planning && !general} general={general} />
+          })()}
           {quickReads?.length && onOpenQuickRead ? <DelayedQuickReads reads={quickReads} onOpen={onOpenQuickRead} /> : null}
         </div>
       </div>
     )
   }
 
+  return <Answer item={item} petName={petName} onLogFood={onLogFood} />
+}
+
+/** Minimal hast shape, enough for splitting text into words. */
+type HastNode = { type: string; tagName?: string; value?: string; children?: HastNode[]; properties?: Record<string, unknown> }
+
+/** Rehype plugin: wraps each word in a span that fades in as it mounts. Code is left as is. */
+function rehypeFadeWords() {
+  const split = (node: HastNode) => {
+    if (!node.children || node.tagName === "code" || node.tagName === "pre") return
+    node.children = node.children.flatMap((child): HastNode[] => {
+      if (child.type !== "text" || !child.value) {
+        split(child)
+        return [child]
+      }
+      return child.value
+        .split(/(\s+)/)
+        .filter(Boolean)
+        .map((part) =>
+          /^\s+$/.test(part)
+            ? { type: "text", value: part }
+            : { type: "element", tagName: "span", properties: { className: ["paw-gpt-anim-word"] }, children: [{ type: "text", value: part }] }
+        )
+    })
+  }
+  return (tree: HastNode) => split(tree)
+}
+
+/**
+ * Streamed text arrives in bursts; this lets it out a few characters per frame, whole words at a
+ * time, speeding up when a lot is waiting so it never falls far behind. Saved answers show at once.
+ */
+function useSmoothReveal(text: string, streaming: boolean) {
+  const [shown, setShown] = useState(streaming ? 0 : text.length)
+  useEffect(() => {
+    if (shown >= text.length) return
+    const id = requestAnimationFrame(() => {
+      const backlog = text.length - shown
+      let next = Math.min(text.length, shown + Math.max(2, Math.ceil(backlog / 22)))
+      // Finish the word we're in, so words appear whole
+      const space = text.slice(next).search(/\s/)
+      if (space !== -1) next += space
+      else if (streaming) return // the rest of this word hasn't arrived yet; wait for more text
+      else next = text.length
+      if (next > shown) setShown(next)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [text, shown, streaming])
+  return { visible: text.slice(0, shown), revealing: streaming || shown < text.length }
+}
+
+function Answer({ item, petName, onLogFood }: { item: ChatItem; petName?: string; onLogFood?: () => void }) {
+  const { visible, revealing } = useSmoothReveal(item.content, Boolean(item.pending))
+
   return (
     <div className="paw-gpt-anim-pop flex gap-3">
-      <Avatar thinking={item.pending} />
+      <Avatar thinking={revealing} />
       <div className="min-w-0 flex-1">
-        <div className="paw-glass rounded-[1.4rem] rounded-tl-md px-4 py-3">
+        {/* Phones: the avatar sits above the answer so the answer gets the full width */}
+        <div className="mb-1.5 ml-1 flex items-center gap-2 sm:hidden">
+          <Avatar thinking={revealing} small />
+          <span className="text-xs font-bold tracking-tight text-foreground/70">Paw GPT</span>
+        </div>
+        <div className="paw-glass rounded-[1.4rem] rounded-tl-md px-4 py-3 max-sm:rounded-tl-[1.4rem]">
           <div className="prose prose-sm max-w-none text-[15px] leading-relaxed dark:prose-invert prose-headings:mb-2 prose-headings:mt-4 prose-headings:font-semibold prose-headings:tracking-tight prose-p:my-2 prose-li:my-0.5 prose-table:my-3 prose-th:bg-black/[0.03] prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5 prose-a:text-orange-600 prose-strong:text-foreground [&>*:first-child]:mt-0">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              // Only while it's being written: finished answers are plain text again (selection, copy)
+              rehypePlugins={revealing ? [rehypeFadeWords as never] : []}
               components={{
                 table: ({ children }) => (
                   <div className="overflow-x-auto rounded-2xl border border-black/5 dark:border-white/10">
@@ -115,12 +186,12 @@ export function ChatMessage({ item, petName, petKind = "dog", planning = false, 
                   ),
               }}
             >
-              {item.content}
+              {visible}
             </ReactMarkdown>
-            {item.pending && <span aria-hidden className="ml-0.5 inline-block h-4 w-[3px] translate-y-0.5 animate-pulse rounded-full bg-orange-500" />}
+            {revealing && <span aria-hidden className="ml-0.5 inline-block h-4 w-[3px] translate-y-0.5 animate-pulse rounded-full bg-orange-500" />}
           </div>
         </div>
-        {!item.pending && <AnswerActions id={item.id} text={item.content} petName={petName} onLogFood={onLogFood} />}
+        {!revealing && <AnswerActions id={item.id} text={item.content} petName={petName} onLogFood={onLogFood} />}
       </div>
     </div>
   )
@@ -133,7 +204,12 @@ function DelayedQuickReads({ reads, onOpen }: { reads: QuickRead[]; onOpen: (rea
     const timer = window.setTimeout(() => setVisible(true), 2500)
     return () => window.clearTimeout(timer)
   }, [])
-  return visible ? <QuickReads reads={reads} onOpen={onOpen} /> : null
+  // Laptops and up show these in the reading panel on the right instead.
+  return visible ? (
+    <div className="lg:hidden">
+      <QuickReads reads={reads} onOpen={onOpen} />
+    </div>
+  ) : null
 }
 
 /** Actions under a finished answer, as one segmented group: Copy, Read aloud, and Log food when relevant. */
@@ -189,56 +265,16 @@ function AnswerActions({ id, text, petName, onLogFood }: { id: string; text: str
   )
 }
 
-function Avatar({ thinking }: { thinking?: boolean }) {
+/** The beside-the-answer avatar shows from small tablets up; `small` is the phone byline version. */
+function Avatar({ thinking, small }: { thinking?: boolean; small?: boolean }) {
   return (
     <span
-      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
-        thinking ? "paw-gpt-anim-breathe" : ""
-      }`}
+      className={`shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_4px_12px_-4px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] ${
+        small ? "flex h-6 w-6" : "mt-0.5 hidden h-8 w-8 sm:flex"
+      } ${thinking ? "paw-gpt-anim-breathe" : ""}`}
     >
-      <Sparkles className="h-4 w-4" />
+      <Sparkles className={small ? "h-3 w-3" : "h-4 w-4"} />
     </span>
-  )
-}
-
-/** Playful steps the little runner goes through, in the pet's own language. */
-function thinkingSteps(petName: string | undefined, kind: "dog" | "cat", planning: boolean) {
-  const name = petName || "your pet"
-  if (planning) {
-    return ["Sniffing out the right breeds", "Digging into costs", "Fetching a first-week checklist", "Chasing down the details", "Wagging out an answer"]
-  }
-  return kind === "cat"
-    ? [`Pawing through ${name}'s profile`, "Batting at the meal logs", "Stalking the weight chart", "Pouncing on the details", "Purring out an answer"]
-    : [`Sniffing through ${name}'s profile`, "Digging up meal logs", "Fetching the weight chart", "Chasing down the details", "Wagging out an answer"]
-}
-
-/**
- * Small "thinking" pill: a pet galloping in place and a status line that changes every ~1.6s.
- * Stays on the last step if the answer takes longer.
- */
-export function ThinkingPill({ petName, petKind = "dog", planning = false }: { petName?: string; petKind?: "dog" | "cat"; planning?: boolean }) {
-  const steps = thinkingSteps(petName, petKind, planning)
-  const [step, setStep] = useState(0)
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setStep((current) => Math.min(current + 1, steps.length - 1)), 1600)
-    return () => window.clearInterval(timer)
-  }, [steps.length])
-
-  return (
-    <div role="status" aria-live="polite" className="paw-glass inline-flex max-w-full items-center gap-2 rounded-full py-1 pl-1 pr-3.5">
-      <span className="flex h-8 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-orange-500/[0.08]">
-        <MiniRunner kind={petKind} className="h-8 w-auto" />
-      </span>
-      <span key={step} className="paw-gpt-anim-pop min-w-0 truncate text-[13px] font-medium text-foreground/75">
-        {steps[step]}
-      </span>
-      <span aria-hidden className="flex shrink-0 items-end gap-0.5 pb-0.5">
-        {[0, 1, 2].map((dot) => (
-          <span key={dot} className="paw-gpt-anim-dot h-1 w-1 rounded-full bg-orange-500" style={{ animationDelay: `${dot * 0.15}s` }} />
-        ))}
-      </span>
-    </div>
   )
 }
 

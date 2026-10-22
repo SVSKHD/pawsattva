@@ -81,13 +81,28 @@ function RunningCat({ x, y, colors }: { x: number; y: number; colors: PetColors 
   )
 }
 
+/** A walk is the same stride, slowed down (and without kicking up dust). */
+const WALK_STRIDE = 0.95
+
 /**
- * One pet galloping in place on a strip of ground, small enough to sit inside a pill
- * (Paw GPT's thinking indicator). Pure CSS (paw-gpt-anim-*), so it stops for reduced motion.
+ * One pet moving in place on a strip of ground, small enough to sit inside a pill
+ * (Paw GPT's thinking indicator). `gait` "run" gallops, "walk" strolls. Pure CSS
+ * (paw-gpt-anim-*), so it stops for reduced motion.
  */
-export function MiniRunner({ kind = "dog", className }: { kind?: "dog" | "cat"; className?: string }) {
+export function MiniRunner({
+  kind = "dog",
+  colors,
+  gait = "run",
+  className,
+}: {
+  kind?: "dog" | "cat"
+  colors?: PetColors
+  gait?: "run" | "walk"
+  className?: string
+}) {
+  const stride = gait === "walk" ? WALK_STRIDE : STRIDE
   return (
-    <svg viewBox="-58 14 124 68" className={className} aria-hidden style={{ "--paw-stride": `${STRIDE}s` } as CSSProperties}>
+    <svg viewBox="-58 14 124 68" className={className} aria-hidden style={{ "--paw-stride": `${stride}s` } as CSSProperties}>
       {/* ground scrolling under the paws */}
       <line x1={-58} y1={76} x2={66} y2={76} stroke="#9a3412" strokeOpacity={0.2} strokeWidth={2} />
       <g className="paw-gpt-anim-ground">
@@ -95,11 +110,11 @@ export function MiniRunner({ kind = "dog", className }: { kind?: "dog" | "cat"; 
           <rect key={index} x={-58 + index * 28} y={79.5} width={12} height={2.5} rx={1.25} fill="#9a3412" opacity={0.2} />
         ))}
       </g>
-      <circle cx={-52} cy={73} r={3.5} fill="#d6a77a" className="paw-gpt-anim-dust" />
+      {gait === "run" && <circle cx={-52} cy={73} r={3.5} fill="#d6a77a" className="paw-gpt-anim-dust" />}
       {kind === "cat" ? (
-        <RunningCat x={-4} y={55} colors={PET_PALETTES.ginger} />
+        <RunningCat x={-4} y={55} colors={colors ?? PET_PALETTES.ginger} />
       ) : (
-        <RunningDog x={-6} y={52} colors={PET_PALETTES.golden} />
+        <RunningDog x={-6} y={52} colors={colors ?? PET_PALETTES.golden} />
       )}
     </svg>
   )

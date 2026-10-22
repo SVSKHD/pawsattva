@@ -15,9 +15,40 @@ import { clip, formatBlogDate, toBlogSummary, toPlainText, type BlogSummary } fr
 export interface QuickRead extends BlogSummary {
   /** The article's opening as plain text (never rendered as HTML here) */
   preview: string
+  /** The article body's HTML, read into text blocks by articleBlocks() when opened (never rendered as HTML) */
+  html: string
 }
 
-const RECENT_POSTS = 24
+export type ArticleBlock = { type: "heading" | "paragraph" | "item" | "quote"; text: string }
+
+/**
+ * Article HTML → headings, paragraphs, list items and quotes as plain text, for the reading
+ * panel. DOMParser doesn't run scripts or load images, and only textContent is kept, so the
+ * post's markup is never injected into the page.
+ */
+export function articleBlocks(html: string): ArticleBlock[] {
+  if (typeof DOMParser === "undefined" || !html) return []
+  const doc = new DOMParser().parseFromString(html, "text/html")
+  const blocks: ArticleBlock[] = []
+  for (const el of doc.body.querySelectorAll("h1, h2, h3, h4, h5, h6, p, li, blockquote")) {
+    // Paragraphs inside a list item or quote are read as part of it.
+    if (el.tagName === "P" && el.parentElement?.closest("li, blockquote")) continue
+    const text = el.textContent?.replace(/\s+/g, " ").trim()
+    if (!text) continue
+    const type = /^H\d$/.test(el.tagName) ? "heading" : el.tagName === "LI" ? "item" : el.tagName === "BLOCKQUOTE" ? "quote" : "paragraph"
+    blocks.push({ type, text })
+  }
+  // Posts written as bare text with line breaks: fall back to paragraphs.
+  if (!blocks.length) {
+    for (const text of (doc.body.textContent ?? "").split(/\n{2,}/).map((part) => part.replace(/\s+/g, " ").trim())) {
+      if (text) blocks.push({ type: "paragraph", text })
+    }
+  }
+  return blocks
+}
+
+// Enough to cover the whole library for matching and reading in the panel.
+const RECENT_POSTS = 80
 let cache: Promise<QuickRead[]> | null = null
 
 /** Recent published posts, fetched once per visit and only when first needed. */
@@ -35,7 +66,7 @@ function loadQuickReads() {
           return blog
         })
         .filter((blog) => blog.status === "published" && blog.slug)
-        .map((blog) => ({ ...toBlogSummary(blog), preview: clip(toPlainText(blog.content || ""), 700) }))
+        .map((blog) => ({ ...toBlogSummary(blog), preview: clip(toPlainText(blog.content || ""), 700), html: blog.content || "" }))
     )
     .catch((error) => {
       console.error("Paw GPT: could not load quick reads:", error)
@@ -61,7 +92,12 @@ export function useQuickReads(enabled: boolean) {
   return reads
 }
 
-const STOP_WORDS = new Set(["what", "when", "which", "with", "should", "could", "would", "about", "there", "their", "they", "this", "that", "have", "does", "from", "your", "much", "many", "give", "tell", "make", "best"])
+const STOP_WORDS = new Set([
+  "what", "when", "which", "with", "should", "could", "would", "about", "there", "their", "they", "this", "that",
+  "have", "does", "from", "your", "much", "many", "give", "tell", "make", "best", "each", "every", "daily", "need",
+  "needs", "times", "time", "week", "weeks", "month", "months", "year", "years", "good", "okay", "help", "please",
+  "know", "want", "like", "some", "more", "less", "than", "into", "just", "also", "very", "really", "pet", "pets",
+])
 
 // Everyday wording → words articles actually use ("eat" → feed / food / diet …).
 const TOPICS: [RegExp, string[]][] = [
@@ -72,30 +108,58 @@ const TOPICS: [RegExp, string[]][] = [
   [/\b(walk|walks|exercise|play|energy|active)\b/, ["walk", "exercise", "play", "activ"]],
   [/\b(sick|ill|unwell|vomit|vomiting|diarrh|symptom|symptoms|vet|fever|scratch|itch)/, ["sick", "unwell", "signs", "health", "vet", "symptom"]],
   [/\b(heat|summer|hot)\b/, ["heat", "summer"]],
-  [/\b(puppy|kitten|adopt|adoption|new pet|breed|breeds)\b/, ["puppy", "kitten", "adopt", "breed"]],
+  [/\b(puppy|puppies|kitten|kittens)\b/, ["puppy", "puppies", "kitten"]],
+  [/\b(adopt|adoption|new pet|breed|breeds|which dog|which cat)\b/, ["adopt", "breed", "guide"]],
+  [/\b(travel|trip|flight|car ride|holiday)\b/, ["travel", "trip"]],
+  [/\b(cold|winter|rain|monsoon)\b/, ["winter", "cold", "monsoon"]],
+  [/\b(ear|ears|eye|eyes|teeth|dental|paw|paws)\b/, ["ear", "eye", "teeth", "dental", "paw"]],
+  [/\b(stray|street|community dog)/, ["stray", "community"]],
 ]
 
-/** Up to `count` posts matching the question's words, topic and pet kind, newest first on ties. */
-export function pickQuickReads(reads: QuickRead[], question: string, petKind: "dog" | "cat" | null, count = 3) {
+/** Posts ranked for the question: its words (more when they're in the title), topic and pet kind. */
+function rankReads(reads: QuickRead[], question: string, petKind: "dog" | "cat" | null) {
   const text = question.toLowerCase()
   const words = (text.match(/[a-z]{4,}/g) ?? []).filter((word) => !STOP_WORDS.has(word))
   const topicWords = TOPICS.filter(([pattern]) => pattern.test(text)).flatMap(([, related]) => related)
+  // Species named in the question beat the selected pet (a guest asking about cats).
+  const kind = /\b(cat|cats|kitten|kittens)\b/.test(text) ? "cat" : /\b(dog|dogs|puppy|puppies)\b/.test(text) ? "dog" : petKind
   return reads
     .map((read, index) => {
-      let score = 0
-      for (const word of words) if (read.searchText.includes(word.replace(/s$/, ""))) score += 2
-      for (const word of topicWords) if (read.searchText.includes(word)) score += 3
-      if (petKind) {
-        const other = petKind === "dog" ? "cat" : "dog"
-        if (read.searchText.includes(petKind)) score += 1
+      const title = read.title.toLowerCase()
+      let relevance = 0
+      for (const word of words) {
+        const stem = word.replace(/s$/, "")
+        if (title.includes(stem)) relevance += 4
+        else if (read.searchText.includes(stem)) relevance += 2
+      }
+      for (const word of topicWords) if (read.searchText.includes(word)) relevance += title.includes(word) ? 4 : 3
+      let score = relevance
+      if (kind) {
+        const other = kind === "dog" ? "cat" : "dog"
+        if (read.searchText.includes(kind)) score += 1
         // A post only about the other species is a poor fit (a Persian cat guide for a dog question).
         else if (read.searchText.includes(other)) score -= 4
       }
-      return { read, score, index }
+      return { read, score, relevance, index }
     })
     .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, count)
-    .map(({ read }) => read)
+}
+
+/** Up to `count` posts matching the question's words, topic and pet kind, newest first on ties. */
+export function pickQuickReads(reads: QuickRead[], question: string, petKind: "dog" | "cat" | null, count = 3) {
+  return rankReads(reads, question, petKind).slice(0, count).map(({ read }) => read)
+}
+
+/**
+ * Posts for the side panel: the ones that really match the question, or (when nothing does)
+ * the newest posts, flagged `related: false` so the panel doesn't call them related.
+ */
+export function relatedReads(reads: QuickRead[], question: string, petKind: "dog" | "cat" | null, count = 4) {
+  const ranked = rankReads(reads, question, petKind)
+  const matching = ranked.filter((entry) => entry.relevance >= 3 && entry.score > 0).slice(0, count)
+  return matching.length
+    ? { related: true, reads: matching.map(({ read }) => read) }
+    : { related: false, reads: reads.slice(0, count) }
 }
 
 /** "While you wait" cards under the thinking card. */

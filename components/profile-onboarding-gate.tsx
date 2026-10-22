@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
+import { useAppPathname } from "@/lib/use-app-pathname"
 import { Loader2, MessageCircle, Phone } from "lucide-react"
 import { toast } from "sonner"
 
@@ -29,7 +29,7 @@ const isValidPhone = (value: string) => {
 
 export function ProfileOnboardingGate() {
   const { user, loading: authLoading, isBlacklisted } = useAuth()
-  const pathname = usePathname()
+  const pathname = useAppPathname()
   const [checkedUserId, setCheckedUserId] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [phone, setPhone] = useState("")

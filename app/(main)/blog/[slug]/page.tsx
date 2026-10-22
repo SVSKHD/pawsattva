@@ -24,7 +24,7 @@ import { getBlogBySlug, getBlogs, getCategories, Blog } from '@/firebase/firesto
 import { categoryHref } from '@/lib/category-slug';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { siteConfig } from '@/lib/metadata';
+import { brandedTitle, siteConfig } from '@/lib/metadata';
 import ReadingEnhancements from './reading-enhancements';
 import { BlogHeroParallax } from './blog-hero-parallax';
 import { ReadAloud } from './read-aloud';
@@ -66,7 +66,7 @@ export async function generateMetadata({
   const robots = (seo?.robots || "index,follow").toLowerCase();
 
   return {
-    title: `${title} | ${siteConfig.name}`,
+    title: brandedTitle(title),
     description,
     keywords: seo?.keywords?.length
       ? seo.keywords
@@ -271,7 +271,7 @@ export default async function BlogPostPage({
       {/* Desktop: a full-viewport split view — the window never scrolls, the left panel stays still and
           only the right column scrolls (it ends with the site footer, hidden from the layout on this page).
           Mobile: both columns use `display: contents` so their parts stack as intro → article → comments → more. */}
-      <div className="relative container mx-auto max-w-7xl px-4 pb-12 pt-28 sm:pb-16 sm:pt-32 lg:h-dvh lg:pb-6 lg:pt-28">
+      <div className="relative container mx-auto max-w-7xl px-4 pb-12 pt-8 sm:pb-16 md:pt-32 lg:h-dvh lg:pb-6 lg:pt-28">
         <div className="grid gap-10 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)] xl:gap-16">
           <aside className="blog-left contents lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:overflow-hidden">
             <div className="order-1 lg:order-none lg:shrink-0">

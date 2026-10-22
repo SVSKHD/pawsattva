@@ -1,9 +1,9 @@
 "use client";
 
 import { ViewTransition } from "react";
-import Link, { useLinkStatus } from "next/link";
+import Link from "next/link";
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { useAppPathname } from "@/lib/use-app-pathname";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Paw from "../app/pawsattva.png"
@@ -25,6 +25,35 @@ import { useAuthDialog } from "@/components/auth-dialog-provider";
 import { auth } from "@/firebase/firebase";
 import { signOut } from "firebase/auth";
 import { LogOut, LayoutDashboard, User, Menu, Home, BookOpen, PawPrint, ChevronDown, CalendarDays, Sparkles } from "lucide-react";
+
+// Phone bottom bar; every other page lives in the menu behind the last tab
+const mobileTabs = [
+  { href: "/", label: "Home", Icon: Home },
+  { href: "/blog", label: "Blog", Icon: BookOpen },
+  { href: "/paw-gpt", label: "Paw GPT", Icon: Sparkles },
+  { href: "/pet-feed", label: "Pet Feed", Icon: PawPrint },
+];
+
+// iOS-style ease: quick start, long soft settle
+const barEase = "ease-[cubic-bezier(0.32,0.72,0,1)]";
+const COMPACT_BAR_PX = 232;
+const BAR_TAB_COUNT = mobileTabs.length + 1; // + the menu tab
+
+// Compact mode only uses transforms and clip-path (no layout work per frame), so it stays smooth on phones:
+// the pill's background is clipped inward and each tab slides toward the centre by its share of the lost width.
+function compactTabShift(index: number) {
+  const fromCenter = (BAR_TAB_COUNT - 1) / 2 - index;
+  return `translateX(calc(${fromCenter} * (100% - ${COMPACT_BAR_PX / BAR_TAB_COUNT}px)))`;
+}
+const barClipFull = "inset(0px 0px 0px 0px round 999px)";
+const barClipCompact = `inset(4px calc(50% - ${COMPACT_BAR_PX / 2}px) 4px calc(50% - ${COMPACT_BAR_PX / 2}px) round 999px)`;
+
+// Each tab sits in a circle that glows orange when it's the current page (or the open menu)
+const tabCircle =
+  `flex size-11 items-center justify-center rounded-full transition-[color,background-color,box-shadow,scale] duration-500 ${barEase} group-active:scale-90 motion-reduce:transition-none`;
+const tabCircleActive =
+  "bg-orange-500/15 text-primary shadow-[0_0_0_1px_rgba(249,115,22,0.18),0_0_18px_rgba(249,115,22,0.35)]";
+const tabCircleIdle = "text-muted-foreground group-active:bg-orange-500/10";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,19 +70,8 @@ const MobileMoreMenu = dynamic(
   { ssr: false }
 );
 
-function NavPendingHint() {
-  const { pending } = useLinkStatus();
-
-  return (
-    <span
-      aria-hidden="true"
-      className={`nav-pending-hint ${pending ? "is-pending" : ""}`}
-    />
-  );
-}
-
 export function Header() {
-  const pathname = usePathname();
+  const pathname = useAppPathname();
   const { user, isAdmin, loading } = useAuth();
   const { requestSignIn } = useAuthDialog();
   const [isVisible, setIsVisible] = useState(true);
@@ -68,7 +86,8 @@ export function Header() {
     const threshold = 8; // ignore micro-scrolls
 
     const handleScroll = () => {
-      const y = window.scrollY;
+      const maxY = document.documentElement.scrollHeight - window.innerHeight;
+      const y = Math.min(Math.max(window.scrollY, 0), Math.max(maxY, 0));
       setIsScrolled(y > 12);
 
       // Always visible near the top
@@ -94,6 +113,10 @@ export function Header() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // Compact bottom bar while reading (scrolling down); full size near the top, on scroll up, or with the menu open
+  const isBarCompact = !isVisible && !isMenuOpen;
+  const tabCircleSize = isBarCompact ? "scale-[0.82]" : "scale-100";
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
@@ -104,8 +127,9 @@ export function Header() {
 
   return (
     <>
+      {/* Top header is desktop/tablet only; phones navigate from the bottom bar */}
       <div
-        className={`fixed top-0 left-0 right-0 z-50 px-3 pt-3 transition-[transform,opacity] duration-300 ease-out sm:px-4 sm:pt-4 ${isVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-32 opacity-0"
+        className={`fixed top-0 left-0 right-0 z-50 hidden px-4 pt-4 transition-[transform,opacity] duration-300 ease-out md:block ${isVisible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-32 opacity-0"
           }`}
       >
         <header
@@ -115,10 +139,10 @@ export function Header() {
               : "border-white/70 shadow-[0_2px_12px_rgba(24,24,27,0.06)] dark:border-white/5"
           }`}
         >
-          <div className="flex h-16 items-center gap-3 pl-3 pr-3 sm:pl-4 md:pr-4">
+          <div className="flex h-16 items-center gap-3 pl-4 pr-4">
             <Link href="/" aria-label="Paw Sattva home" className="group flex shrink-0 items-center gap-2 rounded-full pr-2">
-              {/* Logo: fixed 44/48px badge so it never touches the 64px bar, even on hover */}
-              <span className="relative block size-11 shrink-0 rounded-full drop-shadow-sm transition-transform duration-300 group-hover:scale-105 md:size-12">
+              {/* Logo: fixed 48px badge so it never touches the 64px bar, even on hover */}
+              <span className="relative block size-12 shrink-0 rounded-full drop-shadow-sm transition-transform duration-300 group-hover:scale-105">
                 <Image
                   src={Paw}
                   alt=""
@@ -250,57 +274,69 @@ export function Header() {
         </header>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Phone navigation: floating bottom bar in thumb reach; the last tab opens the full menu.
+          Scrolling down tucks it into a compact pill (tabs pulled together); scrolling up restores it. */}
       <nav
         aria-label="Primary mobile navigation"
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:hidden"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden"
       >
-        <div className="pointer-events-auto mx-auto flex h-[4.5rem] w-full max-w-md items-stretch justify-around rounded-[1.6rem] border border-white/70 bg-white/95 px-1.5 shadow-[0_10px_32px_rgba(24,24,27,0.18)] backdrop-blur-md dark:border-white/10 dark:bg-zinc-950/95">
-          <Link
-            href="/"
-            aria-current={pathname === "/" ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname === "/" ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
-              }`}
-          >
-            <Home className="h-5.5 w-5.5" />
-            <span className="text-[10px] font-bold mt-1">HOME</span>
-            <NavPendingHint />
-          </Link>
+        <div className="relative h-14 w-full">
+          {/* Background pill; drop-shadow follows the clipped shape, so the shadow shrinks with it */}
+          <div aria-hidden className="absolute inset-0 [filter:drop-shadow(0_0_0.5px_rgba(24,24,27,0.18))_drop-shadow(0_8px_18px_rgba(24,24,27,0.16))]">
+            <div
+              className={`size-full bg-white/95 transition-[clip-path] duration-500 ${barEase} motion-reduce:transition-none dark:bg-zinc-900/95`}
+              style={{ clipPath: isBarCompact ? barClipCompact : barClipFull }}
+            />
+          </div>
 
-          <Link
-            href="/blog"
-            aria-current={pathname.startsWith("/blog") ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/blog") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
-              }`}
-          >
-            <BookOpen className="h-5.5 w-5.5" />
-            <span className="text-[10px] font-bold mt-1">BLOG</span>
-            <NavPendingHint />
-          </Link>
+          <div className="absolute inset-0 flex">
+            {mobileTabs.map(({ href, label, Icon }, index) => {
+              const isActive = isRouteActive(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-label={label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`mobile-nav-item group pointer-events-auto flex h-full flex-1 touch-manipulation items-center justify-center transition-transform duration-500 ${barEase} will-change-transform motion-reduce:transition-none`}
+                  style={{ transform: isBarCompact ? compactTabShift(index) : "translateX(0px)" }}
+                >
+                  <span className={`${tabCircle} ${tabCircleSize} ${isActive ? tabCircleActive : tabCircleIdle}`}>
+                    <Icon className="size-[22px]" strokeWidth={isActive ? 2.3 : 1.75} />
+                  </span>
+                </Link>
+              );
+            })}
 
-          <Link
-            href="/pet-feed"
-            aria-current={pathname.startsWith("/pet-feed") ? "page" : undefined}
-            className={`mobile-nav-item relative flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 transition-[color,background-color,transform] duration-150 active:scale-95 ${pathname.startsWith("/pet-feed") ? "bg-orange-500/10 text-primary" : "text-muted-foreground"
-              }`}
-          >
-            <PawPrint className="h-5.5 w-5.5" />
-            <span className="mt-1 text-[10px] font-bold">PET PLAN</span>
-            <NavPendingHint />
-          </Link>
-
-          <button
-            type="button"
-            aria-label="Open more navigation options"
-            aria-expanded={isMenuOpen}
-            onPointerDown={() => void import("@/components/mobile-more-menu")}
-            onFocus={() => void import("@/components/mobile-more-menu")}
-            onClick={() => setIsMenuOpen(true)}
-            className={`mobile-nav-item flex min-h-12 min-w-16 flex-1 touch-manipulation flex-col items-center justify-center rounded-2xl px-2 py-1.5 text-muted-foreground transition-[color,background-color,transform] duration-150 active:scale-95 ${isMenuOpen ? "bg-orange-500/10 text-primary" : ""}`}
-          >
-            <Menu className="h-5.5 w-5.5" />
-            <span className="text-[10px] font-bold mt-1">MORE</span>
-          </button>
+            <button
+              type="button"
+              aria-label={user ? "Open menu and account" : "Open menu"}
+              aria-expanded={isMenuOpen}
+              onPointerDown={() => void import("@/components/mobile-more-menu")}
+              onFocus={() => void import("@/components/mobile-more-menu")}
+              onClick={() => setIsMenuOpen(true)}
+              className={`mobile-nav-item group pointer-events-auto flex h-full flex-1 touch-manipulation items-center justify-center transition-transform duration-500 ${barEase} will-change-transform motion-reduce:transition-none`}
+              style={{ transform: isBarCompact ? compactTabShift(mobileTabs.length) : "translateX(0px)" }}
+            >
+              <span className={`${tabCircle} ${tabCircleSize} ${isMenuOpen ? tabCircleActive : tabCircleIdle}`}>
+                {user ? (
+                  <span
+                    className={`flex size-8 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-primary text-white ring-2 transition-shadow ${
+                      isMenuOpen ? "ring-orange-500" : "ring-white dark:ring-zinc-900"
+                    }`}
+                  >
+                    {user.photoURL && !imageUrlProblem(user.photoURL) ? (
+                      <Image src={user.photoURL} alt="" width={32} height={32} className="size-full object-cover" />
+                    ) : (
+                      <User className="size-4" />
+                    )}
+                  </span>
+                ) : (
+                  <Menu className="size-[22px]" strokeWidth={isMenuOpen ? 2.3 : 1.75} />
+                )}
+              </span>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -310,7 +346,8 @@ export function Header() {
           onOpenChange={setIsMenuOpen}
           pathname={pathname}
           isAdmin={isAdmin}
-          hasUser={Boolean(user)}
+          user={user}
+          onSignOut={handleSignOut}
         />
       )}
     </>
