@@ -6,9 +6,9 @@ import {
   Users, Mail, FileText, Dog, TrendingUp, Heart, ThumbsDown, Eye,
   Activity, BarChart3, MessageCircle
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Blog, Subscription, UserProfile } from "@/firebase/firestore"
 import { PawGptUsageCard } from "./PawGptUsageCard"
+import { PanelBar, TableCard, theadRowClass, thClass } from "./DataTable"
 import {
   ResponsiveContainer,
   BarChart,
@@ -33,6 +33,19 @@ function getTimeAgo(date: Date): string {
   const days = Math.floor(hrs / 24)
   if (days < 30) return `${days}d ago`
   return date.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+}
+
+/** Stat tile card, same family as the shared admin kit cards */
+const cardClass =
+  "rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40"
+
+function LiveBadge({ label }: { label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+      {label}
+    </span>
+  )
 }
 
 interface AnalyticsTabProps {
@@ -125,32 +138,34 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
   }, [blogs])
 
   return (
-    <div className="space-y-5 sm:space-y-8">
+    <div className="space-y-5 sm:space-y-6">
+      <PanelBar
+        icon={BarChart3}
+        title="Analytics"
+        subtitle={`${nonAdminUsers.length.toLocaleString("en-IN")} users · ${publishedCount} published posts · ${totalViews.toLocaleString("en-IN")} views, updated live`}
+      />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
         {stats.map((s) => (
-          <Card key={s.label} className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-xl rounded-2xl sm:rounded-[1.75rem]">
-            <CardContent className="p-3.5 sm:p-6">
-              <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center mb-2.5 sm:mb-4 ${s.color}`}>
+          <div key={s.label} className={`${cardClass} py-4 sm:py-5`}>
+            <div className="px-3.5 sm:px-5">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center mb-2.5 sm:mb-3 ${s.color}`}>
                 <s.icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <p className="text-xl sm:text-3xl font-extrabold tracking-tight">{s.value}</p>
+              <p className="text-xl sm:text-3xl font-extrabold tracking-tight tabular-nums">{s.value.toLocaleString("en-IN")}</p>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 font-medium">{s.label}</p>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         ))}
       </div>
 
       <PawGptUsageCard users={users} />
 
-      {/* Post engagement */}
+      {/* Charts */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
-        <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-          <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-            <CardTitle className="text-lg sm:text-xl font-bold">Top Posts (Views/Likes/Comments)</CardTitle>
-            <CardDescription>Live ranking from current blog metrics</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[320px] px-2 sm:px-4 pb-6">
+        <TableCard icon={BarChart3} title="Top posts" subtitle="Views, likes and comments for the most-read posts">
+          <div className="h-[320px] px-2 pb-4 sm:px-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={topPostsData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
@@ -163,15 +178,11 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
                 <Bar dataKey="comments" fill="#f59e0b" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </TableCard>
 
-        <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-          <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-            <CardTitle className="text-lg sm:text-xl font-bold">6-Month Engagement Trend</CardTitle>
-            <CardDescription>Views, likes and comments over time</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[320px] px-2 sm:px-4 pb-6">
+        <TableCard icon={TrendingUp} title="6-month engagement trend" subtitle="Views, likes and comments by publish month">
+          <div className="h-[320px] px-2 pb-4 sm:px-4">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyData}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
@@ -184,48 +195,37 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
                 <Line type="monotone" dataKey="comments" stroke="#f59e0b" strokeWidth={2.5} dot={false} />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          </div>
+        </TableCard>
       </div>
 
       {/* Post engagement */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 rounded-xl bg-violet-500/10 text-violet-600">
-              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
-            </div>
-            <div>
-              <CardTitle className="text-lg sm:text-xl font-bold">Post Engagement</CardTitle>
-              <CardDescription className="text-xs sm:text-sm">Real-time likes & dislikes per article</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0 overflow-hidden">
+      <TableCard icon={Heart} title="Post engagement" subtitle="Real-time likes and dislikes per article">
+        <div className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-border/40 bg-white/20 dark:bg-black/10">
-                  <th className="px-3 sm:px-6 md:px-8 py-3 sm:py-4 font-semibold text-xs sm:text-sm">Article</th>
-                  <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
+                <tr className={theadRowClass}>
+                  <th className={thClass}>Article</th>
+                  <th className={`${thClass} text-center`}>
                     <span className="flex items-center justify-center gap-1.5">
                       <Eye className="w-3.5 h-3.5 text-sky-500" />
                       <span className="hidden sm:inline">Views</span>
                     </span>
                   </th>
-                  <th className="px-4 md:px-6 py-4 font-semibold text-sm text-center">
+                  <th className={`${thClass} text-center`}>
                     <span className="flex items-center justify-center gap-1.5">
                       <Heart className="w-3.5 h-3.5 text-emerald-500" />
                       <span className="hidden sm:inline">Likes</span>
                     </span>
                   </th>
-                  <th className="hidden sm:table-cell px-6 py-4 font-semibold text-sm text-center">
+                  <th className={`${thClass} hidden text-center sm:table-cell`}>
                     <span className="flex items-center justify-center gap-1.5">
                       <ThumbsDown className="w-3.5 h-3.5 text-rose-500" />
                       <span className="hidden md:inline">Dislikes</span>
                     </span>
                   </th>
-                  <th className="px-6 py-4 font-semibold text-sm text-center">Eng.</th>
+                  <th className={`${thClass} text-center`}>Eng.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
@@ -242,26 +242,26 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
                   const total = likes + dislikes
                   const likePct = total > 0 ? Math.round((likes / total) * 100) : 0
                   return (
-                    <tr key={row.id} className="group hover:bg-white/20 dark:hover:bg-white/5 transition-colors">
-                      <td className="px-6 md:px-8 py-4">
-                        <span className="font-semibold text-foreground group-hover:text-violet-600 transition-colors text-xs md:text-sm line-clamp-1">
+                    <tr key={row.id} className="group transition-colors hover:bg-orange-500/[0.04]">
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-foreground group-hover:text-orange-700 dark:group-hover:text-orange-300 transition-colors text-xs md:text-sm line-clamp-1">
                           {row.title}
                         </span>
                       </td>
-                      <td className="px-4 md:px-6 py-4 text-center text-xs md:text-sm font-medium text-muted-foreground">
+                      <td className="px-4 py-3 text-center text-xs md:text-sm font-medium text-muted-foreground">
                         {views.toLocaleString()}
                       </td>
-                      <td className="px-4 md:px-6 py-4 text-center">
+                      <td className="px-4 py-3 text-center">
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2.5 py-0.5 rounded-full">
                           <Heart className="w-3 h-3" />{likes.toLocaleString()}
                         </span>
                       </td>
-                      <td className="hidden sm:table-cell px-6 py-4 text-center">
+                      <td className="hidden sm:table-cell px-4 py-3 text-center">
                         <span className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 bg-rose-500/10 px-2.5 py-0.5 rounded-full">
                           <ThumbsDown className="w-3 h-3" />{dislikes.toLocaleString()}
                         </span>
                       </td>
-                      <td className="px-4 md:px-6 py-4 text-center">
+                      <td className="px-4 py-3 text-center">
                         <div className="flex items-center justify-center gap-2">
                           <div className="hidden xs:block w-16 h-1.5 rounded-full bg-muted overflow-hidden">
                             <div
@@ -278,28 +278,17 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
               </tbody>
             </table>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TableCard>
 
       {/* Users with pet feeds */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-600">
-              <Dog className="w-5 h-5" />
-            </div>
-            <div>
-              <CardTitle className="text-xl font-bold">Users with Pet Feeds</CardTitle>
-              <CardDescription>Users who have submitted pet information</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-8 pt-2">
+      <TableCard icon={Dog} title="Users with pet feeds" subtitle="Pet parents who have submitted pet information">
+        <div className="px-4 pb-5 sm:px-5">
           <div className="space-y-3">
             {nonAdminUsers.filter(u => u.petFeeds && u.petFeeds.length > 0).map((u, rank) => (
               <div
                 key={u.id}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                className="flex items-center gap-4 p-3 rounded-xl border border-border/50 bg-muted/20 hover:bg-orange-500/[0.04] transition-colors"
               >
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm font-extrabold shrink-0 ${
                   rank === 0 ? "bg-gradient-to-br from-amber-400 to-yellow-500 text-white"
@@ -334,68 +323,38 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TableCard>
 
       {/* Performance overview */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-orange-500/10 text-orange-600">
-              <BarChart3 className="w-5 h-5" />
-            </div>
-            <div>
-              <CardTitle className="text-xl font-bold">Performance Overview</CardTitle>
-              <CardDescription>Key metrics at a glance</CardDescription>
-            </div>
-            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Real-time
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-8 pt-2">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+      <TableCard icon={Activity} title="Performance overview" subtitle="Key blog metrics at a glance" actions={<LiveBadge label="Real-time" />}>
+        <div className="px-4 pb-5 sm:px-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/20 text-center">
               <p className="text-2xl font-extrabold text-sky-600">{avgViewsPerPost.toLocaleString()}</p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Avg. Views / Post</p>
             </div>
-            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/20 text-center">
               <p className="text-2xl font-extrabold text-emerald-600">{engagementRate}%</p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Engagement Rate</p>
             </div>
-            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/20 text-center">
               <p className="text-2xl font-extrabold text-violet-600">{publishedCount}</p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Published Posts</p>
             </div>
-            <div className="p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 text-center">
+            <div className="p-4 rounded-xl border border-border/50 bg-muted/20 text-center">
               <p className="text-2xl font-extrabold text-orange-600">
                 {totalLikes + totalDislikes > 0 ? Math.round((totalLikes / (totalLikes + totalDislikes)) * 100) : 0}%
               </p>
               <p className="text-xs text-muted-foreground font-medium mt-1">Like Ratio</p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TableCard>
 
       {/* Recent signups */}
-      <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-        <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600">
-              <Activity className="w-5 h-5" />
-            </div>
-            <div>
-              <CardTitle className="text-xl font-bold">Recent Signups</CardTitle>
-              <CardDescription>Newest users on the platform</CardDescription>
-            </div>
-            <span className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Live
-            </span>
-          </div>
-        </CardHeader>
-        <CardContent className="p-4 sm:p-8 pt-2">
+      <TableCard icon={Users} title="Recent signups" subtitle="Newest pet parents on the platform" actions={<LiveBadge label="Live" />}>
+        <div className="px-4 pb-5 sm:px-5">
           <div className="space-y-3">
             {recentUsers.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
@@ -410,7 +369,7 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
               return (
                 <div
                   key={u.id}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/30 dark:bg-white/5 border border-white/40 dark:border-white/10 hover:bg-white/50 dark:hover:bg-white/10 transition-all"
+                  className="flex items-center gap-4 p-3 rounded-xl border border-border/50 bg-muted/20 hover:bg-orange-500/[0.04] transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 relative">
                     {u.photoURL
@@ -433,8 +392,8 @@ export function AnalyticsTab({ users, subscribers, blogs, totalPetFeeds }: Analy
               )
             })}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </TableCard>
     </div>
   )
 }

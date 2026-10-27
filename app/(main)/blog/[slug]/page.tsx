@@ -13,9 +13,9 @@ import {
   Home,
   MessageCircle,
   Tag,
-  ThumbsDown,
-  ThumbsUp,
 } from 'lucide-react';
+import { PostCard } from '../blog-explorer';
+import { toBlogSummary } from '../blog-summary';
 import { Badge } from '@/components/ui/badge';
 import { SocialShare } from '@/components/social-share';
 import { SubscriptionForm } from '@/components/subscription-form';
@@ -124,12 +124,6 @@ function toPlainText(html: string): string {
   return decodeHtmlEntities(html.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
-function readTimeFor(html: string): number {
-  const text = toPlainText(html);
-  const words = text ? text.split(' ').length : 0;
-  return Math.max(1, Math.ceil(words / 200));
-}
-
 // Inject ids onto h2/h3 so the TOC can link to them
 function injectHeadingIds(html: string): { html: string; toc: { id: string; text: string; level: number }[] } {
   const toc: { id: string; text: string; level: number }[] = [];
@@ -234,10 +228,12 @@ export default async function BlogPostPage({
       ? published[currentIdx + 1]
       : null;
 
-  // Related: same category first, fall back to latest
+  // Related: posts sharing any of this post's categories first, fall back to latest
+  const categoryIdsOf = (b: Blog) => (b.categoryIds?.length ? b.categoryIds : b.categoryId ? [b.categoryId] : []);
   const sameCat = published.filter(
-    (b) => b.id !== blog.id && b.categoryId === blog.categoryId
+    (b) => b.id !== blog.id && categoryIdsOf(b).some((id) => postCategoryIds.includes(id))
   );
+  const categoryNameById = new Map(allCategories.map((c) => [c.id, c.name]));
   const related = (sameCat.length ? sameCat : published.filter((b) => b.id !== blog.id)).slice(0, 3);
 
   // Stats
@@ -248,6 +244,8 @@ export default async function BlogPostPage({
   // TOC + enhanced HTML
   const { html: contentWithIds, toc } = injectHeadingIds(blog.content);
 
+  // Shared links always point at the post itself, never at a #section or tracking query.
+  const postUrl = `${siteConfig.url}/blog/${blog.slug}`;
   const authorName = blog.authorName || 'Paw Sattva Team';
   const authorInitial = authorName[0];
   const tags = blog.keywords
@@ -373,7 +371,7 @@ export default async function BlogPostPage({
 
             <div className="mt-4 hidden shrink-0 items-center gap-2 border-t border-border/70 pt-4 lg:flex">
               <span className="mr-auto text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">Share</span>
-              <SocialShare title={blog.title} iconOnly />
+              <SocialShare title={blog.title} url={postUrl} iconOnly />
               <a
                 href="#comments"
                 aria-label="Jump to comments"
@@ -490,7 +488,7 @@ export default async function BlogPostPage({
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3 border-t border-border/70 pt-6 sm:justify-between">
                 <span className="text-sm font-medium text-muted-foreground">Share this guide with a fellow pet parent</span>
                 <div className="flex items-center gap-2">
-                  <SocialShare title={blog.title} />
+                  <SocialShare title={blog.title} url={postUrl} />
                   <a
                     href="#comments"
                     className="inline-flex h-8 items-center gap-2 rounded-full border border-orange-100 px-3 text-sm font-medium transition-colors hover:bg-orange-50 hover:text-orange-600 dark:border-border dark:hover:bg-orange-950/30"
@@ -540,38 +538,19 @@ export default async function BlogPostPage({
                   </Link>
                 </div>
 
+                {/* Same card as the /blog listing */}
                 <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                  {related.map((post) => (
-                    <Link
-                      key={post.id}
-                      href={`/blog/${post.slug}`}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card transition-all hover:-translate-y-1 hover:shadow-xl hover:shadow-orange-950/5"
-                    >
-                      <div className="relative aspect-[16/10] overflow-hidden">
-                        <ShimmerImage
-                          src={safeImageSrc(post.image, defaultImage)}
-                          alt=""
-                          caption={post.title}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-105"
-                          sizes="(min-width: 1280px) 240px, (min-width: 640px) 50vw, 100vw"
-                        />
-                      </div>
-                      <div className="flex flex-1 flex-col p-4">
-                        <h3 className="line-clamp-2 font-bold leading-snug transition-colors group-hover:text-orange-600">
-                          {post.title}
-                        </h3>
-                        <div className="mt-auto flex items-center gap-3 pt-3 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{post.date}</span>
-                          <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{readTimeFor(post.content)} min</span>
-                          <span className="ml-auto flex items-center gap-2.5" aria-label={`${post.likes ?? 0} likes, ${post.dislikes ?? 0} dislikes`}>
-                            <span className="flex items-center gap-1 text-emerald-600"><ThumbsUp className="h-3.5 w-3.5" />{(post.likes ?? 0).toLocaleString()}</span>
-                            <span className="flex items-center gap-1 text-rose-500"><ThumbsDown className="h-3.5 w-3.5" />{(post.dislikes ?? 0).toLocaleString()}</span>
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                  {related.map((post) => {
+                    const summary = toBlogSummary(post);
+                    return (
+                      <PostCard
+                        key={post.id}
+                        post={summary}
+                        categoryName={summary.categoryIds.map((id) => categoryNameById.get(id)).find(Boolean)}
+                        sizes="(min-width: 1280px) 280px, (min-width: 640px) 50vw, 100vw"
+                      />
+                    );
+                  })}
                 </div>
               </section>
             )}

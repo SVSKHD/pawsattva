@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Category } from "@/firebase/firestore"
 import { TablePagination, usePagination } from "./TablePagination"
 import {
-  ActionsCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty, TableHeading,
-  TableSearch, TableToolbar, filterSelectClass, nextSort, primaryActionClass, rowClass, rowTitleClass,
+  ActionButton, ActionsCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty,
+  TableSearch, TableToolbar, filterSelectClass, nextSort, rowClass, rowTitleClass,
   thClass, theadRowClass, type SortState,
 } from "./DataTable"
 
@@ -88,18 +88,17 @@ export function CategoryTable({ kind, items, allCategories, postCounts, onCreate
 
   return (
     <div className="space-y-4">
-      <TableHeading
-        title={nounPlural}
-        subtitle={isSub ? "Nested topics shown under a parent category." : "Top-level topics that group your blog posts."}
-        action={
-          <Button onClick={onCreate} className={primaryActionClass}>
-            <Plus className="h-4 w-4" />
-            New {noun}
-          </Button>
+      <TableCard
+        icon={isSub ? CornerDownRight : FolderOpen}
+        title={isSub ? "Sub-categories" : "Categories"}
+        subtitle={
+          <>
+            {counts.published} published · {counts.draft} drafts ·{" "}
+            {isSub ? "Nested topics shown under a parent category." : "Top-level topics that group your blog posts."}
+          </>
         }
-      />
-
-      <TableCard>
+        actions={<ActionButton variant="primary" icon={Plus} onClick={onCreate}>New {noun}</ActionButton>}
+      >
         <TableToolbar>
           <FilterTabs
             label="Filter by status"

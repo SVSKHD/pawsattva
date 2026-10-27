@@ -655,13 +655,12 @@ export const addBlogComment = async (blogId: string, payload: Omit<BlogComment, 
   // the parent blog document. The comment is already saved at this point, so a
   // denied counter update must not report the whole submission as failed (and
   // tempt the reader to post the same comment again).
+  // Only the counter may change: the rules let readers bump commentsCount by 1 and nothing
+  // else (an updatedAt here would reject every non-staff update).
   let countSynced = true;
   try {
     const blogRef = doc(db, "blogs", blogId);
-    await updateDoc(blogRef, {
-      commentsCount: increment(1),
-      updatedAt: serverTimestamp(),
-    });
+    await updateDoc(blogRef, { commentsCount: increment(1) });
   } catch (error) {
     countSynced = false;
     console.warn("Comment saved, but the blog comment count could not be updated.", error);

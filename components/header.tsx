@@ -133,7 +133,7 @@ export function Header() {
           }`}
       >
         <header
-          className={`pointer-events-auto mx-auto w-full max-w-7xl rounded-[1.75rem] border bg-white/90 backdrop-blur-xl transition-[box-shadow,background-color,border-color] duration-300 dark:bg-zinc-950/85 ${
+          className={`liquid-sheen pointer-events-auto mx-auto w-full max-w-7xl rounded-[1.75rem] border bg-white/90 backdrop-blur-xl transition-[box-shadow,background-color,border-color] duration-300 dark:bg-zinc-950/85 ${
             isScrolled
               ? "border-black/[0.06] shadow-[0_8px_30px_rgba(24,24,27,0.12)] dark:border-white/10"
               : "border-white/70 shadow-[0_2px_12px_rgba(24,24,27,0.06)] dark:border-white/5"

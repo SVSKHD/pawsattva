@@ -1,5 +1,25 @@
 import { format } from "date-fns"
+import { Cookie, Moon, Pill, Sun, Sunrise, Utensils } from "lucide-react"
 import type { FeedQuality, LoggerMealType } from "@/lib/logger-store"
+
+export const mealIcons: Record<LoggerMealType, typeof Sun> = {
+  breakfast: Sunrise,
+  lunch: Sun,
+  dinner: Moon,
+  snack: Cookie,
+  supplement: Pill,
+  other: Utensils,
+}
+
+/** Icon tile colours per meal, so the timeline reads at a glance */
+export const mealTint: Record<LoggerMealType, string> = {
+  breakfast: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  lunch: "bg-orange-500/15 text-orange-600 dark:text-orange-300",
+  dinner: "bg-indigo-500/15 text-indigo-600 dark:text-indigo-300",
+  snack: "bg-pink-500/15 text-pink-600 dark:text-pink-300",
+  supplement: "bg-teal-500/15 text-teal-600 dark:text-teal-300",
+  other: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-300",
+}
 
 export const mealLabels: Record<LoggerMealType, string> = {
   breakfast: "Breakfast",

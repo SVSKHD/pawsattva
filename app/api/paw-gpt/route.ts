@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
-import { ApiError as GeminiApiError, GoogleGenAI } from "@google/genai"
+import { ApiError as GeminiApiError, GoogleGenAI, type ThinkingLevel } from "@google/genai"
 import { NextResponse } from "next/server"
 
 import {
@@ -28,6 +28,10 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
 // Lighter model tried when the main one is overloaded; set GEMINI_FALLBACK_MODEL=none to disable.
 const GEMINI_FALLBACK_MODEL =
   process.env.GEMINI_FALLBACK_MODEL?.trim() === "none" ? "" : process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-flash-lite-latest"
+// Flash models think before the first visible word by default, which is most of the wait on a
+// chat answer. "low" keeps reports sensible and starts streaming far sooner. Set
+// GEMINI_THINKING_LEVEL=minimal|low|medium|high, or "default" to let the model decide.
+const GEMINI_THINKING_LEVEL = process.env.GEMINI_THINKING_LEVEL?.trim().toLowerCase() || "low"
 
 type ServerProvider = "gemini" | "anthropic"
 
@@ -490,19 +494,32 @@ const GEMINI_BLOCKED = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RE
 /** Gemini via the Gemini Developer API (GEMINI_API_KEY). */
 async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage, model: string) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  const response = await ai.models.generateContentStream({
-    model,
-    contents: request.messages.map(({ role, content }) => ({
-      role: role === "assistant" ? "model" : "user",
-      parts: [{ text: content }],
-    })),
-    config: {
-      systemInstruction: `${SYSTEM_PROMPT}\n\n${petRecordPrompt(request)}`,
-      maxOutputTokens: 16000,
-      temperature: 0.6,
-      abortSignal: signal,
-    },
-  })
+  const start = (thinkingLevel?: string) =>
+    ai.models.generateContentStream({
+      model,
+      contents: request.messages.map(({ role, content }) => ({
+        role: role === "assistant" ? "model" : "user",
+        parts: [{ text: content }],
+      })),
+      config: {
+        systemInstruction: `${SYSTEM_PROMPT}\n\n${petRecordPrompt(request)}`,
+        maxOutputTokens: 16000,
+        temperature: 0.6,
+        abortSignal: signal,
+        ...(thinkingLevel ? { thinkingConfig: { thinkingLevel: thinkingLevel.toUpperCase() as ThinkingLevel } } : {}),
+      },
+    })
+
+  const thinkingLevel = GEMINI_THINKING_LEVEL === "default" ? undefined : GEMINI_THINKING_LEVEL
+  let response: Awaited<ReturnType<typeof start>>
+  try {
+    response = await start(thinkingLevel)
+  } catch (error) {
+    // Older models (a pinned GEMINI_MODEL such as 2.5) only take a thinking budget.
+    if (!thinkingLevel || !(error instanceof GeminiApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error
+    console.warn(`Paw GPT: ${model} doesn't accept thinkingLevel, retrying with its default thinking`)
+    response = await start()
+  }
 
   let finishReason: string | undefined
   let blocked = false

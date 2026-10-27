@@ -28,10 +28,10 @@ import { Button } from "@/components/ui/button"
 import { AdminNav } from "./components/AdminNav"
 import { BlogListTab } from "./components/BlogListTab"
 import { BlogUrlGuide } from "./components/BlogUrlGuide"
-import { BlogToolbar } from "./components/BlogToolbar"
 import { BlogJsonDialog, type BlogJsonDialogMode } from "./components/BlogJsonDialog"
 import type { BlogImportData } from "@/lib/blog-json"
 import { imageUrlProblem } from "@/lib/image-hosts"
+import { refreshPublicBlogPages } from "@/lib/blog-revalidate"
 
 function TabLoading() {
   return (
@@ -930,12 +930,22 @@ export default function AdminPanel({
       toast.error(`Featured image: ${imageProblem}`)
       return
     }
+    // A hand-typed slug may have spaces, capitals or a trailing space, which break the post's link.
+    const slug = generateSlug(blogSlug) || generateSlug(blogTitle)
+    if (!slug) {
+      toast.error("Add a URL slug for this post.")
+      return
+    }
+    if (blogs.some((b) => b.slug === slug && b.id !== editingBlogId)) {
+      toast.error(`Another post already uses /blog/${slug}. Pick a different slug.`)
+      return
+    }
     try {
       setIsSavingBlog(true)
       const selectedAuthor = authors.find(a => a.id === blogAuthorId)
       const nextStatus = isAuthor && blogStatus === "published" ? "pending_review" : blogStatus
       const blogData = {
-        title: blogTitle, slug: blogSlug, keywords: blogKeywords,
+        title: blogTitle, slug, keywords: blogKeywords,
         excerpt: blogExcerpt, image: blogImage, content: blogContent,
         seo: {
           title: blogSeoTitle.trim() || blogTitle.trim(),
@@ -944,7 +954,7 @@ export default function AdminPanel({
             .split(",")
             .map((keyword) => keyword.trim())
             .filter(Boolean),
-          canonicalUrl: `https://pawsattva.com/blog/${blogSlug}`,
+          canonicalUrl: `https://pawsattva.com/blog/${slug}`,
           robots: "index,follow",
           image: blogImage,
           ogTitle: blogSeoTitle.trim() || blogTitle.trim(),
@@ -1000,6 +1010,7 @@ export default function AdminPanel({
         }
       }
 
+      void refreshPublicBlogPages()
       resetBlogForm()
       clearDraft()
       handleTabChange("blog-list")
@@ -1050,6 +1061,7 @@ export default function AdminPanel({
         return
       }
       await deleteBlog(id)
+      void refreshPublicBlogPages()
       toast.success("Blog post deleted.")
     } catch {
       toast.error("Failed to delete blog post.")
@@ -1060,6 +1072,7 @@ export default function AdminPanel({
     if (!user?.uid) return
     try {
       await approveBlog(id, user.uid)
+      void refreshPublicBlogPages()
       toast.success("Blog approved and published.")
     } catch { toast.error("Failed to approve blog.") }
   }
@@ -1262,14 +1275,6 @@ export default function AdminPanel({
 
           {(activeTab === "blog-list" || activeTab === "blog") && (
             <>
-              <BlogToolbar
-                activeTab={activeTab}
-                onNavigate={handleTabChange}
-                onNewPost={() => { if (editingBlogId) resetBlogForm(); handleTabChange("blog") }}
-                onOpenTips={() => setBlogTipsOpen(true)}
-                onOpenImport={() => openBlogJson("import")}
-                onOpenExport={() => openBlogJson("export")}
-              />
               <BlogUrlGuide
                 open={blogTipsOpen}
                 onOpenChange={setBlogTipsOpen}
@@ -1293,7 +1298,9 @@ export default function AdminPanel({
             <div className="tab-panel">
               <BlogListTab
                 blogs={blogs}
-                onCreate={() => handleTabChange("blog")}
+                onCreate={() => { if (editingBlogId) resetBlogForm(); handleTabChange("blog") }}
+                onOpenImport={() => openBlogJson("import")}
+                onOpenTips={() => setBlogTipsOpen(true)}
                 filteredBlogs={filteredBlogsList}
                 searchQuery={blogSearchQuery}
                 setSearchQuery={setBlogSearchQuery}
@@ -1345,6 +1352,10 @@ export default function AdminPanel({
                 handleTitleChange={handleTitleChange}
                 onLoadSoftWaterPetsTemplate={loadSoftWaterPetsTemplate}
                 onCancel={() => { resetBlogForm(); handleTabChange("blog-list") }}
+                onBackToList={() => handleTabChange("blog-list")}
+                onOpenImport={() => openBlogJson("import")}
+                onOpenExport={() => openBlogJson("export")}
+                onOpenTips={() => setBlogTipsOpen(true)}
                 currentUserId={userId}
               />
             </div>

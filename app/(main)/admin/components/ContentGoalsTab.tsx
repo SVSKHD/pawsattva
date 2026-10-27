@@ -54,6 +54,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
+import { ActionButton, FilterTabs, PanelBar } from "./DataTable"
 import {
   addContentGoal,
   ContentGoal,
@@ -465,93 +466,61 @@ export function ContentGoalsTab({ currentUser }: ContentGoalsTabProps) {
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-emerald-600" />
-            <h2 className="text-xl font-black sm:text-2xl">Content Goals</h2>
-          </div>
-          <p className="mt-1 max-w-2xl text-xs text-muted-foreground sm:text-sm">
-            Shared targets for the full admin team. Any admin can create, update, satisfy, reopen, or delete a goal.
-          </p>
+      <PanelBar
+        icon={Target}
+        title="Content Goals"
+        subtitle="Shared Blog and Instagram targets any admin can create, satisfy, reopen or delete."
+        actions={<ActionButton variant="primary" icon={Plus} onClick={openCreateDialog}>New goal</ActionButton>}
+      >
+        <FilterTabs<GoalFilter>
+          label="Filter goals by type"
+          tabs={[
+            { id: "all", label: "All goals" },
+            { id: "blog", label: "Blog", icon: BookOpen },
+            { id: "instagram", label: "Instagram", icon: FaInstagram },
+          ]}
+          value={filter}
+          onChange={setFilter}
+          counts={{
+            all: goals.length,
+            blog: goals.filter(goal => goal.type === "blog").length,
+            instagram: goals.filter(goal => goal.type === "instagram").length,
+          }}
+        />
+        <div className="ml-auto">
+          <FilterTabs<GoalView>
+            label="Goal view"
+            tabs={[
+              { id: "board", label: "Board", icon: Grid2X2 },
+              { id: "list", label: "List", icon: List },
+            ]}
+            value={view}
+            onChange={setView}
+          />
         </div>
-        <Button
-          onClick={openCreateDialog}
-          className="h-10 w-full rounded-xl border-0 bg-gradient-to-r from-emerald-600 to-teal-500 px-5 font-bold text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-700 hover:to-teal-600 sm:w-auto"
-        >
-          <Plus className="h-4 w-4" />
-          New Goal
-        </Button>
-      </div>
+      </PanelBar>
 
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
-          { label: "Active", value: goals.filter(goal => goal.status === "active").length, Icon: CircleDashed, style: "text-sky-600 bg-sky-500/10 border-sky-500/15" },
-          { label: "Satisfied", value: goals.filter(goal => goal.status === "completed").length, Icon: CheckCircle2, style: "text-emerald-600 bg-emerald-500/10 border-emerald-500/15" },
-          { label: "Overdue", value: overdueCount, Icon: Clock3, style: "text-rose-600 bg-rose-500/10 border-rose-500/15" },
-        ].map(({ label, value, Icon, style }) => (
-          <div key={label} className={cn("rounded-2xl border p-3 backdrop-blur-xl sm:p-4", style)}>
+          { label: "Active", value: goals.filter(goal => goal.status === "active").length, Icon: CircleDashed, tone: "text-sky-600 bg-sky-500/10 dark:text-sky-400" },
+          { label: "Satisfied", value: goals.filter(goal => goal.status === "completed").length, Icon: CheckCircle2, tone: "text-emerald-600 bg-emerald-500/10 dark:text-emerald-400" },
+          { label: "Overdue", value: overdueCount, Icon: Clock3, tone: "text-rose-600 bg-rose-500/10 dark:text-rose-400" },
+        ].map(({ label, value, Icon, tone }) => (
+          <div key={label} className="rounded-2xl border border-black/10 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40 sm:p-4">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-black uppercase tracking-wider sm:text-xs">{label}</span>
-              <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground sm:text-xs">{label}</span>
+              <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg", tone)}>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black sm:text-3xl">{value}</p>
+            <p className="mt-2 text-2xl font-black tabular-nums sm:text-3xl">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-white/40 bg-white/40 p-2.5 backdrop-blur-2xl dark:border-white/10 dark:bg-black/30 sm:flex-row sm:items-center sm:justify-between">
-        <div className="grid grid-cols-3 gap-1">
-          {([
-            ["all", "All goals"],
-            ["blog", "Blog"],
-            ["instagram", "Instagram"],
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setFilter(value)}
-              className={cn(
-                "rounded-xl px-3 py-2 text-[11px] font-bold transition-all sm:text-xs",
-                filter === value
-                  ? "bg-foreground text-background shadow-md"
-                  : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
-              )}
-            >
-              {label}
-              <span className="ml-1.5 opacity-60">
-                {value === "all" ? goals.length : goals.filter(goal => goal.type === value).length}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted/40 p-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setView("board")}
-            className={cn("h-8 rounded-lg px-3 text-xs", view === "board" && "bg-background shadow-sm")}
-          >
-            <Grid2X2 className="h-3.5 w-3.5" />
-            Board
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setView("list")}
-            className={cn("h-8 rounded-lg px-3 text-xs", view === "list" && "bg-background shadow-sm")}
-          >
-            <List className="h-3.5 w-3.5" />
-            List
-          </Button>
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex min-h-64 items-center justify-center rounded-2xl border border-border/50 bg-muted/10">
-          <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+          <Loader2 className="h-7 w-7 animate-spin text-orange-600" />
         </div>
       ) : filteredGoals.length === 0 ? (
         <EmptyGoals />
@@ -648,7 +617,7 @@ export function ContentGoalsTab({ currentUser }: ContentGoalsTabProps) {
               <Button type="button" variant="ghost" className="rounded-xl" onClick={() => handleDialogChange(false)} disabled={saving}>
                 Cancel
               </Button>
-              <Button type="submit" className="rounded-xl border-0 bg-emerald-600 font-bold text-white hover:bg-emerald-700" disabled={saving}>
+              <Button type="submit" className="rounded-xl border-0 bg-gradient-to-r from-orange-500 to-amber-500 font-bold text-white hover:from-orange-600 hover:to-amber-600" disabled={saving}>
                 {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                 {editingGoal ? "Save changes" : "Create goal"}
               </Button>

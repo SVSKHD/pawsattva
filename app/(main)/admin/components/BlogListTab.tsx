@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { CheckCircle2, CircleDashed, FileText, Pencil, Plus, Send, Trash2, XCircle } from "lucide-react"
+import { CheckCircle2, CircleDashed, FileText, Lightbulb, Pencil, Plus, Send, Trash2, Upload, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -16,7 +16,7 @@ import {
 import { Blog } from "@/firebase/firestore"
 import { TablePagination, usePagination } from "./TablePagination"
 import {
-  ActionsCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty, TableHeading,
+  ActionButton, ActionsCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty,
   TableSearch, TableToolbar, nextSort, rowClass, rowTitleClass, thClass, theadRowClass,
   type PillTone, type SortState,
 } from "./DataTable"
@@ -28,6 +28,8 @@ interface BlogListTabProps {
   setSearchQuery: (query: string) => void
   getCategoryName: (id: string) => string
   onCreate: () => void
+  onOpenImport: () => void
+  onOpenTips: () => void
   handleEditBlog: (blog: Blog) => void
   handleDeleteBlog: (id: string) => Promise<void>
   handleApproveBlog?: (id: string) => Promise<void>
@@ -53,6 +55,8 @@ export function BlogListTab({
   setSearchQuery,
   getCategoryName,
   onCreate,
+  onOpenImport,
+  onOpenTips,
   handleEditBlog,
   handleDeleteBlog,
   handleApproveBlog,
@@ -96,7 +100,8 @@ export function BlogListTab({
 
   return (
     <div className="space-y-4">
-      <TableHeading
+      <TableCard
+        icon={FileText}
         title="Blog posts"
         subtitle={
           <>
@@ -105,9 +110,14 @@ export function BlogListTab({
             {counts.review > 0 && <> · <span className="font-semibold text-sky-600">{counts.review} need review</span></>}
           </>
         }
-      />
-
-      <TableCard>
+        actions={
+          <>
+            <ActionButton icon={Lightbulb} onClick={onOpenTips}>Tips &amp; keys</ActionButton>
+            <ActionButton icon={Upload} onClick={onOpenImport}>Import JSON</ActionButton>
+            <ActionButton variant="primary" icon={Plus} onClick={onCreate}>New post</ActionButton>
+          </>
+        }
+      >
         <TableToolbar>
           <FilterTabs
             label="Filter by status"

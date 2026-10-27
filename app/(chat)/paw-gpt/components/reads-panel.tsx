@@ -6,7 +6,7 @@ import Link from "next/link"
 import { ArrowLeft, BookOpen, Clock, ExternalLink, X } from "lucide-react"
 
 import { formatBlogDate } from "@/app/(main)/blog/blog-summary"
-import { articleBlocks, type ArticleBlock, type QuickRead } from "./quick-reads"
+import { articleBlocks, ReadAloudButton, type ArticleBlock, type QuickRead } from "./quick-reads"
 
 export interface ReadsPanelContent {
   question: string
@@ -137,6 +137,7 @@ function Article({ read }: { read: QuickRead }) {
           · <Clock className="h-3 w-3" /> {read.readMinutes} min read
         </span>
       </p>
+      <ReadAloudButton read={read} className="-ml-2.5 mt-2" />
       {read.excerpt && <p className="mt-4 text-[15px] font-medium leading-relaxed text-foreground/80">{read.excerpt}</p>}
       <div className="mt-4 space-y-3 text-[15px] leading-relaxed text-foreground/85">
         {(blocks.length ? groupItems(blocks) : [[{ type: "paragraph" as const, text: read.preview }]]).map((group, index) =>

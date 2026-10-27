@@ -5,8 +5,10 @@ import {
   X as TwitterIcon,
   Link as LinkIcon,
   Check,
-  Share2
+  Share2,
+  Smartphone,
 } from 'lucide-react';
+import { FaFacebookF, FaLinkedinIn, FaTelegramPlane } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,24 +20,42 @@ import { toast } from 'sonner';
 
 interface SocialShareProps {
   title: string;
+  /** The page's canonical URL. Defaults to the current page without its #hash or query. */
   url?: string;
   iconOnly?: boolean;
 }
 
+/** Fallback for in-app browsers (WhatsApp, Instagram) where navigator.clipboard is blocked. */
+function legacyCopy(text: string) {
+  const field = document.createElement('textarea');
+  field.value = text;
+  field.setAttribute('readonly', '');
+  field.style.position = 'fixed';
+  field.style.opacity = '0';
+  document.body.appendChild(field);
+  field.select();
+  const copied = document.execCommand('copy');
+  field.remove();
+  return copied;
+}
+
 export function SocialShare({ title, url, iconOnly = false }: SocialShareProps) {
   const [copied, setCopied] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+  const [pageUrl, setPageUrl] = useState('');
 
-  // Get current URL if not provided
-  const shareUrl = typeof window !== 'undefined' ? (url || window.location.href) : '';
+  // Read when the menu opens (the menu is client-only), so server and client renders agree.
+  const handleOpenChange = (open: boolean) => {
+    if (!open) return;
+    setCanNativeShare(typeof navigator.share === 'function');
+    setPageUrl(`${window.location.origin}${window.location.pathname}`);
+  };
+
+  const shareUrl = url || pageUrl;
   const encodedUrl = encodeURIComponent(shareUrl);
   const encodedTitle = encodeURIComponent(title);
 
   const shareLinks = [
-    {
-      name: 'Twitter',
-      icon: <TwitterIcon className="w-4 h-4 text-[#1DA1F2]" />,
-      href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
-    },
     {
       name: 'WhatsApp',
       icon: (
@@ -44,26 +64,61 @@ export function SocialShare({ title, url, iconOnly = false }: SocialShareProps) 
         </svg>
       ),
       href: `https://api.whatsapp.com/send?text=${encodedTitle}%20${encodedUrl}`,
-    }
+    },
+    {
+      name: 'X (Twitter)',
+      icon: <TwitterIcon className="w-4 h-4 text-foreground" />,
+      href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
+    },
+    {
+      name: 'Facebook',
+      icon: <FaFacebookF className="w-4 h-4 text-[#1877F2]" />,
+      href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+    },
+    {
+      name: 'LinkedIn',
+      icon: <FaLinkedinIn className="w-4 h-4 text-[#0A66C2]" />,
+      href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+    },
+    {
+      name: 'Telegram',
+      icon: <FaTelegramPlane className="w-4 h-4 text-[#26A5E4]" />,
+      href: `https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`,
+    },
   ];
 
-  const copyToClipboard = async () => {
+  const nativeShare = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast.success('Link copied to clipboard!');
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.share({ title, url: shareUrl });
     } catch (err) {
-      toast.error('Failed to copy link');
+      // Closing the share sheet is not an error.
+      if ((err as DOMException)?.name !== 'AbortError') toast.error('Could not open the share sheet');
     }
   };
 
+  const copyToClipboard = async () => {
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      ok = true;
+    } catch {
+      ok = legacyCopy(shareUrl);
+    }
+    if (!ok) {
+      toast.error('Could not copy. Long-press the address bar to copy the link.');
+      return;
+    }
+    setCopied(true);
+    toast.success('Link copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
-          size={iconOnly ? "icon" : "sm"} 
+        <Button
+          variant="outline"
+          size={iconOnly ? "icon" : "sm"}
           className={`rounded-full flex items-center transition-all border-orange-100 hover:bg-orange-50 hover:text-orange-600 ${!iconOnly && 'gap-2'}`}
         >
           <Share2 className="w-4 h-4" />
@@ -71,10 +126,19 @@ export function SocialShare({ title, url, iconOnly = false }: SocialShareProps) 
           {iconOnly && <span className="sr-only">Share</span>}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 p-2 rounded-2xl border-orange-100 shadow-xl">
+      <DropdownMenuContent align="end" className="w-52 p-2 rounded-2xl border-orange-100 shadow-xl">
         <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
           Share Article
         </div>
+        {canNativeShare && (
+          <DropdownMenuItem
+            className="flex items-center gap-3 cursor-pointer rounded-xl focus:bg-orange-50/50 py-2.5"
+            onClick={nativeShare}
+          >
+            <span className="p-1.5 rounded-lg bg-muted/20"><Smartphone className="w-4 h-4 text-orange-600" /></span>
+            <span className="font-medium text-sm">Share via…</span>
+          </DropdownMenuItem>
+        )}
         {shareLinks.map((link) => (
           <DropdownMenuItem
             key={link.name}

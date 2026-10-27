@@ -22,11 +22,22 @@ type SortKey = "latest" | "popular"
 const BATCH = 6
 
 interface BlogExplorerProps {
-  posts: BlogSummary[]
+  /** The latest posts, rendered into the HTML */
+  initialPosts: BlogSummary[]
+  /** All published posts, including the ones still to be fetched */
+  totalPosts: number
+  /** Posts per category id (parents include their sub-categories), across all posts */
+  categoryCounts: Record<string, number>
   categories: BlogCategoryOption[]
 }
 
-export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
+type LoadState = "loading" | "done" | "error"
+
+export function BlogExplorer({ initialPosts, totalPosts, categoryCounts, categories }: BlogExplorerProps) {
+  // The newest posts arrive with the page; the older ones are fetched right after it loads
+  const [posts, setPosts] = useState(initialPosts)
+  const [loadState, setLoadState] = useState<LoadState>(initialPosts.length >= totalPosts ? "done" : "loading")
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState("all")
   const [sort, setSort] = useState<SortKey>("latest")
@@ -62,6 +73,28 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(null, "", next)
   }, [urlReady, deferredQuery, category, sort])
 
+  // Fetch the older posts once the page is up (and again on "Try again")
+  const needsRest = initialPosts.length < totalPosts
+  useEffect(() => {
+    if (!needsRest) return
+    let cancelled = false
+    fetch("/api/blog/posts")
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`)
+        return response.json() as Promise<{ posts: BlogSummary[] }>
+      })
+      .then((data) => {
+        if (cancelled) return
+        setPosts(data.posts)
+        setLoadState("done")
+      })
+      .catch((error) => {
+        console.error("Unable to load older blog posts:", error)
+        if (!cancelled) setLoadState("error")
+      })
+    return () => { cancelled = true }
+  }, [needsRest, loadAttempt])
+
   // GA4's recommended "search" event, once the visitor pauses typing (not on every keystroke)
   useEffect(() => {
     const term = deferredQuery.trim()
@@ -77,21 +110,6 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
   const selected = byId.get(category)
   const activeParentId = selected?.parentId || selected?.id || "all"
   const subs = useMemo(() => categories.filter((c) => c.parentId === activeParentId), [categories, activeParentId])
-
-  // Only categories that actually have posts are worth a chip
-  const postCountByCategory = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const post of posts) {
-      const ids = new Set<string>()
-      for (const id of post.categoryIds) {
-        ids.add(id)
-        const parent = byId.get(id)?.parentId
-        if (parent) ids.add(parent)
-      }
-      ids.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1))
-    }
-    return counts
-  }, [posts, byId])
 
   const results = useMemo(() => {
     const q = deferredQuery.trim().toLowerCase()
@@ -111,7 +129,10 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
   const spotlight = isFiltered ? [] : results.slice(0, 3)
   const gridPosts = isFiltered ? results : results.slice(3)
   const shown = gridPosts.slice(0, visible)
-  const hasMore = visible < gridPosts.length
+  const pending = loadState !== "done"
+  const canGrow = visible < gridPosts.length
+  // More to show: cards already loaded but not rendered, or older posts still on their way
+  const hasMore = canGrow || pending
 
   const applyFilter = (update: () => void) => {
     startTransition(() => {
@@ -123,7 +144,8 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
   // Load the next batch shortly before the end of the list comes into view
   useEffect(() => {
     const node = sentinelRef.current
-    if (!node || !hasMore) return
+    // While older posts are still loading there is nothing new to reveal yet
+    if (!node || !canGrow) return
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) setVisible((count) => count + BATCH)
@@ -132,7 +154,7 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
     )
     observer.observe(node)
     return () => observer.disconnect()
-  }, [hasMore, visible])
+  }, [canGrow, visible])
 
   const categoryName = (id: string) => byId.get(id)?.name
 
@@ -155,13 +177,13 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <div className="-mx-4 flex flex-1 gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:mx-0 md:flex-wrap md:px-0 [&::-webkit-scrollbar]:hidden">
             <Chip active={activeParentId === "all"} onClick={() => applyFilter(() => setCategory("all"))}>
-              All <span className="opacity-60">{posts.length}</span>
+              All <span className="opacity-60">{totalPosts}</span>
             </Chip>
             {parents
-              .filter((c) => postCountByCategory.get(c.id))
+              .filter((c) => categoryCounts[c.id])
               .map((c) => (
                 <Chip key={c.id} active={activeParentId === c.id} onClick={() => applyFilter(() => setCategory(c.id))}>
-                  {c.name} <span className="opacity-60">{postCountByCategory.get(c.id)}</span>
+                  {c.name} <span className="opacity-60">{categoryCounts[c.id]}</span>
                 </Chip>
               ))}
           </div>
@@ -209,7 +231,7 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
               All in {byId.get(activeParentId)?.name}
             </Chip>
             {subs
-              .filter((s) => postCountByCategory.get(s.id))
+              .filter((s) => categoryCounts[s.id])
               .map((s) => (
                 <Chip key={s.id} small active={category === s.id} onClick={() => applyFilter(() => setCategory(s.id))}>
                   {s.name}
@@ -224,6 +246,7 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
               <strong className="text-foreground">{results.length}</strong> {results.length === 1 ? "article" : "articles"}
               {selected && <> in <strong className="text-foreground">{selected.name}</strong></>}
               {deferredQuery.trim() && <> for “<strong className="text-foreground">{deferredQuery.trim()}</strong>”</>}
+              {pending && <> so far, checking older articles…</>}
             </p>
             <button
               type="button"
@@ -252,7 +275,7 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
             />
           ))}
         </div>
-      ) : results.length === 0 ? (
+      ) : results.length === 0 && !pending ? (
         <div className="flex flex-col items-center py-24 text-center">
           <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10 text-orange-600">
             <Search className="h-7 w-7" />
@@ -272,21 +295,39 @@ export function BlogExplorer({ posts, categories }: BlogExplorerProps) {
       {/* Infinite scroll sentinel: placeholder cards in the shape of the next row, plus a manual fallback */}
       {hasMore && (
         <div ref={sentinelRef} className="mt-6">
-          <div aria-hidden className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            <SkeletonCard />
-            <SkeletonCard className="hidden sm:flex" />
-            <SkeletonCard className="hidden lg:flex" />
-          </div>
-          <div className="mt-8 flex justify-center">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full px-6"
-              onClick={() => setVisible((count) => count + BATCH)}
-            >
-              Show more ({gridPosts.length - visible} left)
-            </Button>
-          </div>
+          {loadState === "error" && !canGrow ? (
+            <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
+              <p>Couldn&apos;t load the older articles.</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full px-6"
+                onClick={() => { setLoadState("loading"); setLoadAttempt((n) => n + 1) }}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div aria-hidden className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                <SkeletonCard />
+                <SkeletonCard className="hidden sm:flex" />
+                <SkeletonCard className="hidden lg:flex" />
+              </div>
+              {canGrow && (
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full px-6"
+                    onClick={() => setVisible((count) => count + BATCH)}
+                  >
+                    Show more{!pending && <> ({gridPosts.length - visible} left)</>}
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
       {!hasMore && gridPosts.length > BATCH && (
@@ -440,7 +481,10 @@ function CompactCard({ post, categoryName }: { post: BlogSummary; categoryName?:
   )
 }
 
-function PostCard({ post, categoryName, eager }: { post: BlogSummary; categoryName?: string; eager?: boolean }) {
+/** The standard post card; also used for "Keep reading" on the post page so both look the same */
+export function PostCard({
+  post, categoryName, eager, sizes = "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw",
+}: { post: BlogSummary; categoryName?: string; eager?: boolean; sizes?: string }) {
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card transition duration-300 focus-within:ring-4 focus-within:ring-orange-500/20 hover:-translate-y-1 hover:border-orange-200 hover:shadow-xl hover:shadow-orange-950/5 dark:hover:border-orange-900">
       <div className="relative aspect-[16/10] overflow-hidden bg-muted">
@@ -450,7 +494,7 @@ function PostCard({ post, categoryName, eager }: { post: BlogSummary; categoryNa
           caption={post.title}
           fill
           loading={eager ? "eager" : "lazy"}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          sizes={sizes}
           className="object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute left-3 top-3"><CategoryTag name={categoryName} onImage /></div>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Subscription } from "@/firebase/firestore"
 import { TablePagination, usePagination } from "./TablePagination"
 import {
-  EmptyCell, FilterTabs, SortHeader, StatusPill, TableCard, TableEmpty, TableHeading, TableSearch,
+  EmptyCell, FilterTabs, SortHeader, StatusPill, TableCard, TableEmpty, TableSearch,
   TableToolbar, nextSort, rowTitleClass, thClass, theadRowClass, type SortState,
 } from "./DataTable"
 
@@ -63,12 +63,11 @@ export function SubscribersTab({ subscribers }: SubscribersTabProps) {
 
   return (
     <div className="space-y-4">
-      <TableHeading
+      <TableCard
+        icon={Users}
         title="Pack subscribers"
         subtitle={`${subscribers.length} pet parents signed up for community updates.`}
-      />
-
-      <TableCard>
+      >
         <TableToolbar>
           <FilterTabs
             label="Filter subscribers"

@@ -3,6 +3,7 @@
 import {
   PlusCircle, Edit, Save, CheckCircle2, CircleDashed, Trash2,
   ChevronRight, UploadCloud, History, Sparkles, Settings2, Search, ImageIcon, AlertTriangle,
+  ArrowLeft, Download, Lightbulb, Upload,
 } from "lucide-react"
 import { imageUrlProblem } from "@/lib/image-hosts"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ import Editor from "@/components/editor"
 import { Category, UserProfile } from "@/firebase/firestore"
 import { useRef, useState } from "react"
 import { BlogPublishCheck, blockingCount, runBlogChecks } from "./BlogPublishCheck"
+import { ActionButton, FilterTabs } from "./DataTable"
 
 interface BlogFormTabProps {
   blogTitle: string
@@ -69,11 +71,23 @@ interface BlogFormTabProps {
   handleTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   onLoadSoftWaterPetsTemplate: () => void
   onCancel: () => void
+  /** Back to the post list, keeping the draft */
+  onBackToList: () => void
+  onOpenImport: () => void
+  onOpenExport: () => void
+  onOpenTips: () => void
   /** Signed-in user, offered as the author when the check auto-fixes a missing author */
   currentUserId?: string
 }
 
-const fieldClass = "bg-white/60 dark:bg-black/40 border-black/10 dark:border-white/10 focus-visible:ring-orange-500/30 focus-visible:border-orange-500 rounded-xl"
+/** Shared admin field look (height is set per field) */
+const fieldClass =
+  "rounded-xl border-black/10 bg-white/80 shadow-none dark:border-white/10 dark:bg-black/30 focus-visible:border-orange-400 focus-visible:ring-4 focus-visible:ring-orange-500/10"
+
+const VISIBILITY_TABS = [
+  { id: "draft" as const, label: "Draft", icon: CircleDashed },
+  { id: "published" as const, label: "Published", icon: CheckCircle2 },
+]
 
 /**
  * One-screen blog workspace: title + fixed-height editor on the left,
@@ -100,6 +114,7 @@ export function BlogFormTab({
   savedDraft, hasDraftContent,
   restoreDraft, discardDraft, formatDraftTime,
   handleBlogSubmit, isSavingBlog, handleTitleChange, onLoadSoftWaterPetsTemplate, onCancel,
+  onBackToList, onOpenImport, onOpenExport, onOpenTips,
   currentUserId,
 }: BlogFormTabProps) {
   const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
@@ -168,6 +183,15 @@ export function BlogFormTab({
         {/* ── Action bar: always visible ── */}
         <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border/40 bg-white/30 dark:bg-black/20 px-4 py-3 sm:px-5">
           <div className="flex min-w-0 items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onBackToList}
+              aria-label="Back to all posts"
+              title="All posts"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-black/10 bg-white/80 text-muted-foreground transition hover:border-orange-300 hover:text-orange-600 dark:border-white/10 dark:bg-black/30"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
             <div className="p-2 bg-orange-500/10 rounded-xl border border-orange-500/20 shrink-0">
               {editingBlogId
                 ? <Edit className="w-4 h-4 text-orange-600" />
@@ -184,61 +208,61 @@ export function BlogFormTab({
             )}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-xl border border-black/10 bg-white/60 p-0.5 dark:border-white/10 dark:bg-black/30">
+              {([
+                { label: "Tips & keys", icon: Lightbulb, onClick: onOpenTips },
+                { label: "Import JSON", icon: Upload, onClick: onOpenImport },
+                { label: "Export JSON", icon: Download, onClick: onOpenExport },
+              ] as const).map(({ label, icon: Icon, onClick }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  title={label}
+                  aria-label={label}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-muted-foreground transition hover:bg-orange-500/10 hover:text-orange-700 dark:hover:text-orange-300"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span className="hidden 2xl:inline">{label}</span>
+                </button>
+              ))}
+            </div>
             {!editingBlogId && (
-              <Button
-                type="button"
+              <ActionButton
                 variant="ghost"
-                size="sm"
+                icon={Sparkles}
                 onClick={onLoadSoftWaterPetsTemplate}
                 title="Prefill the Soft Water & Pets article"
-                className="h-9 rounded-xl text-cyan-800 hover:bg-cyan-50 dark:text-cyan-300 dark:hover:bg-cyan-500/10"
+                className="text-cyan-800 hover:bg-cyan-50 hover:text-cyan-900 dark:text-cyan-300 dark:hover:bg-cyan-500/10 dark:hover:text-cyan-200"
               >
-                <Sparkles className="h-3.5 w-3.5" />
                 <span className="hidden md:inline">Soft-water template</span>
-              </Button>
+              </ActionButton>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
+            <ActionButton
+              icon={openIssues ? Sparkles : CheckCircle2}
               onClick={() => setCheckOpen(true)}
               title="Check the post before publishing"
-              className={`h-9 rounded-xl font-semibold ${
-                openIssues ? "border-violet-500/30 text-violet-700 hover:bg-violet-500/10 dark:text-violet-300" : "text-emerald-700 dark:text-emerald-400"
-              }`}
+              className={openIssues ? "text-violet-700 dark:text-violet-300" : "text-emerald-700 dark:text-emerald-400"}
             >
-              {openIssues ? <Sparkles className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
               Check
               {openIssues > 0 && (
                 <span className={`flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${blocking ? "bg-red-500" : "bg-violet-500"}`}>
                   {openIssues}
                 </span>
               )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isSavingBlog}
-              className="h-9 px-4 rounded-xl bg-white/50 dark:bg-black/50 font-semibold"
-              onClick={onCancel}
-            >
+            </ActionButton>
+            <ActionButton disabled={isSavingBlog} onClick={onCancel}>
               Cancel
-            </Button>
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isSavingBlog}
-              className="h-9 px-5 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-lg shadow-orange-500/20 font-bold border-0"
-            >
-              {isSavingBlog ? <CircleDashed className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            </ActionButton>
+            <ActionButton type="submit" variant="primary" disabled={isSavingBlog} className="px-5">
+              {isSavingBlog ? <CircleDashed className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {isSavingBlog
                 ? "Saving..."
                 : editingBlogId
                   ? "Update"
                   : `Save ${blogStatus === "draft" ? "Draft" : "Post"}`}
-            </Button>
+            </ActionButton>
           </div>
         </div>
 
@@ -315,7 +339,7 @@ export function BlogFormTab({
                       })}
                     </div>
                   )}
-                  <div className="rounded-xl border border-black/10 dark:border-white/10 bg-white/40 dark:bg-black/30 divide-y divide-border/30 overflow-hidden max-h-[220px] overflow-y-auto">
+                  <div className="max-h-[220px] divide-y divide-border/30 overflow-y-auto rounded-xl border border-black/10 bg-white/80 dark:border-white/10 dark:bg-black/30">
                     {categories.filter(c => !c.parentId).map(cat => {
                       const subs = categories.filter(s => s.parentId === cat.id)
                       const checked = blogCategories.includes(cat.id)
@@ -377,12 +401,12 @@ export function BlogFormTab({
                   <div className="space-y-2">
                     <FieldLabel required="Req">Author</FieldLabel>
                     <Select value={blogAuthorId} onValueChange={setBlogAuthorId}>
-                      <SelectTrigger className={`h-10 w-full ${fieldClass}`}>
+                      <SelectTrigger aria-label="Author" className={`h-10 w-full px-3 text-sm data-[size=default]:h-10 ${fieldClass}`}>
                         <SelectValue placeholder="Select an author" />
                       </SelectTrigger>
-                      <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
+                      <SelectContent>
                         {authors.map((admin) => (
-                          <SelectItem key={admin.id} value={admin.id} className="rounded-lg my-1 cursor-pointer">
+                          <SelectItem key={admin.id} value={admin.id}>
                             {admin.displayName || admin.email}
                           </SelectItem>
                         ))}
@@ -392,25 +416,10 @@ export function BlogFormTab({
 
                   <div className="space-y-2">
                     <FieldLabel>Visibility</FieldLabel>
-                    <Select value={blogStatus} onValueChange={(val: "published" | "draft") => setBlogStatus(val)}>
-                      <SelectTrigger className={`h-10 w-full ${fieldClass}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
-                        <SelectItem value="draft" className="rounded-lg my-1 cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <CircleDashed className="w-4 h-4 text-orange-500" />
-                            <span className="font-medium">Draft (Hidden)</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="published" className="rounded-lg my-1 cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                            <span className="font-medium">Published (Public)</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FilterTabs label="Visibility" tabs={VISIBILITY_TABS} value={blogStatus} onChange={setBlogStatus} />
+                    <p className="text-[11px] text-muted-foreground">
+                      {blogStatus === "published" ? "Public on the blog once saved." : "Hidden until you publish."}
+                    </p>
                   </div>
                 </div>
 
@@ -539,7 +548,7 @@ export function BlogFormTab({
                   onChange={(e) => setBlogImage(e.target.value)}
                   className={`h-10 px-3 text-sm ${fieldClass}`}
                 />
-                <label className="flex w-full items-center justify-center gap-2 text-xs font-semibold text-orange-600 bg-orange-500/10 border border-orange-500/20 rounded-xl px-3 py-2.5 cursor-pointer hover:bg-orange-500/15 transition-colors">
+                <label className={`flex h-10 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-black/10 bg-white/80 px-3.5 text-xs font-bold transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-white/10 dark:bg-black/30 dark:hover:bg-orange-500/10 dark:hover:text-orange-300 ${uploadingFeaturedImage ? "pointer-events-none opacity-60" : ""}`}>
                   <UploadCloud className="w-3.5 h-3.5" />
                   {uploadingFeaturedImage ? "Uploading & compressing..." : "Upload image (auto-compress)"}
                   <input
@@ -654,13 +663,13 @@ function FieldLabel({
   children, htmlFor, required, hint, count,
 }: { children: React.ReactNode; htmlFor?: string; required?: string; hint?: string; count?: string }) {
   return (
-    <Label htmlFor={htmlFor} className="flex items-center justify-between text-xs font-semibold">
+    <Label htmlFor={htmlFor} className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
       {children}
       {required && (
-        <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">{required}</span>
+        <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-orange-600 dark:text-orange-300">{required}</span>
       )}
-      {hint && <span className="text-[11px] font-normal text-muted-foreground">{hint}</span>}
-      {count && <span className="text-[11px] font-medium tabular-nums text-muted-foreground">{count}</span>}
+      {hint && <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/80">{hint}</span>}
+      {count && <span className="text-[10px] font-medium normal-case tracking-normal tabular-nums text-muted-foreground/80">{count}</span>}
     </Label>
   )
 }

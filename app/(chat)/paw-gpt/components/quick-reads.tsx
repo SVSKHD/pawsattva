@@ -1,16 +1,18 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { collection, getDocs, limit, orderBy, query } from "firebase/firestore"
-import { BookOpen, Clock, ExternalLink } from "lucide-react"
+import { BookOpen, Clock, ExternalLink, Loader2, Square, Volume2 } from "lucide-react"
 
+import { useAuth } from "@/components/auth-provider"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { db } from "@/firebase/db"
 import type { Blog } from "@/firebase/firestore"
 import { clip, formatBlogDate, toBlogSummary, toPlainText, type BlogSummary } from "@/app/(main)/blog/blog-summary"
+import { useReadAloud } from "./read-aloud"
 
 export interface QuickRead extends BlogSummary {
   /** The article's opening as plain text (never rendered as HTML here) */
@@ -45,6 +47,37 @@ export function articleBlocks(html: string): ArticleBlock[] {
     }
   }
   return blocks
+}
+
+/** "Read aloud" for a post: title, summary and the whole article, in the same voice as answers. */
+export function ReadAloudButton({ read, className = "" }: { read: QuickRead; className?: string }) {
+  const { user } = useAuth()
+  const text = useMemo(() => {
+    const blocks = articleBlocks(read.html)
+    const body = blocks.length ? blocks.map((block) => block.text) : [read.preview]
+    return [read.title, read.excerpt, ...body].filter(Boolean).join("\n\n")
+  }, [read])
+  const readAloud = useReadAloud(`read:${read.id}`, text, user)
+  if (!readAloud.available) return null
+  return (
+    <button
+      type="button"
+      onClick={readAloud.toggle}
+      aria-pressed={readAloud.status !== "idle"}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-sm font-semibold transition hover:bg-muted ${
+        readAloud.status !== "idle" ? "text-orange-700 dark:text-orange-300" : "text-muted-foreground hover:text-foreground"
+      } ${className}`}
+    >
+      {readAloud.status === "loading" ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : readAloud.status === "speaking" ? (
+        <Square className="h-3.5 w-3.5 fill-current" />
+      ) : (
+        <Volume2 className="h-4 w-4" />
+      )}
+      {readAloud.status === "loading" ? "Preparing…" : readAloud.status === "speaking" ? "Stop" : "Read aloud"}
+    </button>
+  )
 }
 
 // Enough to cover the whole library for matching and reading in the panel.
@@ -210,6 +243,7 @@ export function QuickViewDialog({ read, onOpenChange }: { read: QuickRead | null
                 <Clock className="h-3 w-3" /> {read.readMinutes} min read · {read.authorName}
               </p>
               <DialogTitle className="text-xl font-black leading-snug tracking-tight">{read.title}</DialogTitle>
+              <ReadAloudButton read={read} className="-ml-2.5" />
               <DialogDescription className="text-sm font-medium text-foreground/80">{read.excerpt}</DialogDescription>
               {read.preview && (
                 <p className="relative max-h-48 overflow-hidden text-sm leading-relaxed text-muted-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-16 after:bg-gradient-to-t after:from-background after:to-transparent">

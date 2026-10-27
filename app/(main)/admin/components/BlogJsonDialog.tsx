@@ -4,7 +4,7 @@ import { useMemo, useState } from "react"
 import { AlertTriangle, CheckCircle2, CircleDashed, Copy, Download, FileJson, Link2, Upload } from "lucide-react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+import { ActionButton } from "./DataTable"
 import {
   Dialog,
   DialogContent,
@@ -160,18 +160,12 @@ function ImportPane({ onImport, editorHasContent }: { onImport: (data: BlogImpor
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          onClick={runImport}
-          disabled={!result?.ok}
-          className="flex-1 rounded-xl bg-orange-500 font-bold text-white hover:bg-orange-600"
-        >
-          <Upload className="h-4 w-4" />
+        <ActionButton variant="primary" icon={Upload} onClick={runImport} disabled={!result?.ok} className="flex-1">
           {confirming ? "Replace & import" : "Import into editor"}
-        </Button>
-        <Button type="button" variant="outline" className="rounded-xl" onClick={() => setText(BLOG_JSON_SAMPLE)}>
+        </ActionButton>
+        <ActionButton onClick={() => setText(BLOG_JSON_SAMPLE)}>
           Use sample
-        </Button>
+        </ActionButton>
       </div>
       <p className="text-[11px] text-muted-foreground">
         Imported posts always open as a <strong className="text-foreground">draft</strong>. Categories and author are picked in the editor.
@@ -222,12 +216,12 @@ function ExportPane({ values }: { values: BlogFormValues }) {
         {json}
       </pre>
       <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => copy(json, "JSON")} className="flex-1 rounded-xl bg-orange-500 font-bold text-white hover:bg-orange-600">
-          <Copy className="h-4 w-4" /> Copy JSON
-        </Button>
-        <Button type="button" variant="outline" className="rounded-xl" onClick={download}>
-          <Download className="h-4 w-4" /> Download .json
-        </Button>
+        <ActionButton variant="primary" icon={Copy} onClick={() => copy(json, "JSON")} className="flex-1">
+          Copy JSON
+        </ActionButton>
+        <ActionButton icon={Download} onClick={download}>
+          Download .json
+        </ActionButton>
       </div>
 
       <div className="rounded-xl border border-border/70 p-3">
@@ -243,9 +237,9 @@ function ExportPane({ values }: { values: BlogFormValues }) {
             Include content
           </label>
         </div>
-        <Button type="button" variant="outline" size="sm" className="w-full rounded-xl" onClick={() => copy(url, "Prefill URL")}>
-          <Copy className="h-3.5 w-3.5" /> Copy prefill URL ({url.length.toLocaleString()} chars)
-        </Button>
+        <ActionButton icon={Copy} onClick={() => copy(url, "Prefill URL")} className="w-full">
+          Copy prefill URL ({url.length.toLocaleString()} chars)
+        </ActionButton>
         {url.length > SAFE_URL_LENGTH && (
           <p className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-amber-600">
             <AlertTriangle className="h-3.5 w-3.5" /> Too long for some browsers — untick content or share the JSON instead.

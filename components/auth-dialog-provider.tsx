@@ -5,6 +5,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,7 +14,7 @@ import type { ReactNode } from "react"
 import { signInWithPopup } from "firebase/auth"
 import type { User } from "firebase/auth"
 import Image from "next/image"
-import { CalendarHeart, Heart, Loader2, MessageCircle, PawPrint, RotateCcw } from "lucide-react"
+import { CalendarHeart, ExternalLink, Heart, Loader2, MessageCircle, PawPrint, RotateCcw } from "lucide-react"
 import { toast } from "sonner"
 
 import PawLogo from "@/app/pawsattva.png"
@@ -83,6 +84,29 @@ function getErrorMessage(error: unknown) {
   return "Google sign-in failed. Please try again."
 }
 
+/**
+ * Apps that open links in their own embedded browser (Instagram, Facebook, LinkedIn…), where
+ * Google refuses to sign anyone in ("disallowed_useragent") and pop-ups don't open.
+ */
+function inAppBrowserName(userAgent: string) {
+  if (/Instagram/i.test(userAgent)) return "Instagram"
+  if (/FBAN|FBAV|FB_IAB|FBIOS/i.test(userAgent)) return "Facebook"
+  if (/LinkedInApp/i.test(userAgent)) return "LinkedIn"
+  if (/Snapchat/i.test(userAgent)) return "Snapchat"
+  if (/\bLine\//i.test(userAgent)) return "LINE"
+  if (/Twitter/i.test(userAgent)) return "X"
+  // Android WebViews add "; wv)"; WhatsApp and Telegram usually open Chrome Custom Tabs, which work.
+  if (/Android.*; wv\)/i.test(userAgent)) return "this app"
+  return null
+}
+
+/** Android can hand the page to Chrome directly; iOS has no such link, so readers use the app menu. */
+function openInBrowserHref() {
+  if (!/Android/i.test(navigator.userAgent)) return null
+  const { host, pathname, search, hash } = window.location
+  return `intent://${host}${pathname}${search}${hash}#Intent;scheme=https;package=com.android.chrome;end`
+}
+
 function GoogleIcon() {
   return (
     <svg className="h-5 w-5" aria-hidden="true" viewBox="0 0 48 48">
@@ -99,6 +123,12 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
   const [signingIn, setSigningIn] = useState(false)
   const [dialogState, setDialogState] = useState(defaultDialogState)
   const continuationRef = useRef<SignInContinuation | null>(null)
+  const [inAppBrowser, setInAppBrowser] = useState<{ name: string; openHref: string | null } | null>(null)
+
+  useEffect(() => {
+    const name = inAppBrowserName(navigator.userAgent)
+    if (name) setInAppBrowser({ name, openHref: openInBrowserHref() })
+  }, [])
 
   const runContinuation = useCallback(async (continuation: SignInContinuation | null, user: User) => {
     if (!continuation) return
@@ -214,6 +244,25 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
                 </li>
               ))}
             </ul>
+
+            {inAppBrowser && (
+              <div role="note" className="mt-5 rounded-2xl border border-amber-300/70 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-bold">Google sign-in doesn&apos;t work inside {inAppBrowser.name}.</p>
+                <p className="mt-1">
+                  {inAppBrowser.openHref
+                    ? "Open this page in Chrome to sign in — your place on the page is kept."
+                    : "Tap the ⋯ menu and choose “Open in browser” (Safari or Chrome), then sign in there."}
+                </p>
+                {inAppBrowser.openHref && (
+                  <a
+                    href={inAppBrowser.openHref}
+                    className="mt-3 inline-flex h-10 items-center gap-2 rounded-xl bg-amber-500 px-4 font-bold text-white transition-colors hover:bg-amber-600"
+                  >
+                    <ExternalLink className="h-4 w-4" /> Open in Chrome
+                  </a>
+                )}
+              </div>
+            )}
 
             <Button
               type="button"

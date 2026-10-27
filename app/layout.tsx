@@ -8,6 +8,7 @@ import { AuthDialogProvider } from "@/components/auth-dialog-provider";
 import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { FirebaseAnalytics } from "@/components/firebase-analytics";
 import PetCursorAura from "@/components/pet-cursor-aura";
+import { LiquidPointer } from "@/components/liquid-pointer";
 import { ProfileOnboardingGate } from "@/components/profile-onboarding-gate";
 import { BlacklistGate } from "@/components/blacklist-gate";
 import { Analytics } from "@vercel/analytics/next";
@@ -56,6 +57,7 @@ export default function RootLayout({
               <BlacklistGate>
                 <ProfileOnboardingGate />
                 <PetCursorAura />
+                <LiquidPointer />
                 {children}
               </BlacklistGate>
               <SonnerToaster richColors position="top-center" />

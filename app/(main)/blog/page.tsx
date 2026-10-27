@@ -1,29 +1,40 @@
 import { BookOpen } from "lucide-react"
 
-import { getBlogs, getCategories } from "@/firebase/firestore"
+import { getCategories } from "@/firebase/firestore"
 import { SubscriptionForm } from "@/components/subscription-form"
+import { getPublishedBlogSummaries, INITIAL_BLOG_POSTS } from "@/lib/blog-posts"
 import { BlogExplorer, type BlogCategoryOption } from "./blog-explorer"
-import { toBlogSummary } from "./blog-summary"
 
-// Rendered on the server (refreshed every 5 minutes via blog/layout.tsx `revalidate`), so the
-// first articles arrive as HTML — no client-side fetch of every full article before anything shows.
+// Rendered on the server (refreshed every 5 minutes via blog/layout.tsx `revalidate`, and right
+// after an admin publishes via /api/admin/blog/revalidate). Only the latest posts go in the HTML
+// so the page is small and quick; BlogExplorer fetches the older ones from /api/blog/posts.
 export default async function BlogPage() {
-  const [blogs, categories] = await Promise.all([
-    getBlogs().catch((error) => {
-      console.error("Unable to load blogs:", error)
-      return []
-    }),
+  const [posts, categories] = await Promise.all([
+    getPublishedBlogSummaries(),
     getCategories().catch((error) => {
       console.error("Unable to load categories:", error)
       return []
     }),
   ])
 
-  const posts = blogs.filter((blog) => blog.status === "published").map(toBlogSummary)
   const categoryOptions: BlogCategoryOption[] = categories
     .filter((category) => category.status !== "draft")
     .map(({ id, name, parentId, description }) => ({ id, name, parentId, description }))
     .sort((a, b) => a.name.localeCompare(b.name))
+
+  // Chip counts cover every post, including the ones not in the HTML yet; a post counts
+  // towards its categories and their parents.
+  const parentOf = new Map(categoryOptions.map((c) => [c.id, c.parentId]))
+  const categoryCounts: Record<string, number> = {}
+  for (const post of posts) {
+    const ids = new Set<string>()
+    for (const id of post.categoryIds) {
+      ids.add(id)
+      const parent = parentOf.get(id)
+      if (parent) ids.add(parent)
+    }
+    ids.forEach((id) => { categoryCounts[id] = (categoryCounts[id] ?? 0) + 1 })
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -43,7 +54,12 @@ export default async function BlogPage() {
         </div>
       </header>
 
-      <BlogExplorer posts={posts} categories={categoryOptions} />
+      <BlogExplorer
+        initialPosts={posts.slice(0, INITIAL_BLOG_POSTS)}
+        totalPosts={posts.length}
+        categoryCounts={categoryCounts}
+        categories={categoryOptions}
+      />
 
       <section className="container mx-auto mt-24 max-w-7xl px-4">
         <div className="grid items-center gap-8 overflow-hidden rounded-[2rem] bg-primary p-8 text-white sm:p-12 md:grid-cols-2">

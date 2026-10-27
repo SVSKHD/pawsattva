@@ -5,13 +5,13 @@ import { collectionGroup, onSnapshot, query, Timestamp, where } from "firebase/f
 import { Bot } from "lucide-react"
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
 import { db } from "@/firebase/db"
 import { auth } from "@/firebase/firebase"
 import type { UserProfile } from "@/firebase/firestore"
+import { TableCard, theadRowClass, thClass } from "./DataTable"
 import { PAW_GPT_DAILY_LIMIT, PAW_GPT_DAILY_PASS, PAW_GPT_DAILY_TOKEN_LIMIT, pawGptDayKey } from "@/lib/paw-gpt"
 
 const DAYS = 14
@@ -150,26 +150,22 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
   const perQuestion = summary && summary.period.questions ? summary.period.tokens / summary.period.questions : 0
 
   return (
-    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl rounded-2xl sm:rounded-[2rem]">
-      <CardHeader className="p-4 sm:p-8 pb-3 sm:pb-4">
-        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold">
-          <Bot className="h-5 w-5 text-orange-500" /> Paw GPT usage
-        </CardTitle>
-        <CardDescription>
-          Questions and AI tokens per day (India time). Pet parents: {PAW_GPT_DAILY_LIMIT} questions and {fmt(PAW_GPT_DAILY_TOKEN_LIMIT)} tokens a day; admins and authors are counted but not limited.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6 px-4 pb-6 sm:px-8">
-        {error && <p className="rounded-xl bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-300">{error}</p>}
+    <TableCard
+      icon={Bot}
+      title="Paw GPT usage"
+      subtitle={`Per day, India time. Pet parents get ${PAW_GPT_DAILY_LIMIT} questions and ${fmt(PAW_GPT_DAILY_TOKEN_LIMIT)} tokens; staff are counted, not limited.`}
+    >
+      <div className="space-y-6 pb-5">
+        {error && <p className="mx-4 rounded-xl sm:mx-5 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-800 dark:text-amber-300">{error}</p>}
 
         {!summary ? (
-          <div className="space-y-3">
+          <div className="space-y-3 px-4 sm:px-5">
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{[0, 1, 2, 3].map((key) => <Skeleton key={key} className="h-20 rounded-2xl" />)}</div>
             <Skeleton className="h-64 rounded-2xl" />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 px-4 sm:px-5 lg:grid-cols-4">
               {[
                 { label: "Tokens today", value: fmt(summary.today.tokens) },
                 { label: "Questions today", value: fmt(summary.today.questions) },
@@ -179,14 +175,14 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
                 },
                 { label: `Avg tokens / question (${DAYS}d)`, value: perQuestion ? fmt(perQuestion) : "—" },
               ].map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-border/50 bg-white/50 p-3 dark:bg-white/[0.03]">
+                <div key={stat.label} className="rounded-xl border border-border/50 bg-muted/20 p-3">
                   <p className="text-xl font-extrabold tracking-tight tabular-nums">{stat.value}</p>
                   <p className="mt-0.5 text-xs font-medium text-muted-foreground">{stat.label}</p>
                 </div>
               ))}
             </div>
 
-            <div>
+            <div className="px-4 sm:px-5">
               <p className="mb-2 text-xs font-semibold text-muted-foreground">
                 Last {DAYS} days: {fmt(summary.period.tokens)} tokens ({fmt(summary.period.inputTokens)} input · {fmt(summary.period.outputTokens)} output) over {fmt(summary.period.questions)} questions
               </p>
@@ -206,18 +202,18 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Top users today</p>
+              <p className="mb-2 px-4 text-xs font-bold uppercase tracking-wider text-muted-foreground sm:px-5">Top users today</p>
               {summary.topToday.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No Paw GPT questions yet today.</p>
+                <p className="px-4 text-sm text-muted-foreground sm:px-5">No Paw GPT questions yet today.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b border-border/50 text-[11px] uppercase tracking-wider text-muted-foreground">
-                        <th className="py-2 pr-3 font-semibold">User</th>
-                        <th className="py-2 pr-3 text-right font-semibold">Questions</th>
-                        <th className="py-2 pr-3 text-right font-semibold">Tokens</th>
-                        <th className="hidden py-2 text-right font-semibold sm:table-cell">In / out</th>
+                      <tr className={`${theadRowClass} border-t`}>
+                        <th className={thClass}>User</th>
+                        <th className={`${thClass} text-right`}>Questions</th>
+                        <th className={`${thClass} text-right`}>Tokens</th>
+                        <th className={`${thClass} hidden text-right sm:table-cell`}>In / out</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/40">
@@ -227,8 +223,8 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
                         const hasPass = row.passTokenLimit > 0
                         const share = Math.min(1, row.tokens / (hasPass ? row.passTokenLimit : PAW_GPT_DAILY_TOKEN_LIMIT))
                         return (
-                          <tr key={row.uid}>
-                            <td className="max-w-0 py-2 pr-3">
+                          <tr key={row.uid} className="transition-colors hover:bg-orange-500/[0.04]">
+                            <td className="max-w-0 px-4 py-2.5">
                               <p className="truncate font-semibold">
                                 {profile?.displayName || profile?.email || row.uid}
                                 {staff && <span className="ml-1.5 rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-bold text-sky-700 dark:text-sky-400">Staff</span>}
@@ -252,9 +248,9 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
                                 </div>
                               )}
                             </td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{staff || hasPass ? row.questions : `${row.questions}/${PAW_GPT_DAILY_LIMIT}`}</td>
-                            <td className="py-2 pr-3 text-right tabular-nums">{fmt(row.tokens)}</td>
-                            <td className="hidden py-2 text-right tabular-nums text-muted-foreground sm:table-cell">
+                            <td className="px-4 py-2.5 text-right tabular-nums">{staff || hasPass ? row.questions : `${row.questions}/${PAW_GPT_DAILY_LIMIT}`}</td>
+                            <td className="px-4 py-2.5 text-right tabular-nums">{fmt(row.tokens)}</td>
+                            <td className="hidden px-4 py-2.5 text-right tabular-nums text-muted-foreground sm:table-cell">
                               {fmt(row.inputTokens)} / {fmt(row.outputTokens)}
                             </td>
                           </tr>
@@ -267,7 +263,7 @@ export function PawGptUsageCard({ users }: { users: UserProfile[] }) {
             </div>
           </>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </TableCard>
   )
 }

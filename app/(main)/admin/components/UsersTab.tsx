@@ -59,8 +59,8 @@ import type { PetFeedEntry, RestrictedEmail, UserProfile } from "@/firebase/fire
 import { normalizeEmail } from "@/firebase/restricted-email"
 import { TablePagination, usePagination } from "./TablePagination"
 import {
-  ActionsCell, EmptyCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty,
-  TableHeading, TableSearch, TableToolbar, filterSelectClass, nextSort, rowClass, rowTitleClass,
+  ActionButton, ActionsCell, EmptyCell, FilterTabs, IconAction, SortHeader, StatusPill, TableCard, TableEmpty,
+  TableSearch, TableToolbar, filterSelectClass, nextSort, rowClass, rowTitleClass,
   thClass, theadRowClass, type SortState,
 } from "./DataTable"
 
@@ -422,7 +422,8 @@ export function UsersTab({
   return (
     <>
       <div className="space-y-4">
-        <TableHeading
+        <TableCard
+          icon={Users}
           title="Users"
           subtitle={
             <>
@@ -433,9 +434,7 @@ export function UsersTab({
               )}
             </>
           }
-        />
-
-        <TableCard>
+        >
           <TableToolbar>
             <FilterTabs
               label="Filter users"
@@ -478,7 +477,7 @@ export function UsersTab({
                   <tr className={theadRowClass}>
                     <SortHeader label="User" sortKey="name" sort={sort} onSort={onSort} />
                     <th className={`hidden lg:table-cell ${thClass}`}>Contact</th>
-                    <SortHeader label="Pets" sortKey="pets" sort={sort} onSort={onSort} className="hidden md:table-cell" />
+                    <SortHeader label="Pets" sortKey="pets" sort={sort} onSort={onSort} className="hidden min-w-[9rem] md:table-cell" />
                     <th className={`hidden sm:table-cell ${thClass}`}>Status</th>
                     <SortHeader label="Joined" sortKey="joined" sort={sort} onSort={onSort} className="hidden xl:table-cell" />
                     <th className={thClass}>Role</th>
@@ -533,7 +532,7 @@ export function UsersTab({
                         </td>
 
                         {/* Pets */}
-                        <td className="hidden px-4 py-3 md:table-cell">
+                        <td className="hidden min-w-[9rem] px-4 py-3 md:table-cell">
                           {pets.length ? (
                             <div className="flex max-w-[260px] flex-wrap items-center gap-1">
                               {pets.slice(0, 2).map((feed, index) => (
@@ -646,41 +645,38 @@ export function UsersTab({
         </TableCard>
 
         {/* Restricted emails: block addresses before or after they sign up */}
-        <TableCard>
-          <div className="flex flex-col justify-between gap-3 border-b border-border/50 p-4 md:flex-row md:items-center">
-            <div>
-              <h3 className="flex items-center gap-2 text-sm font-bold">
-                <Ban className="h-4 w-4 text-red-600" />
-                Restricted emails
-                <span className="text-xs font-semibold tabular-nums text-muted-foreground">{sortedRestrictedEmails.length}</span>
-              </h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Anyone signing in with these emails is restricted instantly, even on a new account.
-              </p>
-            </div>
-            <form onSubmit={handleRestrictEmail} className="flex w-full gap-2 md:w-auto">
+        <TableCard
+          icon={Ban}
+          title={
+            <span className="inline-flex items-center gap-2">
+              Restricted emails
+              <span className="text-sm font-semibold tabular-nums text-muted-foreground">{sortedRestrictedEmails.length}</span>
+            </span>
+          }
+          subtitle="Anyone signing in with these emails is restricted instantly, even on a new account."
+          actions={
+            <form onSubmit={handleRestrictEmail} className="flex w-full gap-2 sm:w-auto">
               <Input
                 type="email"
                 value={newRestrictedEmail}
                 onChange={(event) => setNewRestrictedEmail(event.target.value)}
                 placeholder="email@example.com"
                 aria-label="Email to restrict"
-                className="h-9 rounded-xl bg-white/70 text-sm dark:bg-black/30 md:w-64"
+                className="h-9 flex-1 rounded-xl bg-white/70 text-sm dark:bg-black/30 sm:w-64 sm:flex-none"
               />
-              <Button
+              <ActionButton
                 type="submit"
-                size="sm"
+                variant="primary"
+                icon={Ban}
                 disabled={restrictingEmail || !newRestrictedEmail.trim()}
-                className="h-9 rounded-xl bg-red-600 text-white hover:bg-red-600/90"
               >
-                <Ban className="h-4 w-4" />
                 Restrict
-              </Button>
+              </ActionButton>
             </form>
-          </div>
-
+          }
+        >
           {sortedRestrictedEmails.length ? (
-            <ul className="divide-y divide-border/40">
+            <ul className="divide-y divide-border/40 border-t border-border/50">
               {sortedRestrictedEmails.map((entry) => {
                 const linkedUser = users.find(
                   (profile) =>
@@ -715,7 +711,7 @@ export function UsersTab({
               })}
             </ul>
           ) : (
-            <p className="px-4 py-6 text-center text-xs text-muted-foreground">No restricted emails.</p>
+            <p className="border-t border-border/50 px-4 py-6 text-center text-xs text-muted-foreground">No restricted emails.</p>
           )}
         </TableCard>
       </div>

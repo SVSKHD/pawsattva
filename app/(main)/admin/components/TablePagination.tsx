@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
+import { ArrowStepper } from "./DataTable"
+
 export const PAGE_SIZE_OPTIONS = [10, 25, 50]
 
 /** Client-side paging; the page is clamped so shrinking results never leave you on an empty page */
@@ -48,16 +50,10 @@ export function TablePagination({ pagination, noun }: { pagination: Pagination; 
         <span className="tabular-nums">
           {from}–{to} of {total} {noun}
         </span>
-        <label className="hidden items-center gap-1.5 sm:flex">
+        <span className="hidden items-center gap-1.5 sm:flex">
           Rows
-          <select
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-            className="h-7 rounded-lg border bg-background px-1.5 text-xs font-semibold text-foreground"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </label>
+          <ArrowStepper value={pageSize} options={PAGE_SIZE_OPTIONS} onChange={setPageSize} label="Rows per page" />
+        </span>
       </div>
 
       {pageCount > 1 && (

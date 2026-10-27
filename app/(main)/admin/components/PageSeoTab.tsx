@@ -8,7 +8,6 @@ import {
   FileText,
   Globe2,
   Loader2,
-  Search,
   SearchCheck,
   ShieldCheck,
   Sparkles,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { auth } from "@/firebase/firebase"
+import { refreshPublicBlogPages } from "@/lib/blog-revalidate"
 import {
   getBlogs,
   getPageSeoConfigs,
@@ -42,6 +41,7 @@ import {
   type PageSeoKey,
   type SeoConfigFields,
 } from "@/firebase/firestore"
+import { ActionButton, FilterTabs, PanelBar, TableSearch } from "./DataTable"
 
 const SITE_URL = "https://pawsattva.com"
 
@@ -396,6 +396,7 @@ export function PageSeoTab() {
       setBulk({ done, total: targets.length, failed })
     }
     setBulk(null)
+    void refreshPublicBlogPages()
     const saved = done - failed
     if (failed) toast.error(`Saved ${saved} of ${targets.length}. ${failed} failed — try those again.`)
     else toast.success(`${bulkStop.current ? "Stopped. " : ""}AI SEO saved for ${saved} ${saved === 1 ? "item" : "items"}.`)
@@ -426,6 +427,7 @@ export function PageSeoTab() {
         )
         toast.success("Blog SEO saved.")
       }
+      void refreshPublicBlogPages()
     } catch (error) {
       console.error(error)
       toast.error("SEO save failed.")
@@ -440,26 +442,28 @@ export function PageSeoTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-orange-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-orange-700">
-            <Sparkles className="h-3.5 w-3.5" /> SEO Command Center
-          </div>
-          <h2 className="mt-3 text-3xl font-black tracking-tight">PawSattva search control</h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Manage metadata, canonical URLs, robots, Open Graph, Twitter cards and Schema.org JSON-LD page by page and blog by blog.
-          </p>
+      <PanelBar
+        icon={SearchCheck}
+        title="SEO Command Center"
+        subtitle="Metadata, canonical URLs, robots, social cards and JSON-LD for every page and blog post."
+      >
+        <div
+          aria-disabled={Boolean(bulk) || undefined}
+          title={bulk ? "Wait for the bulk AI fix to finish" : undefined}
+          className={bulk ? "pointer-events-none opacity-50" : undefined}
+        >
+          <FilterTabs<"pages" | "blogs">
+            label="SEO scope"
+            tabs={[
+              { id: "pages", label: "Pages", icon: Globe2 },
+              { id: "blogs", label: "Blogs", icon: FileText },
+            ]}
+            value={scope}
+            onChange={(next) => { if (!bulk) setScope(next) }}
+            counts={{ pages: PAGE_OPTIONS.length, blogs: blogs.length }}
+          />
         </div>
-
-        <div className="inline-flex rounded-2xl border bg-background p-1 shadow-sm">
-          <Button type="button" variant={scope === "pages" ? "default" : "ghost"} onClick={() => setScope("pages")} disabled={Boolean(bulk)} className="rounded-xl">
-            <Globe2 className="mr-2 h-4 w-4" /> Pages
-          </Button>
-          <Button type="button" variant={scope === "blogs" ? "default" : "ghost"} onClick={() => setScope("blogs")} disabled={Boolean(bulk)} className="rounded-xl">
-            <FileText className="mr-2 h-4 w-4" /> Blogs
-          </Button>
-        </div>
-      </div>
+      </PanelBar>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Ready" value={counts.ready} tone="emerald" />
@@ -469,7 +473,7 @@ export function PageSeoTab() {
 
       {/* Bulk AI fix for everything in this scope that isn't Ready */}
       {(incompleteCount > 0 || bulk) && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           {bulk ? (
             <>
               <div className="min-w-0 flex-1">
@@ -482,9 +486,9 @@ export function PageSeoTab() {
                   <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(bulk.done / bulk.total) * 100}%` }} />
                 </div>
               </div>
-              <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => { bulkStop.current = true }}>
+              <ActionButton variant="secondary" onClick={() => { bulkStop.current = true }}>
                 Stop
-              </Button>
+              </ActionButton>
             </>
           ) : (
             <>
@@ -497,9 +501,9 @@ export function PageSeoTab() {
                   AI drafts the missing titles, descriptions, keywords and social copy; URLs, images and Schema.org are filled from the page itself. Fields that already pass are kept.
                 </p>
               </div>
-              <Button type="button" onClick={() => setBulkConfirm(true)} className="shrink-0 rounded-xl bg-violet-600 text-white hover:bg-violet-700">
-                <WandSparkles className="h-4 w-4" /> Fix all with AI
-              </Button>
+              <ActionButton variant="primary" icon={WandSparkles} onClick={() => setBulkConfirm(true)}>
+                Fix all with AI
+              </ActionButton>
             </>
           )}
         </div>
@@ -527,7 +531,8 @@ export function PageSeoTab() {
               key={page.key}
               type="button"
               onClick={() => setSelectedPage(page.key)}
-              className={`rounded-2xl border p-4 text-left transition ${selectedPage === page.key ? "border-orange-500 bg-orange-500/10" : "hover:bg-muted/50"}`}
+              aria-pressed={selectedPage === page.key}
+              className={`rounded-2xl border p-4 text-left shadow-sm transition ${selectedPage === page.key ? "border-orange-500/60 bg-orange-500/10 ring-1 ring-orange-500/20" : "border-black/10 bg-white/70 hover:border-orange-300 hover:bg-orange-50/60 dark:border-white/10 dark:bg-black/40 dark:hover:bg-orange-500/5"}`}
             >
               <div className="flex items-center justify-between gap-3">
                 <span className="font-bold">{page.label}</span>
@@ -539,27 +544,31 @@ export function PageSeoTab() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-col gap-2 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search blog title or slug…" className="pl-10" />
-            </div>
-            <div className="flex gap-2 overflow-x-auto">
-              {(["all", "critical", "incomplete", "ready"] as const).map((status) => (
-                <Button key={status} type="button" variant={statusFilter === status ? "default" : "outline"} onClick={() => setStatusFilter(status)} className="capitalize">
-                  {status}
-                </Button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <TableSearch value={query} onChange={setQuery} placeholder="Search blog title or slug…" label="Search blog posts" />
+            <FilterTabs<"all" | SeoReadinessStatus>
+              label="Filter posts by SEO status"
+              tabs={[
+                { id: "all", label: "All" },
+                { id: "critical", label: "Critical" },
+                { id: "incomplete", label: "Incomplete" },
+                { id: "ready", label: "Ready" },
+              ]}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              counts={{ all: blogRows.length, ...counts }}
+              alert={{ id: "critical", className: "bg-rose-500" }}
+            />
           </div>
 
-          <div className="max-h-72 overflow-auto rounded-2xl border bg-background/70">
+          <div className="max-h-72 overflow-auto rounded-2xl border border-black/10 bg-white/70 shadow-sm dark:border-white/10 dark:bg-black/40">
             {filteredBlogs.map(({ blog, score, status }) => (
               <button
                 key={blog.id}
                 type="button"
                 onClick={() => setSelectedBlogId(blog.id)}
-                className={`flex w-full items-center justify-between gap-4 border-b px-4 py-3 text-left last:border-0 ${selectedBlogId === blog.id ? "bg-orange-500/10" : "hover:bg-muted/50"}`}
+                aria-pressed={selectedBlogId === blog.id}
+                className={`flex w-full items-center justify-between gap-4 border-b border-border/50 px-4 py-3 text-left last:border-0 ${selectedBlogId === blog.id ? "bg-orange-500/10" : "hover:bg-orange-500/[0.04]"}`}
               >
                 <div className="min-w-0">
                   <p className="truncate font-bold">{blog.title}</p>
@@ -576,7 +585,7 @@ export function PageSeoTab() {
       )}
 
       <form onSubmit={save} className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <Card className="rounded-3xl">
+        <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-4">
               <span className="flex items-center gap-2"><SearchCheck className="h-5 w-5 text-orange-500" /> SEO editor</span>
@@ -589,27 +598,22 @@ export function PageSeoTab() {
               <p className="min-w-0 flex-1 text-xs text-muted-foreground">
                 Let AI draft this {scope === "pages" ? "page's" : "post's"} SEO. Nothing is saved until you press Save SEO.
               </p>
-              <Button
-                type="button"
-                size="sm"
+              <ActionButton
+                variant="primary"
                 onClick={() => void fillWithAi("missing")}
                 disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
-                className="rounded-xl bg-violet-600 text-white hover:bg-violet-700"
               >
                 {aiBusy === "missing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 Fill missing
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
+              </ActionButton>
+              <ActionButton
+                variant="secondary"
                 onClick={() => void fillWithAi("all")}
                 disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
-                className="rounded-xl"
               >
                 {aiBusy === "all" && <Loader2 className="h-4 w-4 animate-spin" />}
                 Rewrite all
-              </Button>
+              </ActionButton>
             </div>
 
             <Field label="SEO title" hint={`${workingSeo.title.trim().length}/60`}>
@@ -655,20 +659,20 @@ export function PageSeoTab() {
               />
             </Field>
 
-            <div className={`flex items-center gap-2 rounded-2xl border p-3 text-sm font-semibold ${schemaValidation.valid ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+            <div className={`flex items-center gap-2 rounded-2xl border p-3 text-sm font-semibold ${schemaValidation.valid ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
               {schemaValidation.valid ? <ShieldCheck className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
               {schemaValidation.message}
             </div>
 
-            <Button type="submit" disabled={saving} className="h-11 rounded-xl px-6 font-bold">
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <ActionButton type="submit" variant="primary" disabled={saving} className="h-10 px-6">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Save SEO
-            </Button>
+            </ActionButton>
           </CardContent>
         </Card>
 
         <div className="space-y-6">
-          <Card className="rounded-3xl">
+          <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
             <CardHeader><CardTitle>Google preview</CardTitle></CardHeader>
             <CardContent>
               <p className="truncate text-sm text-emerald-700">{workingSeo.canonicalUrl || SITE_URL}</p>
@@ -677,7 +681,7 @@ export function PageSeoTab() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-3xl">
+          <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
             <CardHeader><CardTitle>Readiness checks</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               <Check label="Title 30–60 chars" ok={workingSeo.title.trim().length >= 30 && workingSeo.title.trim().length <= 60} />
@@ -726,11 +730,21 @@ function Check({ label, ok }: { label: string; ok: boolean }) {
 }
 
 function StatCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
-  const style = tone === "emerald" ? "border-emerald-200 bg-emerald-50/70 text-emerald-800" : tone === "amber" ? "border-amber-200 bg-amber-50/70 text-amber-800" : "border-rose-200 bg-rose-50/70 text-rose-800"
+  const style = tone === "emerald"
+    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    : tone === "amber"
+      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+      : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+  const Icon = tone === "emerald" ? CheckCircle2 : AlertTriangle
   return (
-    <div className={`rounded-2xl border p-4 ${style}`}>
-      <p className="text-xs font-black uppercase tracking-[0.18em]">{label}</p>
-      <p className="mt-1 text-3xl font-black">{value}</p>
+    <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${style}`}>
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+      <p className="mt-2 text-3xl font-black tabular-nums">{value}</p>
     </div>
   )
 }

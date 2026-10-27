@@ -1,8 +1,6 @@
 "use client"
 
-import { FolderPlus, Save, CheckCircle2, CircleDashed, UploadCloud, Trash2 } from "lucide-react"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { FolderPlus, FolderPen, Save, CheckCircle2, CircleDashed, UploadCloud, Trash2, ImageIcon } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -19,7 +17,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Category } from "@/firebase/firestore"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
+import { ActionButton, FilterTabs } from "./DataTable"
 
 interface CategoryFormTabProps {
   isSubCategory: boolean
@@ -42,6 +41,16 @@ interface CategoryFormTabProps {
   onCancel: () => void
 }
 
+/** Shared admin field look: inputs, textareas and select triggers */
+const fieldClass =
+  "h-10 rounded-xl border-black/10 bg-white/80 px-3 text-sm shadow-none dark:border-white/10 dark:bg-black/30 focus-visible:border-orange-400 focus-visible:ring-4 focus-visible:ring-orange-500/10"
+const triggerClass = `${fieldClass} w-full data-[size=default]:h-10`
+
+const STATUS_TABS = [
+  { id: "draft" as const, label: "Draft", icon: CircleDashed },
+  { id: "published" as const, label: "Published", icon: CheckCircle2 },
+]
+
 export function CategoryFormTab({
   isSubCategory,
   categoryName, setCategoryName,
@@ -58,174 +67,140 @@ export function CategoryFormTab({
   const isEditing = !!editingCategoryId
   const [confirmDeleteImage, setConfirmDeleteImage] = useState(false)
   const parentCategories = categories.filter(c => !c.parentId && c.id !== editingCategoryId)
+  const noun = isSubCategory ? "sub-category" : "category"
+  const HeaderIcon = isEditing ? FolderPen : FolderPlus
+  const hasPreview = Boolean(categoryImage) && /^https?:\/\/.+/i.test(categoryImage)
 
   return (
-    <Card className="border-white/40 dark:border-white/10 bg-white/40 dark:bg-black/40 backdrop-blur-3xl shadow-2xl overflow-hidden max-w-3xl mx-auto rounded-2xl sm:rounded-[2rem]">
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-black/10 bg-white/70 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
       <form onSubmit={handleCategorySubmit}>
-        <CardHeader className="border-b border-border/40 bg-white/30 dark:bg-black/20 pb-4 sm:pb-6 pt-4 sm:pt-6 px-4 sm:px-8">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
-              <FolderPlus className="w-7 h-7 text-amber-500" />
-            </div>
-            <div>
-              <CardTitle className="text-2xl font-bold">
-                {isEditing
-                  ? `Edit ${isSubCategory ? "Sub-Category" : "Category"}`
-                  : `New ${isSubCategory ? "Sub-Category" : "Category"}`}
-              </CardTitle>
-              <CardDescription className="mt-0.5">
-                {isSubCategory
-                  ? "Group content more granularly by nesting under a parent category."
-                  : "Add a new top-level category to group related blog posts."}
-              </CardDescription>
-            </div>
+        {/* Header bar — mirrors the shared kit's HeaderBar */}
+        <div className="flex flex-wrap items-center gap-3 px-4 pb-3 pt-4 sm:px-5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500/15 to-amber-400/15 text-orange-600 ring-1 ring-orange-500/15 dark:text-orange-300">
+            <HeaderIcon className="h-5 w-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-extrabold tracking-tight sm:text-xl">
+              {isEditing ? "Edit" : "New"} {noun}
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+              {isSubCategory
+                ? "Nest under a parent category to group posts more finely."
+                : "A top-level category that groups related blog posts."}
+            </p>
           </div>
-        </CardHeader>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end">
+            <ActionButton onClick={onCancel}>Cancel</ActionButton>
+            <ActionButton type="submit" variant="primary" icon={Save}>
+              {isEditing ? "Update" : "Save"} {noun}
+            </ActionButton>
+          </div>
+        </div>
 
-        <CardContent className="p-4 sm:p-8 space-y-5 sm:space-y-6">
+        <div className="space-y-5 border-t border-border/50 p-4 sm:p-5">
           {/* Parent selector — only for sub-categories */}
           {isSubCategory && (
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold flex items-center justify-between">
-                Parent Category
-                <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Required</span>
-              </Label>
+            <Field label="Parent category" required>
               <Select value={categoryParentId} onValueChange={setCategoryParentId} required>
-                <SelectTrigger className="h-13 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-xl focus:ring-amber-500/30">
-                  <SelectValue placeholder="Select Parent Category" />
+                <SelectTrigger className={triggerClass} aria-label="Parent category">
+                  <SelectValue placeholder="Select a parent category" />
                 </SelectTrigger>
-                <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10 max-h-[300px]">
+                <SelectContent>
                   {parentCategories.map((c) => (
-                    <SelectItem key={c.id} value={c.id} className="rounded-lg my-1 cursor-pointer">
+                    <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
           )}
 
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold flex items-center justify-between">
-              {isSubCategory ? "Sub-Category Name" : "Category Name"}
-              <span className="text-[10px] uppercase font-bold tracking-wider text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Required</span>
-            </Label>
+          <Field label={isSubCategory ? "Sub-category name" : "Category name"} htmlFor="category-name" required>
             <Input
+              id="category-name"
               placeholder={isSubCategory
                 ? "e.g. Behavioral Training, Senior Health..."
                 : "e.g. Nutrition, Health & Wellness..."}
               value={categoryName}
               onChange={(e) => setCategoryName(e.target.value)}
-              className="h-13 text-base bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 rounded-xl px-4"
+              className={fieldClass}
               required
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold flex items-center justify-between">
-              Description
-              <span className="text-xs text-muted-foreground font-normal">Optional</span>
-            </Label>
+          <Field label="Description" htmlFor="category-desc" hint="Optional">
             <Textarea
+              id="category-desc"
               placeholder="Briefly describe what this category is about..."
-              className="min-h-[90px] resize-y bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 rounded-xl p-4"
+              className={`${fieldClass} h-auto min-h-[90px] resize-y py-2.5`}
               value={categoryDesc}
               onChange={(e) => setCategoryDesc(e.target.value)}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Category Image</Label>
-            <Input
-              placeholder="https://example.com/category-image.jpg"
-              value={categoryImage}
-              onChange={(e) => setCategoryImage(e.target.value)}
-              className="h-11 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 focus-visible:ring-amber-500/30 focus-visible:border-amber-500 rounded-xl px-4"
-            />
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 cursor-pointer hover:bg-amber-500/15 transition-colors">
-              <UploadCloud className="w-3.5 h-3.5" />
-              {uploadingCategoryImage ? `Uploading... ${categoryImageUploadProgress}%` : "Upload image (auto-compress)"}
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={uploadingCategoryImage}
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (file) await handleCategoryImageUpload(file)
-                  e.currentTarget.value = ""
-                }}
+          <Field label="Category image" htmlFor="category-image" hint="Optional">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="category-image"
+                placeholder="https://example.com/category-image.jpg"
+                value={categoryImage}
+                onChange={(e) => setCategoryImage(e.target.value)}
+                className={`${fieldClass} min-w-0 flex-1`}
               />
-            </label>
+              <label
+                className={`inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-xl border border-black/10 bg-white/80 px-3.5 text-xs font-bold transition hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700 dark:border-white/10 dark:bg-black/30 dark:hover:bg-orange-500/10 dark:hover:text-orange-300 sm:text-sm ${
+                  uploadingCategoryImage ? "pointer-events-none opacity-60" : ""
+                }`}
+              >
+                <UploadCloud className="h-4 w-4" />
+                {uploadingCategoryImage ? `Uploading ${categoryImageUploadProgress}%` : "Upload"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingCategoryImage}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (file) await handleCategoryImageUpload(file)
+                    e.currentTarget.value = ""
+                  }}
+                />
+              </label>
+            </div>
             {uploadingCategoryImage && (
-              <div className="space-y-1">
-                <Progress value={categoryImageUploadProgress} className="h-2" />
-                <p className="text-[11px] text-muted-foreground">Upload progress: {categoryImageUploadProgress}%</p>
-              </div>
+              <Progress value={categoryImageUploadProgress} className="h-1.5" />
             )}
-            {categoryImage && /^https?:\/\/.+/i.test(categoryImage) && (
-              <div className="rounded-xl overflow-hidden border border-black/10 dark:border-white/10 bg-muted/20">
+            {hasPreview ? (
+              <div className="overflow-hidden rounded-xl border border-black/10 bg-muted/20 dark:border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={categoryImage} alt="Category preview" className="max-h-40 w-full object-contain" />
-                <div className="p-2 border-t border-black/10 dark:border-white/10 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1 text-rose-600 border-rose-200 hover:bg-rose-50 hover:text-rose-700"
+                <div className="flex justify-end border-t border-black/10 p-2 dark:border-white/10">
+                  <ActionButton
+                    icon={Trash2}
                     onClick={() => setConfirmDeleteImage(true)}
+                    className="h-8 text-red-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
                     Remove
-                  </Button>
+                  </ActionButton>
                 </div>
               </div>
+            ) : (
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <ImageIcon className="h-3.5 w-3.5" /> Paste an image URL or upload one; uploads are compressed automatically.
+              </p>
             )}
-          </div>
+          </Field>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Status</Label>
-            <Select value={categoryStatus} onValueChange={(val: "published" | "draft") => setCategoryStatus(val)}>
-              <SelectTrigger className="h-13 bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/10 rounded-xl focus:ring-amber-500/30">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="backdrop-blur-2xl bg-white/80 dark:bg-black/80 rounded-xl border border-white/20 dark:border-white/10">
-                <SelectItem value="draft" className="rounded-lg my-1 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <CircleDashed className="w-4 h-4 text-orange-500" />
-                    <span className="font-medium">Draft (Hidden)</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="published" className="rounded-lg my-1 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span className="font-medium">Published (Public)</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 border-t border-border/40 bg-white/20 dark:bg-black/20 p-4 sm:p-6">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-10 sm:h-11 px-5 sm:px-7 rounded-xl bg-white/50 dark:bg-black/50 border-white/40 dark:border-white/20 font-semibold w-full sm:w-auto"
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            className="h-10 sm:h-11 px-6 sm:px-9 gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-xl shadow-orange-500/20 font-bold border-0 w-full sm:w-auto"
-          >
-            <Save className="w-4 h-4" />
-            {isEditing
-              ? `Update ${isSubCategory ? "Sub-Category" : "Category"}`
-              : `Save ${isSubCategory ? "Sub-Category" : "Category"}`}
-          </Button>
-        </CardFooter>
+          <Field label="Status">
+            <div className="flex flex-wrap items-center gap-3">
+              <FilterTabs label="Status" tabs={STATUS_TABS} value={categoryStatus} onChange={setCategoryStatus} />
+              <span className="text-[11px] text-muted-foreground">
+                {categoryStatus === "published" ? "Visible on the public site." : "Hidden from the public site."}
+              </span>
+            </div>
+          </Field>
+        </div>
       </form>
 
       <AlertDialog open={confirmDeleteImage} onOpenChange={setConfirmDeleteImage}>
@@ -250,6 +225,23 @@ export function CategoryFormTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </div>
+  )
+}
+
+function Field({
+  label, htmlFor, required, hint, children,
+}: { label: string; htmlFor?: string; required?: boolean; hint?: string; children: ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={htmlFor} className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+        {required && (
+          <span className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-orange-600 dark:text-orange-300">Required</span>
+        )}
+        {hint && <span className="text-[10px] font-medium normal-case tracking-normal text-muted-foreground/80">{hint}</span>}
+      </Label>
+      {children}
+    </div>
   )
 }

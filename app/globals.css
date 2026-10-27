@@ -182,11 +182,12 @@
   background: rgba(255,255,255,0.45);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255,255,255,0.35);
+  border: 1px solid rgba(24,24,27,0.06);
   border-radius: 1.5rem;
+  /* Clean, neutral elevation: a hairline contact shadow plus one soft ambient one */
   box-shadow:
-    0 4px 6px -1px rgba(0,0,0,0.04),
-    0 10px 40px -10px rgba(0,0,0,0.08),
+    0 1px 2px rgba(24,24,27,0.04),
+    0 8px 24px -14px rgba(24,24,27,0.14),
     inset 0 1px 0 rgba(255,255,255,0.6);
 }
 
@@ -197,6 +198,131 @@
     0 4px 6px -1px rgba(0,0,0,0.3),
     0 10px 40px -10px rgba(0,0,0,0.4),
     inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* ── Liquid UI, app-wide ──
+   .liquid-glass   frosted, lit-edge surface for bars, tab lists and floating controls
+   .liquid-sheen   adds the pointer highlight to any surface (liquid-card / liquid-glass have it built in);
+                   components/liquid-pointer.tsx feeds --lx / --ly
+   Tab pills slide with a springy stretch (components/ui/tabs.tsx), buttons squish when pressed,
+   .liquid-blob morphs a soft background shape and .liquid-rise staggers cards in (style="--i: n"). */
+@layer components {
+  .liquid-glass {
+    background: linear-gradient(180deg, rgba(255, 252, 248, 0.72), rgba(255, 250, 245, 0.56));
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-color: rgba(24, 24, 27, 0.06);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      0 1px 2px rgba(24, 24, 27, 0.04),
+      0 6px 16px -10px rgba(24, 24, 27, 0.14);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+  }
+  .dark .liquid-glass {
+    background: linear-gradient(180deg, rgba(39, 39, 42, 0.72), rgba(24, 24, 27, 0.58));
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.3),
+      0 6px 16px -10px rgba(0, 0, 0, 0.5);
+  }
+
+  .liquid-card,
+  .liquid-glass,
+  .liquid-sheen {
+    position: relative;
+    isolation: isolate;
+  }
+  /* Sits above the surface's own background but under its content (isolation makes z-index -1 local) */
+  .liquid-card::after,
+  .liquid-glass::after,
+  .liquid-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.45s ease;
+    background:
+      radial-gradient(260px circle at var(--lx, 50%) var(--ly, 0%), rgba(255, 255, 255, 0.7), transparent 60%),
+      radial-gradient(420px circle at var(--lx, 50%) var(--ly, 0%), rgba(251, 146, 60, 0.12), transparent 70%);
+  }
+  .dark .liquid-card::after,
+  .dark .liquid-glass::after,
+  .dark .liquid-sheen::after {
+    background:
+      radial-gradient(260px circle at var(--lx, 50%) var(--ly, 0%), rgba(255, 255, 255, 0.08), transparent 60%),
+      radial-gradient(420px circle at var(--lx, 50%) var(--ly, 0%), rgba(251, 146, 60, 0.14), transparent 70%);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .liquid-card:hover::after,
+    .liquid-glass:hover::after,
+    .liquid-sheen:hover::after {
+      opacity: 1;
+    }
+  }
+
+  /* Tab pill: overshooting spring, and a squash-and-stretch while it travels */
+  .liquid-tab-indicator {
+    transition:
+      transform 0.5s cubic-bezier(0.34, 1.4, 0.64, 1),
+      width 0.5s cubic-bezier(0.34, 1.4, 0.64, 1),
+      height 0.3s ease,
+      opacity 0.2s ease;
+    will-change: transform, width;
+  }
+  .liquid-tab-indicator[data-moving] {
+    animation: liquid-stretch 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .liquid-blob {
+    animation: liquid-morph 14s ease-in-out infinite;
+    will-change: border-radius, transform;
+  }
+
+  .liquid-rise {
+    animation: liquid-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: calc(min(var(--i, 0), 12) * 45ms);
+  }
+}
+
+@keyframes liquid-stretch {
+  0% { scale: 1 1; }
+  35% { scale: 1.12 0.82; }
+  70% { scale: 0.97 1.05; }
+  100% { scale: 1 1; }
+}
+
+@keyframes liquid-morph {
+  0%, 100% { border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%; transform: translate3d(0, 0, 0) rotate(0deg); }
+  33% { border-radius: 63% 37% 41% 59% / 57% 62% 38% 43%; transform: translate3d(18px, -14px, 0) rotate(40deg); }
+  66% { border-radius: 36% 64% 52% 48% / 62% 35% 65% 38%; transform: translate3d(-14px, 12px, 0) rotate(-30deg); }
+}
+
+@keyframes liquid-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+/* Buttons and tabs give a soft, springy squish when pressed */
+[data-slot="button"],
+[data-slot="tabs-trigger"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, scale, translate, rotate;
+}
+[data-slot="button"]:not(:disabled):active,
+[data-slot="tabs-trigger"]:not(:disabled):active {
+  scale: 0.96;
+  transition-duration: 0.08s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-tab-indicator { transition: none; }
+  .liquid-tab-indicator[data-moving],
+  .liquid-blob,
+  .liquid-rise { animation: none; }
+  [data-slot="button"]:active,
+  [data-slot="tabs-trigger"]:active { scale: none; }
 }
 
 /* ── Image loading shimmer (components/shimmer-image.tsx) ── */
@@ -470,37 +596,169 @@ a {
 }
 
 
+/* Form glass (Pet Feed, Logger): glass surfaces and one shared easing, so every transition feels the same. */
+:root {
+  --pf-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --pf-accent: 249, 115, 22;
+}
+
+/* Fields and cards sit on the frosted card, so they use translucency and a lit rim rather than
+   their own backdrop blur (dozens of nested blurs are slow on phones). States live here too,
+   since this unlayered CSS outranks Tailwind's border/background utilities. */
+.paw-field-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52));
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(24, 24, 27, 0.04),
+    0 6px 18px -10px rgba(24, 24, 27, 0.16);
+  transition:
+    background 300ms var(--pf-ease),
+    border-color 300ms var(--pf-ease),
+    box-shadow 300ms var(--pf-ease),
+    transform 300ms var(--pf-ease),
+    color 200ms ease;
+}
+.paw-field-glass:hover:not([data-selected="true"]) {
+  border-color: rgba(var(--pf-accent), 0.28);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 4px rgba(24, 24, 27, 0.04),
+    0 12px 28px -14px rgba(24, 24, 27, 0.22);
+}
+label.paw-field-glass:hover:not([data-selected="true"]) {
+  transform: translateY(-1px);
+}
+.paw-field-glass:focus-visible,
+.paw-field-glass:focus-within,
+.paw-field-glass:has(input:focus-visible) {
+  outline: none;
+  border-color: rgba(var(--pf-accent), 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 0 0 4px rgba(var(--pf-accent), 0.14),
+    0 12px 28px -14px rgba(var(--pf-accent), 0.35);
+}
+.paw-field-glass[data-selected="true"] {
+  background: linear-gradient(180deg, rgba(255, 237, 213, 0.9), rgba(255, 247, 237, 0.62));
+  border-color: rgba(var(--pf-accent), 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 1px rgba(var(--pf-accent), 0.12),
+    0 14px 30px -16px rgba(var(--pf-accent), 0.55);
+}
+.paw-field-glass[aria-invalid="true"],
+.paw-field-glass[data-invalid="true"] {
+  border-color: rgba(239, 68, 68, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 0 0 4px rgba(239, 68, 68, 0.12);
+}
+.paw-field-glass[readonly] {
+  background: linear-gradient(180deg, rgba(244, 244, 245, 0.75), rgba(244, 244, 245, 0.5));
+}
+.dark .paw-field-glass {
+  background: linear-gradient(180deg, rgba(39, 39, 42, 0.62), rgba(24, 24, 27, 0.42));
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 8px 22px -14px rgba(0, 0, 0, 0.7);
+}
+.dark .paw-field-glass:hover:not([data-selected="true"]) {
+  border-color: rgba(var(--pf-accent), 0.3);
+}
+.dark .paw-field-glass[data-selected="true"] {
+  background: linear-gradient(180deg, rgba(124, 45, 18, 0.45), rgba(67, 20, 7, 0.3));
+  border-color: rgba(var(--pf-accent), 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 30px -16px rgba(var(--pf-accent), 0.45);
+}
+.dark .paw-field-glass[readonly] {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* The main button: solid orange with a lit top edge and a light sweep on hover. */
+.paw-cta {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #fb923c, #ea580c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 10px 24px -10px rgba(var(--pf-accent), 0.7);
+  transition: transform 250ms var(--pf-ease), box-shadow 250ms var(--pf-ease);
+}
+.paw-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 700ms var(--pf-ease);
+  pointer-events: none;
+}
+.paw-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    0 16px 30px -12px rgba(var(--pf-accent), 0.8);
+}
+.paw-cta:hover:not(:disabled)::after {
+  transform: translateX(120%);
+}
+.paw-cta:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+/* Steps slide in from the side you are heading to, coming out of a soft blur. */
+@keyframes pet-feed-step-forward {
+  from { opacity: 0; transform: translateX(28px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes pet-feed-step-back {
+  from { opacity: 0; transform: translateX(-28px); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes paw-fade {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.pet-feed-step[data-direction="forward"] { animation: pet-feed-step-forward 420ms var(--pf-ease) both; }
+.pet-feed-step[data-direction="back"] { animation: pet-feed-step-back 420ms var(--pf-ease) both; }
+.paw-fade { animation: paw-fade 380ms var(--pf-ease) both; }
+
 /* PetFeed step fields: subtle staggered entrance while preserving layout. */
 @keyframes pet-feed-field-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.995);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 .pet-feed-field {
-  animation: pet-feed-field-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pet-feed-field-in 460ms var(--pf-ease) both;
 }
 
-.pet-feed-field:nth-child(2) { animation-delay: 45ms; }
-.pet-feed-field:nth-child(3) { animation-delay: 90ms; }
-.pet-feed-field:nth-child(4) { animation-delay: 135ms; }
-.pet-feed-field:nth-child(5) { animation-delay: 180ms; }
-.pet-feed-field:nth-child(6) { animation-delay: 225ms; }
-.pet-feed-field:nth-child(7) { animation-delay: 270ms; }
-.pet-feed-field:nth-child(8) { animation-delay: 315ms; }
-.pet-feed-field:nth-child(9) { animation-delay: 360ms; }
-.pet-feed-field:nth-child(10) { animation-delay: 405ms; }
-.pet-feed-field:nth-child(11) { animation-delay: 450ms; }
-.pet-feed-field:nth-child(12) { animation-delay: 495ms; }
+.pet-feed-field:nth-child(2) { animation-delay: 40ms; }
+.pet-feed-field:nth-child(3) { animation-delay: 80ms; }
+.pet-feed-field:nth-child(4) { animation-delay: 120ms; }
+.pet-feed-field:nth-child(5) { animation-delay: 160ms; }
+.pet-feed-field:nth-child(6) { animation-delay: 200ms; }
+.pet-feed-field:nth-child(7) { animation-delay: 240ms; }
+.pet-feed-field:nth-child(8) { animation-delay: 280ms; }
+.pet-feed-field:nth-child(9) { animation-delay: 320ms; }
+.pet-feed-field:nth-child(10) { animation-delay: 360ms; }
+.pet-feed-field:nth-child(11) { animation-delay: 400ms; }
+.pet-feed-field:nth-child(12) { animation-delay: 440ms; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pet-feed-field {
+  .pet-feed-field,
+  .pet-feed-step[data-direction],
+  .paw-fade {
     animation: none;
+  }
+  .paw-field-glass,
+  .paw-cta,
+  .paw-cta::after {
+    transition: none;
   }
 }
 

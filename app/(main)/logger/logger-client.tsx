@@ -173,6 +173,20 @@ export function LoggerClient() {
 
   const loggedDays = useMemo(() => Array.from(new Set(petEntries.map((entry) => entry.loggedOn))), [petEntries])
   const loggedDates = useMemo(() => loggedDays.map((day) => parseISO(day)), [loggedDays])
+  const loggedDaySet = useMemo(() => new Set(loggedDays), [loggedDays])
+
+  // Each pet's recent foods (newest first) for one-tap fills in the meal dialog
+  const recentFoods = useMemo(() => {
+    const byPet: Record<string, string[]> = {}
+    const newestFirst = [...entries].sort((a, b) =>
+      `${b.loggedOn} ${b.loggedAt ?? ""}`.localeCompare(`${a.loggedOn} ${a.loggedAt ?? ""}`)
+    )
+    for (const entry of newestFirst) {
+      const list = (byPet[entry.petName] ??= [])
+      if (list.length < 5 && !list.some((food) => food.toLowerCase() === entry.foodName.toLowerCase())) list.push(entry.foodName)
+    }
+    return byPet
+  }, [entries])
 
   const qualityTrend = useMemo(() => {
     const byDay = new Map<string, { total: number; count: number }>()
@@ -219,15 +233,43 @@ export function LoggerClient() {
     }
   }
 
+  // Deleting is instant, with Undo in the toast instead of an "are you sure?" step
   const handleDelete = async (entry: PetLoggerEntry) => {
     if (!user) return
     try {
       await deletePetLoggerEntry(entry.id, user.uid)
       setEntries((current) => current.filter((item) => item.id !== entry.id))
-      toast.success("Log entry removed.")
+      toast.success(`${mealLabels[entry.mealType]} removed.`, {
+        duration: 6000,
+        action: { label: "Undo", onClick: () => void restoreEntry(entry) },
+      })
     } catch (error) {
       console.error("Unable to delete logger entry:", error)
       toast.error("Could not remove this log entry.")
+    }
+  }
+
+  const restoreEntry = async (entry: PetLoggerEntry) => {
+    if (!user) return
+    try {
+      const saved = await savePetLoggerEntry({
+        userId: user.uid,
+        loggedOn: entry.loggedOn,
+        petName: entry.petName,
+        mealType: entry.mealType,
+        loggedAt: entry.loggedAt,
+        foodName: entry.foodName,
+        feedQuality: entry.feedQuality,
+        quantity: entry.quantity,
+        waterMl: entry.waterMl,
+        treats: entry.treats,
+        notes: entry.notes,
+      })
+      setEntries((current) => [saved, ...current])
+      toast.success("Entry restored.")
+    } catch (error) {
+      console.error("Unable to restore logger entry:", error)
+      toast.error("Could not restore this entry.")
     }
   }
 
@@ -301,7 +343,7 @@ export function LoggerClient() {
 
         <div className="flex flex-wrap items-center gap-2">
           {pets.length > 1 && (
-            <div role="tablist" aria-label="Pet" className="flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl bg-muted/70 p-1">
+            <div role="tablist" aria-label="Pet" className="paw-glass flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl p-1 [scrollbar-width:none]">
               <PetTab active={activePet === ALL} onClick={() => setActivePet(ALL)} icon={Users} label="All pets" />
               {pets.map((pet) => (
                 <PetTab
@@ -316,7 +358,7 @@ export function LoggerClient() {
           )}
           <Button
             type="button"
-            className="h-10 rounded-2xl bg-orange-500 px-5 font-bold text-white shadow-md shadow-orange-500/20 hover:bg-orange-600"
+            className="paw-cta h-10 rounded-2xl px-5 font-bold text-white hover:text-white"
             onClick={() => openMeal()}
           >
             <Plus className="h-4 w-4" /> Log meal
@@ -325,20 +367,20 @@ export function LoggerClient() {
       </header>
 
       {!loadingPets && profilePets.length === 0 && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-dashed border-orange-300/60 bg-orange-50/50 px-4 py-3 text-sm dark:border-orange-900 dark:bg-orange-950/10">
+        <div className="paw-glass paw-fade mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm">
           <span>
             <strong>Add your pet in Pet Feed</strong>
             <span className="text-muted-foreground"> to pick them in one tap and get their usual food & portions prefilled.</span>
           </span>
-          <Button asChild size="sm" variant="outline" className="rounded-lg">
+          <Button asChild size="sm" className="paw-cta rounded-xl text-white hover:text-white">
             <Link href="/pet-feed">Open Pet Feed</Link>
           </Button>
         </div>
       )}
 
       {weightDue && (
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-2xl border border-sky-300/50 bg-sky-50/70 px-4 py-3 dark:border-sky-900/60 dark:bg-sky-950/20">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-600 text-white">
+        <div className="paw-glass paw-fade mb-5 flex flex-wrap items-center gap-3 rounded-2xl px-4 py-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-b from-sky-400 to-sky-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_8px_18px_-8px_rgba(2,132,199,0.7)]">
             <Scale className="h-4 w-4" />
           </span>
           <p className="min-w-0 flex-1 text-sm">
@@ -347,7 +389,7 @@ export function LoggerClient() {
               {lastWeight ? ` · last ${lastWeight.weightKg.toFixed(2)} kg, ${daysSinceWeight} days ago` : " · no weight logged yet"}
             </span>
           </p>
-          <Button type="button" size="sm" className="rounded-lg bg-sky-600 text-white hover:bg-sky-700" onClick={() => setWeightOpen(true)}>
+          <Button type="button" size="sm" className="rounded-xl bg-sky-600 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3)] transition hover:-translate-y-px hover:bg-sky-700" onClick={() => setWeightOpen(true)}>
             Log weight
           </Button>
         </div>
@@ -355,7 +397,7 @@ export function LoggerClient() {
 
       <div className="grid gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">
         {/* Calendar */}
-        <aside className="h-fit rounded-3xl border bg-card p-4 shadow-sm lg:sticky lg:top-28">
+        <aside className="paw-glass order-2 h-fit rounded-3xl p-4 lg:sticky lg:top-28 lg:order-none">
           <Calendar
             mode="single"
             selected={selectedDate}
@@ -373,16 +415,16 @@ export function LoggerClient() {
             }}
             className="mx-auto w-full"
           />
-          <div className="mt-3 border-t pt-3">
+          <div className="mt-3 border-t border-white/60 pt-3 dark:border-white/5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-muted-foreground">{format(visibleMonth, "MMMM")} logged</span>
               <span className="font-bold tabular-nums">
                 {loadingEntries ? <Loader2 className="h-3 w-3 animate-spin" /> : `${monthDaysLogged} / ${monthDays} days`}
               </span>
             </div>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-orange-500/10">
               <div
-                className="h-full rounded-full bg-orange-500 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-orange-600 shadow-[0_0_10px_rgba(249,115,22,0.5)] transition-[width] duration-700 ease-[var(--pf-ease)]"
                 style={{ width: `${monthDays ? Math.min(100, (monthDaysLogged / monthDays) * 100) : 0}%` }}
               />
             </div>
@@ -398,6 +440,7 @@ export function LoggerClient() {
             }}
             entries={dayEntries}
             loading={loadingEntries}
+            loggedDays={loggedDaySet}
             showPet={activePet === ALL && pets.length > 1}
             onAdd={(meal) => openMeal(meal)}
             onLogAgain={(entry) => openMeal(undefined, entry)}
@@ -427,6 +470,7 @@ export function LoggerClient() {
         date={selectedDate}
         pets={pets}
         defaultPetName={activePet !== ALL ? activePet : pets[0]?.name || ""}
+        recentFoods={recentFoods}
         template={mealTemplate}
         initialMeal={mealInitial}
         onSave={handleSaveMeal}
@@ -442,8 +486,10 @@ function PetTab({ active, onClick, icon: Icon, label }: { active: boolean; onCli
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition ${
-        active ? "bg-background text-orange-700 shadow-sm dark:text-orange-300" : "text-muted-foreground hover:text-foreground"
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-xl px-3 text-xs font-bold transition-all duration-300 ease-[var(--pf-ease)] ${
+        active
+          ? "bg-orange-500 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.3),0_6px_14px_-6px_rgba(249,115,22,0.6)]"
+          : "text-muted-foreground hover:bg-orange-500/10 hover:text-foreground"
       }`}
     >
       <Icon className="h-3.5 w-3.5" />
