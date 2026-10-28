@@ -53,7 +53,7 @@ interface ChatMessageProps {
 export function ChatMessage({ item, question, petName, petKind = "dog", planning = false, general = false, onRetry, onLogFood, quickReads, onOpenQuickRead }: ChatMessageProps) {
   if (item.role === "user") {
     return (
-      <div id={`msg-${item.id}`} data-question className="paw-gpt-anim-pop flex scroll-mt-24 justify-end">
+      <div id={`msg-${item.id}`} data-question className="paw-gpt-anim-drop flex scroll-mt-24 justify-end">
         <p className="max-w-[85%] whitespace-pre-wrap rounded-[1.4rem] rounded-br-md bg-gradient-to-b from-orange-400 to-orange-500 px-4 py-2.5 text-[15px] leading-snug text-white shadow-[0_6px_18px_-6px_rgba(249,115,22,0.55),inset_0_1px_0_rgba(255,255,255,0.3)]">
           {item.content}
         </p>

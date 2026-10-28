@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { subDays } from "date-fns"
-import { ArrowUp, Cat, ChevronDown, Dog, FileText, Heart, Home, LogIn, PawPrint, Plus, Sparkles, SquarePen, Square, User } from "lucide-react"
+import { ArrowUp, Cat, ChevronDown, CircleHelp, Dog, FileText, Heart, Home, LogIn, PawPrint, Plus, Sparkles, SquarePen, Square, User } from "lucide-react"
 import { toast } from "sonner"
 
 import { doc, onSnapshot } from "firebase/firestore"
@@ -74,6 +74,7 @@ import { FloatingRail } from "./components/floating-rail"
 import { ProfileDock, ProfileSidebar, type ChatSummary, type PawGptQuota } from "./components/profile-dock"
 import { PromptDock, usePromptDockOpen } from "./components/prompt-dock"
 import { UsageLimitDialog } from "./components/usage-limit-dialog"
+import { WalkthroughDialog, walkthroughSeen } from "./components/walkthrough-dialog"
 import { ChatHomeButton } from "../chat-home-button"
 import { pickQuickReads, QuickViewDialog, relatedReads, useQuickReads, type QuickRead } from "./components/quick-reads"
 import { ReadsPanel, type ReadsPanelContent } from "./components/reads-panel"
@@ -236,6 +237,14 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
 
   // The "you've been busy" dialog opens by itself the moment the allowance runs out.
   const [limitDialogOpen, setLimitDialogOpen] = useState(false)
+  // "How Paw GPT works": opens by itself on a first visit, and from the help buttons any time
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false)
+  useEffect(() => {
+    // Wait until we know who's here, and not when arriving with a question to ask (?q=)
+    if (authLoading || initialQuestion || walkthroughSeen()) return
+    const timer = window.setTimeout(() => setWalkthroughOpen(true), 900)
+    return () => window.clearTimeout(timer)
+  }, [authLoading, initialQuestion])
   const [wasLimited, setWasLimited] = useState(false)
   if (limitReached !== wasLimited) {
     setWasLimited(limitReached)
@@ -472,19 +481,37 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
       const weights = pet.planning ? [] : await loadWeights(petName)
       const context = buildPetContext(pet, entries, weights, profile?.displayName || user?.displayName || undefined)
       let tracked = false
-      for await (const chunk of streamPawGptAnswer({
-        user,
-        context,
-        messages: history,
-        signal: controller.signal,
-        exempt,
-        onGuestRemaining: setGuestLeft,
-      })) {
-        if (!tracked) {
-          tracked = true
-          void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER, guest: !user })
+      // Chunks arrive every few characters; render at most once per frame so long answers
+      // don't re-parse the whole Markdown on every chunk.
+      let buffered = ""
+      let frame = 0
+      const flush = () => {
+        frame = 0
+        if (!buffered) return
+        const text = buffered
+        buffered = ""
+        updateItem(chatId, answerId, (item) => ({ content: item.content + text }))
+      }
+      try {
+        for await (const chunk of streamPawGptAnswer({
+          user,
+          context,
+          messages: history,
+          signal: controller.signal,
+          exempt,
+          onGuestRemaining: setGuestLeft,
+        })) {
+          if (!tracked) {
+            tracked = true
+            void trackEvent("paw_gpt_question", { turn: Math.ceil(history.length / 2), provider: PAW_GPT_PROVIDER, guest: !user })
+          }
+          buffered += chunk
+          if (!frame) frame = requestAnimationFrame(flush)
         }
-        updateItem(chatId, answerId, (item) => ({ content: item.content + chunk }))
+      } finally {
+        // Whatever arrived before the end, a stop or an error is shown before the outcome below.
+        cancelAnimationFrame(frame)
+        flush()
       }
       updateItem(chatId, answerId, (item) =>
         item.content.trim()
@@ -709,7 +736,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
           onClick={startNewChat}
           aria-label="New chat"
           title="New chat"
-          className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 transition hover:bg-orange-500/15 active:scale-95 sm:px-4 dark:text-orange-300"
+          className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-orange-500/10 px-3 text-sm font-semibold text-orange-700 paw-liquid-press hover:bg-orange-500/15 sm:px-4 dark:text-orange-300"
         >
           <SquarePen className="h-4 w-4" />
           <span className="hidden sm:inline">New chat</span>
@@ -730,6 +757,16 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
           <span className="hidden sm:inline">Sign in</span>
         </button>
       )}
+      <button
+        type="button"
+        onClick={() => setWalkthroughOpen(true)}
+        data-tour="help"
+        aria-label="How Paw GPT works"
+        title="How Paw GPT works"
+        className="paw-liquid-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground/70 hover:bg-orange-500/10 hover:text-orange-700 dark:hover:text-orange-300"
+      >
+        <CircleHelp className="h-[18px] w-[18px]" />
+      </button>
       <ChatHomeButton />
     </div>
   )
@@ -741,6 +778,26 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
         aria-hidden
         className={`pointer-events-none absolute inset-x-0 top-0 h-[70%] bg-gradient-to-b ${phaseCopy[phase].sky} to-transparent transition-colors duration-700`}
       />
+      {/* Liquid ambience: soft colour drifting behind the glass, a little livelier while answering */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <span
+          className={`paw-gpt-anim-blob absolute -left-32 top-[18%] size-[30rem] rounded-full bg-[radial-gradient(circle,rgba(251,146,60,0.2),transparent_65%)] transition-opacity duration-1000 ${
+            streaming ? "opacity-100" : "opacity-50"
+          }`}
+        />
+        <span
+          className={`paw-gpt-anim-blob absolute -right-40 bottom-[8%] size-[34rem] rounded-full bg-[radial-gradient(circle,rgba(244,114,182,0.14),transparent_65%)] transition-opacity duration-1000 ${
+            streaming ? "opacity-100" : "opacity-40"
+          }`}
+          style={{ animationDelay: "-8s", animationDuration: "28s" }}
+        />
+        <span
+          className={`paw-gpt-anim-blob absolute left-1/3 top-[55%] size-[22rem] rounded-full bg-[radial-gradient(circle,rgba(250,204,21,0.12),transparent_65%)] transition-opacity duration-1000 ${
+            streaming ? "opacity-90" : "opacity-0"
+          }`}
+          style={{ animationDelay: "-15s", animationDuration: "18s" }}
+        />
+      </div>
 
       {/* Wider screens: floating liquid-glass top bar; the conversation scrolls underneath it (blurred
           through the glass), and the pets dock floats below it. Phones keep their controls at the bottom instead. */}
@@ -768,7 +825,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
 
       {/* Phones: a small draggable floating rail instead of a top bar (which would sit under the
           Dynamic Island). Home, New chat, and your avatar, which opens your pets, chats and usage. */}
-      <FloatingRail label="Paw GPT">
+      <FloatingRail label="Paw GPT" beacon={streaming}>
         <Link
           href="/"
           aria-label="Back to PawSattva home"
@@ -786,6 +843,15 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             <SquarePen className="size-[18px]" />
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setWalkthroughOpen(true)}
+          data-tour="help"
+          aria-label="How Paw GPT works"
+          className="flex size-10 items-center justify-center rounded-full text-foreground/75 transition active:scale-90 active:bg-orange-500/10"
+        >
+          <CircleHelp className="size-[19px]" />
+        </button>
         {user ? (
           <ProfileSidebar
             {...dockProps}
@@ -838,6 +904,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             onPrompt={(prompt) => void send(prompt)}
             guestLeft={guest ? guestLeft ?? PAW_GPT_GUEST_LIMIT : null}
             onSignIn={promptSignIn}
+            onShowWalkthrough={() => setWalkthroughOpen(true)}
           />
         ) : (
           // Full width on phones: the floating rail tucks away while you scroll instead of reserving a lane
@@ -902,7 +969,11 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             }}
           />
         )}
-        <div className="paw-glass mx-auto max-w-3xl rounded-[1.75rem] p-2 transition focus-within:ring-4 focus-within:ring-orange-500/15">
+        <div data-tour="composer" className="paw-glass relative mx-auto max-w-3xl overflow-hidden rounded-[1.75rem] p-2 transition focus-within:ring-4 focus-within:ring-orange-500/15">
+          {/* While answering: light flowing along the top edge */}
+          <span aria-hidden className={`pointer-events-none absolute inset-x-8 top-0 h-[2px] overflow-hidden rounded-full transition-opacity duration-500 ${streaming ? "opacity-100" : "opacity-0"}`}>
+            {streaming && <span className="paw-gpt-anim-flow absolute inset-0" />}
+          </span>
           <textarea
             ref={inputRef}
             rows={1}
@@ -933,6 +1004,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
               <button
                 type="button"
                 onClick={promptSignIn}
+                data-tour="pet-picker"
                 className={`inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${
                   guestLimitReached
                     ? "bg-orange-500 text-white shadow-sm shadow-orange-500/25 hover:bg-orange-600"
@@ -950,6 +1022,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
             <DropdownMenu open={pickerOpen} onOpenChange={setPickerOpen}>
               <DropdownMenuTrigger asChild>
                 <button
+                  data-tour="pet-picker"
                   type="button"
                   disabled={loadingData}
                   className={`inline-flex h-8 max-w-[60%] items-center gap-1.5 rounded-full px-3 text-xs font-bold transition ${
@@ -1014,6 +1087,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
               <button
                 type="button"
                 onClick={() => setLimitDialogOpen(true)}
+                data-tour="usage"
                 className={`ml-auto mr-1 flex min-w-0 flex-col items-end rounded-lg px-1 text-[11px] font-semibold leading-tight tabular-nums transition hover:bg-black/5 dark:hover:bg-white/10 ${
                   limitReached
                     ? "text-rose-600"
@@ -1038,7 +1112,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
                 type="button"
                 aria-label="Stop answering"
                 onClick={() => abortRef.current?.abort()}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-white transition hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
+                className="paw-gpt-anim-morph paw-liquid-press flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
               </button>
@@ -1047,7 +1121,7 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
                 type="submit"
                 aria-label="Send"
                 disabled={!input.trim() || limitReached}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/25 transition hover:bg-orange-600 disabled:opacity-40"
+                className="paw-gpt-anim-morph paw-liquid-press flex h-9 w-9 items-center justify-center rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/25 hover:bg-orange-600 disabled:opacity-40"
               >
                 <ArrowUp className="h-4 w-4" />
               </button>
@@ -1064,6 +1138,14 @@ export function PawGptClient({ initialQuestion }: { initialQuestion?: string }) 
       </form>
 
       <QuickViewDialog read={quickView} onOpenChange={(open) => !open && setQuickView(null)} />
+
+      <WalkthroughDialog
+        open={walkthroughOpen}
+        onOpenChange={setWalkthroughOpen}
+        guest={guest}
+        petName={pet && !pet.planning && !pet.guest ? pet.name : pets[0]?.name}
+        petKind={isCatPet(pet ?? pets[0] ?? null) ? "cat" : "dog"}
+      />
 
       {quota && (
         <UsageLimitDialog
@@ -1098,6 +1180,7 @@ function Greeting({
   onPrompt,
   guestLeft,
   onSignIn,
+  onShowWalkthrough,
 }: {
   phase: DayPhase
   firstName: string
@@ -1109,6 +1192,7 @@ function Greeting({
   /** Not signed in: free questions left (null when signed in) */
   guestLeft: number | null
   onSignIn: () => void
+  onShowWalkthrough: () => void
 }) {
   const copy = phaseCopy[phase]
 
@@ -1143,7 +1227,7 @@ function Greeting({
                     key={prompt}
                     type="button"
                     onClick={() => onPrompt(prompt)}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-500/25 transition hover:bg-orange-500/10 dark:text-orange-300"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-500/25 paw-liquid-press hover:bg-orange-500/10 dark:text-orange-300"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     {prompt}
@@ -1231,7 +1315,7 @@ function Greeting({
                     type="button"
                     title={item.description}
                     onClick={() => onPrompt(item.prompt)}
-                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-500/25 transition hover:bg-orange-500/10 dark:text-orange-300"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-semibold text-orange-700 ring-1 ring-orange-500/25 paw-liquid-press hover:bg-orange-500/10 dark:text-orange-300"
                   >
                     <FileText className="h-3.5 w-3.5" />
                     {item.title}
@@ -1260,6 +1344,16 @@ function Greeting({
           </>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={onShowWalkthrough}
+        className="paw-gpt-anim-rise paw-liquid-press mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-orange-500/10 hover:text-orange-700 dark:hover:text-orange-300"
+        style={{ animationDelay: "260ms" }}
+      >
+        <CircleHelp className="h-3.5 w-3.5" />
+        New here? See how Paw GPT works
+      </button>
     </div>
   )
 }

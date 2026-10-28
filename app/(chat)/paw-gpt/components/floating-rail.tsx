@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type PointerEvent, type ReactNode } from "react"
+import { History } from "lucide-react"
 
 const POSITION_KEY = "paw-gpt-rail-position"
 const EDGE = 8
@@ -13,6 +14,8 @@ const PEEK = 18
 const PARK_PULL = 24
 // A parked pill comes back only when dragged at least this far towards the middle
 const UNPARK_PULL = 20
+// Tapped out while Paw GPT answers, the pill stays out this long before tucking back
+const BEACON_HOLD_MS = 6000
 
 type Position = { x: number; y: number }
 type Side = "left" | "right"
@@ -34,8 +37,10 @@ function safeAreaInsets() {
  * Phone-only floating pill that can be dragged anywhere on screen.
  * Taps still reach the buttons inside; a drag never triggers them. The spot is remembered per device.
  * Dragged past a screen edge it parks there, only an orange grip showing, until it's dragged out again.
+ * With `beacon` (Paw GPT is answering) it waits against its edge with a shining border, so your
+ * chats are a tap away without covering the answer; a tap brings it out for a few seconds.
  */
-export function FloatingRail({ label, children }: { label: string; children: ReactNode }) {
+export function FloatingRail({ label, beacon = false, children }: { label: string; beacon?: boolean; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const navRef = useRef<HTMLElement>(null)
   const insets = useRef({ top: 0, bottom: 0 })
@@ -51,11 +56,25 @@ export function FloatingRail({ label, children }: { label: string; children: Rea
   // While the conversation scrolls the pill slides mostly off its edge, so it never covers what you read
   const [tucked, setTucked] = useState(false)
   const tuckTimer = useRef(0)
+  // Brought out by a tap while answering: stays out (the answer's own auto-scroll doesn't tuck it)
+  const [held, setHeld] = useState(false)
+  const heldRef = useRef(false)
+  const holdTimer = useRef(0)
+  const hold = () => {
+    heldRef.current = true
+    setHeld(true)
+    window.clearTimeout(holdTimer.current)
+    holdTimer.current = window.setTimeout(() => {
+      heldRef.current = false
+      setHeld(false)
+    }, BEACON_HOLD_MS)
+  }
+  useEffect(() => () => window.clearTimeout(holdTimer.current), [])
 
   useEffect(() => {
     // Scroll events don't bubble, but they do reach a capturing listener on the document
     const onScroll = () => {
-      if (drag.current) return
+      if (drag.current || heldRef.current) return
       setTucked(true)
       window.clearTimeout(tuckTimer.current)
       tuckTimer.current = window.setTimeout(() => setTucked(false), 1100)
@@ -73,7 +92,8 @@ export function FloatingRail({ label, children }: { label: string; children: Rea
   const railX = position?.x ?? viewportWidth - RAIL_WIDTH - EDGE
   const tuckLeft = parked ? parked === "left" : railX + RAIL_WIDTH / 2 < viewportWidth / 2
   const tuckBy = tuckLeft ? -(railX + RAIL_WIDTH - PEEK) : viewportWidth - railX - PEEK
-  const hidden = (parked !== null || tucked) && !dragging
+  const waiting = beacon && !held && parked === null
+  const hidden = (parked !== null || tucked || waiting) && !dragging
   const gripSide = dragging ? parkHint : tuckLeft ? "left" : "right"
   const showGrip = hidden || (dragging && parkHint !== null)
 
@@ -129,10 +149,12 @@ export function FloatingRail({ label, children }: { label: string; children: Rea
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
     suppressClick.current = false
-    // Touching a pill tucked by scrolling just brings it back; it doesn't press the half-hidden button
-    if (tucked && !parked) {
+    // Touching a pill tucked by scrolling (or waiting while Paw GPT answers) just brings it back;
+    // it doesn't press the half-hidden button
+    if ((tucked || waiting) && !parked) {
       window.clearTimeout(tuckTimer.current)
       setTucked(false)
+      if (beacon) hold()
       suppressClick.current = true
       return
     }
@@ -214,12 +236,14 @@ export function FloatingRail({ label, children }: { label: string; children: Rea
       <nav
         ref={navRef}
         aria-label={label}
+        // The walkthrough points at the rail for chats and history
+        data-tour="history"
         className={`paw-liquid-glass flex w-[52px] flex-col items-center gap-1.5 rounded-full p-1.5 duration-300 ease-out ${
           // No translate transition mid-drag, or the pill would lag behind the finger
           dragging
             ? "scale-105 cursor-grabbing shadow-[0_18px_40px_-10px_rgba(24,24,27,0.35)] transition-[scale,box-shadow]"
             : "cursor-grab transition-[translate,scale,box-shadow]"
-        } ${dragging && parkHint ? "ring-2 ring-orange-400/70" : ""}`}
+        } ${dragging && parkHint ? "ring-2 ring-orange-400/70" : ""} ${beacon ? "paw-gpt-anim-shine" : ""}`}
         style={hidden ? { translate: `${tuckBy}px 0` } : undefined}
       >
         {/* Orange grip: hints that the pill can be moved */}
@@ -239,10 +263,25 @@ export function FloatingRail({ label, children }: { label: string; children: Rea
             the pill back; parked, it has to be dragged out. */}
         <span
           aria-hidden
-          className={`absolute top-1/2 h-12 w-1.5 -translate-y-1/2 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 shadow-[0_0_10px_rgba(249,115,22,0.6)] transition-opacity duration-300 ${
+          className={`absolute top-1/2 w-1.5 -translate-y-1/2 rounded-full transition-[opacity,height] duration-300 ${
+            beacon ? "paw-gpt-anim-grip h-[4.5rem]" : "h-14 bg-gradient-to-b from-orange-400 to-orange-600"
+          } ${
+            // Glows, and hops a few times each time it appears
+            showGrip ? "paw-gpt-anim-grippy" : ""
+          } ${
             gripSide === "left" ? "right-[6px]" : "left-[6px]"
           } ${showGrip ? "opacity-100" : "pointer-events-none opacity-0"}`}
         />
+        {/* Hidden on purpose (or waiting while Paw GPT answers): a glowing history icon beside the bar,
+            on the screen, so it's clear your chats are in there. Not while merely tucked by scrolling. */}
+        <span
+          aria-hidden
+          className={`paw-gpt-anim-breathe pointer-events-none absolute top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_0_16px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] transition-[opacity,scale] duration-300 ${
+            tuckLeft ? "-right-11" : "-left-11"
+          } ${(parked !== null || waiting) && !dragging ? "scale-100 opacity-100" : "scale-75 opacity-0"}`}
+        >
+          <History className="size-4" />
+        </span>
       </nav>
     </div>
   )

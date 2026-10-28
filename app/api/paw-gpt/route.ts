@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { ApiError as GeminiApiError, GoogleGenAI, type ThinkingLevel } from "@google/genai"
-import { NextResponse } from "next/server"
+import { after, NextResponse } from "next/server"
 
 import {
   PAW_GPT_DAILY_LIMIT,
@@ -16,7 +16,7 @@ import {
   type PawGptRequest,
 } from "@/lib/paw-gpt"
 import { FirebaseAdminConfigError } from "@/lib/server/firebase-admin"
-import { authenticate, createRateLimiter, firestoreBase, type AuthResult } from "@/lib/server/paw-gpt-auth"
+import { authenticate, createRateLimiter, firestoreBase, unverifiedCaller, type AuthResult } from "@/lib/server/paw-gpt-auth"
 import { clientIp, consumeGuestQuestion, guestCookieHeader, guestIdFrom, recordGuestTokens } from "@/lib/server/paw-gpt-guest"
 
 // Long answers (full reports) stream for a while.
@@ -28,10 +28,13 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest"
 // Lighter model tried when the main one is overloaded; set GEMINI_FALLBACK_MODEL=none to disable.
 const GEMINI_FALLBACK_MODEL =
   process.env.GEMINI_FALLBACK_MODEL?.trim() === "none" ? "" : process.env.GEMINI_FALLBACK_MODEL?.trim() || "gemini-flash-lite-latest"
-// Flash models think before the first visible word by default, which is most of the wait on a
-// chat answer. "low" keeps reports sensible and starts streaming far sooner. Set
-// GEMINI_THINKING_LEVEL=minimal|low|medium|high, or "default" to let the model decide.
-const GEMINI_THINKING_LEVEL = process.env.GEMINI_THINKING_LEVEL?.trim().toLowerCase() || "low"
+// Flash models think before the first visible word, which is most of the wait on a chat answer.
+// By default everyday questions use "minimal" and reports "low". Set
+// GEMINI_THINKING_LEVEL=minimal|low|medium|high to force one, or "default" to let the model decide.
+const GEMINI_THINKING_LEVEL = process.env.GEMINI_THINKING_LEVEL?.trim().toLowerCase() || "auto"
+const REPORT_REQUEST = /\b(report|summary|summari[sz]e|analy[sz]e|analysis|breakdown|compare|plan|chart|schedule)\b/i
+// A model that hasn't written a word by then is abandoned for the next option in the plan.
+const FIRST_TOKEN_TIMEOUT_MS = Number(process.env.PAW_GPT_FIRST_TOKEN_TIMEOUT_MS) || 10_000
 
 type ServerProvider = "gemini" | "anthropic"
 
@@ -93,7 +96,12 @@ function incrementUsage(uid: string, token: string, increments: Record<string, n
  * PAW_GPT_DAILY_LIMIT questions were asked and fewer than PAW_GPT_DAILY_TOKEN_LIMIT tokens
  * were used, so the rules (not this code) stop it, and a user can't reset the counter.
  */
-async function consumeDailyQuestion(uid: string, token: string, staff: boolean): Promise<QuotaResult> {
+async function consumeDailyQuestion(
+  uid: string,
+  token: string,
+  staff: boolean,
+  reads?: Promise<QuotaReads> | null
+): Promise<QuotaResult> {
   if (staff) {
     // Admins and authors are counted for the usage totals but never limited,
     // so a failed write (e.g. rules not deployed yet) must not block them.
@@ -103,11 +111,7 @@ async function consumeDailyQuestion(uid: string, token: string, staff: boolean):
   }
 
   // Read first so a full quota gets a clear message rather than a generic denial.
-  const authHeaders = { Authorization: `Bearer ${token}` }
-  const [current, subscribed] = await Promise.all([
-    fetch(`${firestoreBase}/${pawGptUsagePath(uid)}`, { headers: authHeaders, cache: "no-store" }),
-    hasActiveSubscription(uid, token),
-  ])
+  const [current, subscribed] = await (reads ?? readQuota(uid, token))
   if (current.status === 403) {
     // The owner can always read their counter, so this means the rules aren't deployed.
     console.error("Paw GPT: reading the usage counter was denied. Deploy firebase/firestore.rules.")
@@ -137,6 +141,16 @@ async function consumeDailyQuestion(uid: string, token: string, staff: boolean):
   if (commit.status === 403) return hasPass ? (subscribed ? plusUsedUp() : passUsedUp()) : dailyLimitReached()
   console.error("Paw GPT: could not update the usage counter:", commit.status)
   return { ok: false, status: 502, error: "Could not start your question. Try again." }
+}
+
+type QuotaReads = [usage: Response, subscribed: boolean]
+
+/** Today's usage counter and the Plus subscription, read together. */
+function readQuota(uid: string, token: string): Promise<QuotaReads> {
+  return Promise.all([
+    fetch(`${firestoreBase}/${pawGptUsagePath(uid)}`, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }),
+    hasActiveSubscription(uid, token),
+  ])
 }
 
 /** Paw GPT Plus: pawGptSubscriptions/{uid}.activeUntil is in the future (owner-readable, server-written). */
@@ -231,8 +245,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Paw GPT is not configured on the server yet." }, { status: 503 })
   }
 
+  const timing = createTiming()
   // No Authorization header: a visitor who isn't signed in (a few free questions, then sign in).
-  if (!req.headers.get("authorization")) return answerGuest(req, provider)
+  if (!req.headers.get("authorization")) return answerGuest(req, provider, timing)
+
+  // Every Firestore call is a full round trip, so the quota reads and the body go out alongside
+  // the account check. The reads are only used once that check has passed.
+  const claimed = unverifiedCaller(req)
+  const quotaReads = claimed ? readQuota(claimed.uid, claimed.token) : null
+  quotaReads?.catch(() => {}) // awaited later, or never when the check fails
+  const body = req.json().catch(() => null)
 
   let auth: AuthResult
   try {
@@ -250,33 +272,30 @@ export async function POST(req: Request) {
     )
   }
 
-  let request: PawGptRequest | null = null
-  try {
-    request = parseBody(await req.json())
-  } catch {
-    request = null
-  }
+  const request = parseBody(await body)
   if (!request) {
     return NextResponse.json({ error: "That message could not be sent. Try a shorter question." }, { status: 400 })
   }
+  timing.mark("checks")
 
   // Counted last, so a rejected request never uses up one of the day's questions.
   let quota: QuotaResult
   try {
-    quota = await consumeDailyQuestion(auth.uid, auth.token, auth.staff)
+    quota = await consumeDailyQuestion(auth.uid, auth.token, auth.staff, claimed?.uid === auth.uid ? quotaReads : null)
   } catch (error) {
     console.error("Paw GPT quota check failed:", error)
     return NextResponse.json({ error: "Could not start your question. Try again." }, { status: 502 })
   }
   if (!quota.ok) return NextResponse.json({ error: quota.error, code: quota.code }, { status: quota.status })
+  timing.mark("quota")
 
   const caller = auth
   // Admins and authors are recorded too, so the totals show real usage.
-  return streamAnswer(provider, request, req.signal, (usage) => recordTokens(caller.uid, caller.token, usage))
+  return streamAnswer(provider, request, req.signal, (usage) => recordTokens(caller.uid, caller.token, usage), timing)
 }
 
 /** A visitor who isn't signed in: general questions only, PAW_GPT_GUEST_LIMIT in total. */
-async function answerGuest(req: Request, provider: ServerProvider) {
+async function answerGuest(req: Request, provider: ServerProvider, timing: Timing) {
   const ip = clientIp(req)
   if (rateLimited(`guest-ip:${ip}`)) {
     return NextResponse.json(
@@ -321,29 +340,70 @@ async function answerGuest(req: Request, provider: ServerProvider) {
     console.error("Paw GPT guest quota check failed:", error)
     return NextResponse.json({ error: "Could not start your question. Try again." }, { status: 502 })
   }
+  timing.mark("quota")
 
-  const response = streamAnswer(provider, request, req.signal, (usage) => recordGuestTokens(guest.id, usage))
+  const response = await streamAnswer(provider, request, req.signal, (usage) => recordGuestTokens(guest.id, usage), timing)
   response.headers.set(PAW_GPT_GUEST_REMAINING_HEADER, String(remaining))
   if (guest.isNew) response.headers.append("Set-Cookie", guestCookieHeader(guest.id))
   return response
 }
 
-/** Streams the answer as plain text; `record` gets the tokens it used before the stream closes. */
-function streamAnswer(
+type Timing = ReturnType<typeof createTiming>
+
+/**
+ * Durations of the steps before the answer starts, sent as Server-Timing so they show in
+ * DevTools → Network → (the paw-gpt request) → Timing, and logged for Vercel's Logs tab.
+ */
+function createTiming() {
+  const startedAt = performance.now()
+  let last = startedAt
+  const entries: string[] = []
+  return {
+    mark(name: string, desc?: string) {
+      const now = performance.now()
+      entries.push(`${name};${desc ? `desc="${desc}";` : ""}dur=${Math.round(now - last)}`)
+      last = now
+    },
+    header: () => entries.join(", "),
+    total: () => Math.round(performance.now() - startedAt),
+  }
+}
+
+/** Streams the answer as plain text; `record` gets the tokens it used once the stream has closed. */
+async function streamAnswer(
   provider: ServerProvider,
   request: PawGptRequest,
   signal: AbortSignal,
-  record: (usage: TokenUsage) => Promise<void>
+  record: (usage: TokenUsage) => Promise<void>,
+  timing: Timing
 ) {
   const encoder = new TextEncoder()
   // Tokens this answer used (prompt incl. pet record and cached prefix, plus the answer).
   const usage: TokenUsage = { input: 0, output: 0 }
+  const trace: AnswerTrace = {}
+  // After the response has finished, so the last words aren't held up by this write.
+  // Stopped or failed answers still count for the tokens they actually used.
+  after(() => record(usage))
+
+  // Holding the headers until the first words costs nothing (there's nothing to show sooner)
+  // and lets Server-Timing include how long the model took to start.
+  const answer = answerWithFallback(answerPlan(provider), request, signal, usage, trace)
+  let first: IteratorResult<string> | null = null
+  let failure: unknown = null
+  try {
+    first = await answer.next()
+  } catch (error) {
+    failure = error
+  }
+  timing.mark("model", trace.model)
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        for await (const text of answerWithFallback(answerPlan(provider), request, signal, usage)) {
-          controller.enqueue(encoder.encode(text))
+        if (failure) throw failure
+        if (first && !first.done) {
+          controller.enqueue(encoder.encode(first.value))
+          for await (const text of answer) controller.enqueue(encoder.encode(text))
         }
       } catch (error) {
         if (signal.aborted) return
@@ -353,9 +413,7 @@ function streamAnswer(
           : "Something went wrong while answering. Please try again."
         controller.enqueue(encoder.encode(`\n\n${message}`))
       } finally {
-        // Record before closing: the function may stop once the response ends.
-        // Stopped or failed answers still count for the tokens they actually used.
-        await record(usage)
+        console.log(`Paw GPT timing: ${timing.header()}, total;dur=${timing.total()}`)
         try {
           controller.close()
         } catch {
@@ -370,6 +428,7 @@ function streamAnswer(
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
+      "Server-Timing": timing.header(),
     },
   })
 }
@@ -402,14 +461,14 @@ type Attempt = { provider: ServerProvider; model: string; delayMs: number }
 function answerPlan(primary: ServerProvider): Attempt[] {
   const geminiAttempts: Attempt[] = [
     { provider: "gemini", model: GEMINI_MODEL, delayMs: 0 },
-    { provider: "gemini", model: GEMINI_MODEL, delayMs: 1200 },
+    { provider: "gemini", model: GEMINI_MODEL, delayMs: 400 },
     ...(GEMINI_FALLBACK_MODEL && GEMINI_FALLBACK_MODEL !== GEMINI_MODEL
       ? [{ provider: "gemini" as const, model: GEMINI_FALLBACK_MODEL, delayMs: 300 }]
       : []),
   ]
   const anthropicAttempts: Attempt[] = [
     { provider: "anthropic", model: ANTHROPIC_MODEL, delayMs: 0 },
-    { provider: "anthropic", model: ANTHROPIC_MODEL, delayMs: 1200 },
+    { provider: "anthropic", model: ANTHROPIC_MODEL, delayMs: 400 },
   ]
   const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim())
   const hasAnthropic = Boolean(process.env.ANTHROPIC_API_KEY?.trim())
@@ -425,27 +484,68 @@ const pause = (ms: number, signal: AbortSignal) =>
     signal.addEventListener("abort", () => { clearTimeout(timer); resolve() }, { once: true })
   })
 
+/** Which model ended up answering, for Server-Timing and the logs. */
+type AnswerTrace = { model?: string }
+
+class FirstTokenTimeout extends Error {}
+
 /**
  * Runs the plan until one attempt answers. Only switches while nothing has been streamed yet,
  * so the pet parent never gets half an answer from one model and the rest from another.
+ * An attempt that hasn't written a word within FIRST_TOKEN_TIMEOUT_MS is abandoned too
+ * (except the last, which gets as long as it needs), and so are later attempts on that model.
  */
-async function* answerWithFallback(plan: Attempt[], request: PawGptRequest, signal: AbortSignal, usage: TokenUsage) {
+async function* answerWithFallback(
+  plan: Attempt[],
+  request: PawGptRequest,
+  signal: AbortSignal,
+  usage: TokenUsage,
+  trace: AnswerTrace
+) {
   let lastError: unknown
-  for (const attempt of plan) {
+  const stalled = new Set<string>()
+  for (const [index, attempt] of plan.entries()) {
+    const key = `${attempt.provider}/${attempt.model}`
+    if (stalled.has(key)) continue
     await pause(attempt.delayMs, signal)
     if (signal.aborted) return
+
+    const controller = new AbortController()
+    const abort = () => controller.abort()
+    signal.addEventListener("abort", abort, { once: true })
+    let timedOut = false
+    const timer =
+      index < plan.length - 1
+        ? setTimeout(() => {
+            timedOut = true
+            controller.abort()
+          }, FIRST_TOKEN_TIMEOUT_MS)
+        : undefined
     let streamed = false
     try {
       const run = attempt.provider === "gemini" ? answerWithGemini : answerWithAnthropic
-      for await (const text of run(request, signal, usage, attempt.model)) {
-        streamed = true
+      for await (const text of run(request, controller.signal, usage, attempt.model)) {
+        if (!streamed) {
+          streamed = true
+          clearTimeout(timer)
+          trace.model = attempt.model
+        }
         yield text
       }
-      return
+      if (streamed || !timedOut) return
+      throw new FirstTokenTimeout()
     } catch (error) {
-      if (streamed || signal.aborted || !isTransient(error)) throw error
+      if (streamed || signal.aborted || !(timedOut || isTransient(error))) throw error
       lastError = error
-      console.warn(`Paw GPT: ${attempt.provider}/${attempt.model} unavailable (${errorStatus(error)}), trying the next option`)
+      if (timedOut) {
+        stalled.add(key)
+        console.warn(`Paw GPT: ${key} wrote nothing in ${FIRST_TOKEN_TIMEOUT_MS}ms, trying the next option`)
+      } else {
+        console.warn(`Paw GPT: ${key} unavailable (${errorStatus(error)}), trying the next option`)
+      }
+    } finally {
+      clearTimeout(timer)
+      signal.removeEventListener("abort", abort)
     }
   }
   throw lastError
@@ -491,6 +591,16 @@ async function* answerWithAnthropic(request: PawGptRequest, signal: AbortSignal,
 
 const GEMINI_BLOCKED = new Set(["SAFETY", "BLOCKLIST", "PROHIBITED_CONTENT", "RECITATION", "SPII", "IMAGE_SAFETY"])
 
+/** `${model}:${level}` pairs Gemini rejected with a 400 on this instance. */
+const refusedThinking = new Set<string>()
+
+/** "minimal" for everyday questions and "low" for reports, unless GEMINI_THINKING_LEVEL forces one. */
+function thinkingLevelFor(request: PawGptRequest) {
+  if (GEMINI_THINKING_LEVEL === "default") return undefined
+  if (GEMINI_THINKING_LEVEL !== "auto") return GEMINI_THINKING_LEVEL
+  return REPORT_REQUEST.test(request.messages.at(-1)?.content ?? "") ? "low" : "minimal"
+}
+
 /** Gemini via the Gemini Developer API (GEMINI_API_KEY). */
 async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, usage: TokenUsage, model: string) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
@@ -510,16 +620,25 @@ async function* answerWithGemini(request: PawGptRequest, signal: AbortSignal, us
       },
     })
 
-  const thinkingLevel = GEMINI_THINKING_LEVEL === "default" ? undefined : GEMINI_THINKING_LEVEL
-  let response: Awaited<ReturnType<typeof start>>
-  try {
-    response = await start(thinkingLevel)
-  } catch (error) {
-    // Older models (a pinned GEMINI_MODEL such as 2.5) only take a thinking budget.
-    if (!thinkingLevel || !(error instanceof GeminiApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error
-    console.warn(`Paw GPT: ${model} doesn't accept thinkingLevel, retrying with its default thinking`)
-    response = await start()
+  // Older models (a pinned GEMINI_MODEL such as 2.5) only take a thinking budget, and some
+  // don't offer "minimal", so step up to "low" and then the model's default. A level a model
+  // turned down is remembered, so only the first question on an instance pays for the refusal.
+  const preferred = thinkingLevelFor(request)
+  const levels = (preferred === "minimal" ? ["minimal", "low", undefined] : preferred ? [preferred, undefined] : [undefined])
+    .filter((level) => !level || !refusedThinking.has(`${model}:${level}`))
+  let response: Awaited<ReturnType<typeof start>> | undefined
+  for (const [index, level] of levels.entries()) {
+    try {
+      response = await start(level)
+      break
+    } catch (error) {
+      const next = levels[index + 1]
+      if (index === levels.length - 1 || !(error instanceof GeminiApiError) || error.status !== 400 || !/think/i.test(error.message)) throw error
+      refusedThinking.add(`${model}:${level}`)
+      console.warn(`Paw GPT: ${model} doesn't accept thinkingLevel ${level}, retrying with ${next ?? "its default thinking"}`)
+    }
   }
+  if (!response) throw new Error(`Paw GPT: ${model} did not start`)
 
   let finishReason: string | undefined
   let blocked = false

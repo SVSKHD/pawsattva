@@ -1,11 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
+import { memo, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import type { User as FirebaseUser } from "firebase/auth"
 import { formatDistanceToNowStrict } from "date-fns"
-import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, Mail, Menu, MessageCircle, PawPrint, Phone, Plus, SquarePen, Trash2, User } from "lucide-react"
+import { CalendarDays, Cat, Check, ChevronDown, ChevronRight, Dog, GripVertical, History, Mail, Menu, MessageCircle, PawPrint, Phone, Plus, SquarePen, Trash2, User } from "lucide-react"
 
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import type { UserProfile } from "@/firebase/firestore"
@@ -18,6 +18,22 @@ const POSITION_KEY = "paw-gpt-dock-position"
 const EDGE = 8
 const KEY_STEP = 24
 const TOP_BAR = 72
+// Where the dock waits while Paw GPT answers, and how long it stays after the last word
+const PARKED_SPOT = { x: 16, y: TOP_BAR + EDGE + 8 }
+const PARK_LINGER_MS = 1500
+// Like the phone rail: drag past a screen edge to hide the dock there, only a grip showing
+const DOCK_WIDTH = 304 // 19rem, as in the class below
+// The visible strip of a hidden dock: just the glowing bar on the edge, like iOS's side-button hint
+const PEEK = 16
+// Height of that strip (min-h-36), which the hint beside it is centred on
+const EDGE_TAB_HEIGHT = 144
+// After hiding (or on arrival hidden), the full hint shows this long, then only on hover
+const HINT_MS = 3000
+const STOW_PULL = 24
+const UNSTOW_PULL = 20
+
+type Side = "left" | "right"
+type Saved = { x: number; y: number; stowed?: Side | null }
 
 const statusDot: Record<string, string> = {
   ideal: "bg-emerald-500",
@@ -208,7 +224,10 @@ export function ProfileDock({
   const panelId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<HTMLButtonElement>(null)
-  const drag = useRef<{ startX: number; startY: number; origin: Position; moved: boolean } | null>(null)
+  const drag = useRef<{ startX: number; startY: number; origin: Position; moved: boolean; stowed: Side | null } | null>(null)
+  const moveFrame = useRef(0)
+  const pendingMove = useRef<{ position: Position; hint: Side | null } | null>(null)
+  useEffect(() => () => cancelAnimationFrame(moveFrame.current), [])
   const suppressClick = useRef(false)
 
   const clamp = useCallback(
@@ -217,23 +236,82 @@ export function ProfileDock({
   )
 
   // The dock only renders in the browser (after sign-in resolves), so window is available here.
-  // Restore the last spot, or start top-left under the header; open by default on wide screens.
-  const [position, setPosition] = useState<Position>(() => {
-    const wide = window.innerWidth >= 1024
+  // Restore the last spot (and whether it was hidden against an edge), or start top-left under the
+  // header; open by default on wide screens.
+  const [saved] = useState<Saved | null>(() => {
     try {
-      const saved = JSON.parse(window.localStorage.getItem(POSITION_KEY) ?? "null") as Position | null
-      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) return clampToViewport(saved)
+      const value = JSON.parse(window.localStorage.getItem(POSITION_KEY) ?? "null") as Saved | null
+      return value && Number.isFinite(value.x) && Number.isFinite(value.y) ? value : null
     } catch {
-      // storage unavailable or corrupt; fall back to the default spot
+      return null // storage unavailable or corrupt; fall back to the default spot
     }
-    return clampToViewport({ x: 16, y: wide ? 112 : 96 })
   })
-  const [expanded, setExpanded] = useState(() => window.innerWidth >= 1024)
+  const [position, setPosition] = useState<Position>(() =>
+    clampToViewport(saved ?? { x: 16, y: window.innerWidth >= 1024 ? 112 : 96 })
+  )
+  // Hidden against a screen edge on purpose; stays that way (across visits) until dragged out
+  const [stowed, setStowed] = useState<Side | null>(() => (saved?.stowed === "left" || saved?.stowed === "right" ? saved.stowed : null))
+  // Mid-drag: the edge it would hide against if let go now
+  const [stowHint, setStowHint] = useState<Side | null>(null)
+  const [expanded, setExpanded] = useState(() => window.innerWidth >= 1024 && !stowed)
   const [viewportHeight, setViewportHeight] = useState(() => window.innerHeight)
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
+  const dockWidth = Math.min(DOCK_WIDTH, viewportWidth - 16)
+  // No glide while following the pointer, or the dock would lag behind it
+  const [dragging, setDragging] = useState(false)
 
-  const savePosition = (next: Position) => {
+  // While Paw GPT answers, the dock folds up into the top-left corner with a shining border, out of
+  // the answer's way; a tap opens it right there. Shortly after the last word it goes back to where
+  // it was, open again if it was open before (or was opened while it waited). A dock hidden against
+  // an edge stays hidden; its grip shines instead.
+  const [lingering, setLingering] = useState(false)
+  const [wasStreaming, setWasStreaming] = useState(streaming)
+  if (streaming !== wasStreaming) {
+    setWasStreaming(streaming)
+    if (!streaming) setLingering(true)
+  }
+  useEffect(() => {
+    if (!lingering) return
+    const timer = window.setTimeout(() => setLingering(false), PARK_LINGER_MS)
+    return () => window.clearTimeout(timer)
+  }, [lingering])
+  const parked = (streaming || lingering) && !stowed
+  const [wasParked, setWasParked] = useState(parked)
+  const [expandedBeforePark, setExpandedBeforePark] = useState(expanded)
+  if (parked !== wasParked) {
+    setWasParked(parked)
+    if (parked) {
+      setExpandedBeforePark(expanded)
+      setExpanded(false)
+    } else {
+      setExpanded(!stowed && (expandedBeforePark || expanded))
+    }
+  }
+  // Hidden: all but a sliver past its edge. Mid-drag it follows the pointer instead.
+  const stowedX = stowed === "left" ? PEEK - dockWidth : viewportWidth - PEEK
+  const shownPosition = dragging
+    ? position
+    : stowed
+      ? { x: stowedX, y: position.y }
+      : parked ? clampToViewport(PARKED_SPOT) : position
+  const hidden = stowed !== null && !dragging
+  const gripSide = dragging ? stowHint : stowed
+  const showGrip = hidden || (dragging && stowHint !== null)
+
+  // The "Drag to see history" text beside the bar's glowing icon: on mouse hover, and briefly
+  // whenever it hides.
+  const [hovering, setHovering] = useState(false)
+  const [hinting, setHinting] = useState(() => stowed !== null)
+  useEffect(() => {
+    if (!hinting) return
+    const timer = window.setTimeout(() => setHinting(false), HINT_MS)
+    return () => window.clearTimeout(timer)
+  }, [hinting])
+  const showHint = hidden && (hovering || hinting)
+
+  const savePosition = (next: Position, side: Side | null = stowed) => {
     try {
-      window.localStorage.setItem(POSITION_KEY, JSON.stringify(next))
+      window.localStorage.setItem(POSITION_KEY, JSON.stringify({ ...next, stowed: side } satisfies Saved))
     } catch {
       // storage unavailable; the dock just starts in its default spot next time
     }
@@ -243,36 +321,88 @@ export function ProfileDock({
   useEffect(() => {
     const onResize = () => {
       setViewportHeight(window.innerHeight)
+      setViewportWidth(window.innerWidth)
       setPosition((current) => clamp(current))
     }
     window.addEventListener("resize", onResize)
     return () => window.removeEventListener("resize", onResize)
   }, [clamp])
 
-  const onPointerDown = (event: PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0) return
-    drag.current = { startX: event.clientX, startY: event.clientY, origin: position, moved: false }
+  /** Left and right limits for the dock's x while it's free. */
+  const bounds = () => ({ min: EDGE, max: Math.max(EDGE, viewportWidth - dockWidth - EDGE) })
+
+  /** Where letting go at `rawX` would leave the dock: hidden against an edge, or free (null). */
+  const stowSideFor = (rawX: number, state: NonNullable<typeof drag.current>): Side | null => {
+    if (state.stowed) {
+      const pulled = state.stowed === "left" ? rawX - state.origin.x : state.origin.x - rawX
+      return pulled > UNSTOW_PULL ? null : state.stowed
+    }
+    const { min, max } = bounds()
+    if (rawX < min - STOW_PULL) return "left"
+    if (rawX > max + STOW_PULL) return "right"
+    return null
+  }
+
+  const onPointerDown = (event: PointerEvent<HTMLElement>) => {
+    // Parked in its corner it only opens and closes; it can be moved again once the answer is done
+    if (event.button !== 0 || parked) return
+    // A hidden dock ignores taps (like the phone rail); only dragging it out brings it back
+    if (stowed) suppressClick.current = true
+    drag.current = { startX: event.clientX, startY: event.clientY, origin: shownPosition, moved: false, stowed }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  const onPointerMove = (event: PointerEvent<HTMLButtonElement>) => {
+  const onPointerMove = (event: PointerEvent<HTMLElement>) => {
     const state = drag.current
     if (!state) return
     const dx = event.clientX - state.startX
     const dy = event.clientY - state.startY
     if (!state.moved && Math.hypot(dx, dy) < 5) return
-    state.moved = true
-    setPosition(clamp({ x: state.origin.x + dx, y: state.origin.y + dy }))
+    if (!state.moved) {
+      state.moved = true
+      setDragging(true)
+    }
+    const raw = { x: state.origin.x + dx, y: state.origin.y + dy }
+    const { min, max } = bounds()
+    // Past an edge it follows with some resistance, hinting it can be hidden there. Coming out of
+    // hiding it follows the pointer directly from where it was.
+    const x = state.stowed
+      ? Math.min(Math.max(raw.x, state.stowed === "left" ? state.origin.x : min), state.stowed === "right" ? state.origin.x : max)
+      : raw.x < min ? min - (min - raw.x) * 0.6 : raw.x > max ? max + (raw.x - max) * 0.6 : raw.x
+    // Pointer events can fire several times a frame; render only the latest, once per frame
+    pendingMove.current = { position: { x, y: clamp(raw).y }, hint: stowSideFor(raw.x, state) }
+    if (!moveFrame.current) {
+      moveFrame.current = requestAnimationFrame(() => {
+        moveFrame.current = 0
+        const next = pendingMove.current
+        if (!next) return
+        setPosition(next.position)
+        setStowHint(next.hint)
+      })
+    }
   }
 
-  const onPointerUp = (event: PointerEvent<HTMLButtonElement>) => {
+  const onPointerUp = (event: PointerEvent<HTMLElement>) => {
     const state = drag.current
     drag.current = null
+    cancelAnimationFrame(moveFrame.current)
+    moveFrame.current = 0
+    pendingMove.current = null
     if (!state?.moved) return
+    setDragging(false)
+    setStowHint(null)
     suppressClick.current = true
-    const next = clamp({ x: state.origin.x + event.clientX - state.startX, y: state.origin.y + event.clientY - state.startY })
+    const raw = { x: state.origin.x + event.clientX - state.startX, y: state.origin.y + event.clientY - state.startY }
+    const side = stowSideFor(raw.x, state)
+    const { min, max } = bounds()
+    const next = side ? { x: side === "left" ? min : max, y: clamp(raw).y } : clamp(raw)
     setPosition(next)
-    savePosition(next)
+    setStowed(side)
+    if (side) {
+      setExpanded(false)
+      setHinting(true)
+    }
+    savePosition(next, side)
   }
 
   const onClick = () => {
@@ -280,6 +410,7 @@ export function ProfileDock({
       suppressClick.current = false
       return
     }
+    if (stowed) return
     setExpanded((open) => !open)
   }
 
@@ -292,8 +423,16 @@ export function ProfileDock({
       ArrowRight: { x: KEY_STEP, y: 0 },
     }
     const move = moves[event.key]
-    if (!move) return
+    if (!move || parked) return
     event.preventDefault()
+    // Hidden against an edge: the arrow away from that edge brings it back
+    if (stowed) {
+      if ((stowed === "left" && event.key === "ArrowRight") || (stowed === "right" && event.key === "ArrowLeft")) {
+        setStowed(null)
+        savePosition(position, null)
+      }
+      return
+    }
     const next = clamp({ x: position.x + move.x, y: position.y + move.y })
     setPosition(next)
     savePosition(next)
@@ -301,14 +440,35 @@ export function ProfileDock({
 
   const name = profile?.displayName || user.displayName || user.email?.split("@")[0] || "Pet parent"
   const photo = profile?.photoURL || user.photoURL
-  const bodyMaxHeight = Math.max(180, viewportHeight - position.y - 96)
+  const bodyMaxHeight = Math.max(180, viewportHeight - shownPosition.y - 96)
 
   return (
+    <>
+    {/* Positioner: moves the dock with a transform, so dragging never re-lays out the page and stays
+        on the GPU. It follows the pointer exactly while held, and glides into place when let go. */}
+    <div
+      data-tour={stowed ? undefined : "history"}
+      className={`fixed left-0 top-0 z-40 hidden md:block ${
+        dragging ? "will-change-transform" : "transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+      }`}
+      style={{ transform: `translate3d(${shownPosition.x}px, ${shownPosition.y}px, 0)` }}
+      onPointerEnter={(event) => event.pointerType === "mouse" && setHovering(true)}
+      onPointerLeave={() => setHovering(false)}
+    >
     <div
       ref={rootRef}
-      // Floating dock from tablet width up; phones use ProfileSidebar instead.
-      className="paw-glass fixed z-40 hidden w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem] md:block"
-      style={{ left: position.x, top: position.y }}
+      // Floating dock from tablet width up; phones use ProfileSidebar instead. The two squish classes
+      // are the same animation under different names, so it replays on settling into the corner and back.
+      className={`paw-glass relative w-[min(19rem,calc(100vw-1rem))] overflow-hidden rounded-[1.75rem] transition-[scale,translate] duration-200 ease-out ${
+        parked ? "paw-gpt-anim-squish" : "paw-gpt-anim-squish-back"
+      } ${parked ? "paw-gpt-anim-shine" : ""} ${
+        // Held: lifts a little, with a lighter blur that's cheaper to redraw as it moves
+        dragging ? "paw-dock-dragging scale-[1.03]" : ""
+      } ${
+        // Hidden: the glass disappears and only the glowing bar is left on the edge, which slides out a
+        // little under the pointer, inviting a drag
+        hidden ? `paw-dock-edge min-h-36 ${stowed === "left" ? "hover:translate-x-1.5" : "hover:-translate-x-1.5"}` : ""
+      }`}
     >
       {/* Accordion header doubles as the drag handle */}
       <button
@@ -316,16 +476,25 @@ export function ProfileDock({
         type="button"
         aria-expanded={expanded}
         aria-controls={panelId}
-        aria-label={`${name}'s profile and pets. Click to ${expanded ? "collapse" : "expand"}; drag or use arrow keys to move.`}
+        aria-label={
+          stowed
+            ? `${name}'s pets and chats, hidden against the ${stowed} edge. Drag it out, or press the ${stowed === "left" ? "right" : "left"} arrow key, to bring it back.`
+            : parked
+              ? `${name}'s pets and chats, waiting in the corner while Paw GPT answers. Click to ${expanded ? "collapse" : "expand"}.`
+              : `${name}'s profile and pets. Click to ${expanded ? "collapse" : "expand"}; drag or use arrow keys to move, or drag past a screen edge to hide it.`
+        }
+        title={stowed ? "Drag to see your history" : undefined}
         onClick={onClick}
         onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex w-full cursor-grab touch-none select-none items-center gap-2.5 px-3 py-2.5 text-left active:cursor-grabbing focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-orange-500/25"
+        className={`flex w-full touch-none select-none items-center gap-2.5 px-3 py-2.5 text-left transition-opacity duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-orange-500/25 ${
+          parked ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+        } ${hidden ? "[&>*]:opacity-0" : dragging && stowHint ? "opacity-50" : ""}`}
       >
-        <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+        <GripVertical className={`h-4 w-4 shrink-0 text-muted-foreground/70 transition-opacity ${parked ? "opacity-30" : ""}`} />
         <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-orange-400 to-primary text-white ring-2 ring-white dark:ring-zinc-900">
           {photo && !imageUrlProblem(photo) ? (
             <Image src={photo} alt="" width={40} height={40} className="h-full w-full object-cover" draggable={false} />
@@ -349,8 +518,31 @@ export function ProfileDock({
             </span>
           )}
         </span>
+        {parked && chats.length > 0 && !expanded && (
+          <span
+            title="Your chats are here: tap to open"
+            className="paw-gpt-anim-pop inline-flex h-6 shrink-0 items-center gap-1 rounded-full bg-orange-500/10 px-2 text-[11px] font-bold tabular-nums text-orange-700 dark:text-orange-300"
+          >
+            <History className="h-3 w-3" />
+            {chats.length}
+          </span>
+        )}
         <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} />
       </button>
+
+      {/* Against an edge: a glowing orange bar on the visible strip (light runs down it while Paw GPT
+          answers); drag it out to bring the dock back. Mid-drag it hints where the dock would hide. */}
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute w-1.5 -translate-y-1/2 rounded-full transition-opacity duration-300 ${
+          gripSide === "left" ? "right-[5px]" : "left-[5px]"
+        } ${hidden ? "top-1/2" : "top-[2rem]"} ${
+          streaming ? "paw-gpt-anim-grip" : "bg-gradient-to-b from-orange-400 to-orange-600"
+        } ${hidden ? "h-28" : "h-12"} ${
+          // Glows, and hops a few times each time it appears
+          showGrip ? "paw-gpt-anim-grippy opacity-100" : "opacity-0"
+        }`}
+      />
 
       {/* Accordion body */}
       <div
@@ -381,13 +573,63 @@ export function ProfileDock({
         </div>
       </div>
     </div>
+    </div>
+
+    {/* Beside the bar, on the screen (the dock clips its own overflow): a glowing history icon, always,
+        as on the phone rail; and "Drag to see history" on hover or just after hiding. The icon is a
+        drag handle too, a much bigger target than the bar. It stays mounted (just invisible) during
+        the drag it started, so the pointer stays captured. */}
+    {stowed && (
+      <div
+        aria-hidden
+        // The walkthrough points here while the dock is hidden
+        data-tour="history"
+        className={`pointer-events-none fixed z-40 hidden -translate-y-1/2 items-center gap-2.5 transition-opacity duration-200 md:flex ${
+          stowed === "right" ? "flex-row-reverse text-right" : ""
+        } ${dragging ? "opacity-0" : ""}`}
+        style={{ top: shownPosition.y + EDGE_TAB_HEIGHT / 2, [stowed]: PEEK + 8 }}
+      >
+        <span
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={(event) => {
+            onPointerUp(event)
+            // The click this ends lands on the icon, not the dock's header, so don't let it swallow
+            // the header's next real click
+            suppressClick.current = false
+          }}
+          onPointerCancel={(event) => {
+            onPointerUp(event)
+            suppressClick.current = false
+          }}
+          onPointerEnter={(event) => event.pointerType === "mouse" && setHovering(true)}
+          onPointerLeave={() => setHovering(false)}
+          className="paw-gpt-anim-breathe paw-liquid-press pointer-events-auto flex size-10 shrink-0 cursor-grab touch-none select-none items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-[0_0_18px_rgba(249,115,22,0.6),inset_0_1px_0_rgba(255,255,255,0.35)] hover:scale-110 active:cursor-grabbing"
+        >
+          <History className="size-[18px]" />
+        </span>
+        <span
+          className={`paw-edge-label text-[15px] font-black leading-tight tracking-tight text-orange-700 transition-[opacity,translate] duration-300 dark:text-white ${
+            showHint ? "translate-x-0 opacity-100" : `opacity-0 ${stowed === "left" ? "-translate-x-2" : "translate-x-2"}`
+          }`}
+        >
+          Drag to see
+          <br />
+          history
+        </span>
+      </div>
+    )}
+    </>
   )
 }
 
 type DockBodyProps = Omit<ProfileDockProps, "streaming">
 
-/** What the dock and the mobile sidebar both show: contact, pets, chats and today's usage. */
-function DockBody({
+/**
+ * What the dock and the mobile sidebar both show: contact, pets, chats and today's usage.
+ * Memoised: its props don't change while the dock is dragged, so the lists don't re-render each frame.
+ */
+const DockBody = memo(function DockBody({
   user, profile, pets, loading, mealsLogged, selectedPet, onSelectPet,
   chats, activeChatId, onOpenChat, onNewChat, onClearHistory, quota,
 }: DockBodyProps) {
@@ -492,7 +734,7 @@ function DockBody({
             </p>
     </>
   )
-}
+})
 
 /**
  * Phones get the dock's contents as a left sidebar instead of a floating panel.
