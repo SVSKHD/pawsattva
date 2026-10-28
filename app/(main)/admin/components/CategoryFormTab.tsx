@@ -116,9 +116,9 @@ export function CategoryFormTab({
             </Field>
           )}
 
-          <Field label={isSubCategory ? "Sub-category name" : "Category name"} htmlFor="category-name" required>
+          <Field label={isSubCategory ? "Sub-category name" : "Category name"} htmlFor={`${noun}-name`} required>
             <Input
-              id="category-name"
+              id={`${noun}-name`}
               placeholder={isSubCategory
                 ? "e.g. Behavioral Training, Senior Health..."
                 : "e.g. Nutrition, Health & Wellness..."}
@@ -129,9 +129,9 @@ export function CategoryFormTab({
             />
           </Field>
 
-          <Field label="Description" htmlFor="category-desc" hint="Optional">
+          <Field label="Description" htmlFor={`${noun}-desc`} hint="Optional">
             <Textarea
-              id="category-desc"
+              id={`${noun}-desc`}
               placeholder="Briefly describe what this category is about..."
               className={`${fieldClass} h-auto min-h-[90px] resize-y py-2.5`}
               value={categoryDesc}
@@ -139,10 +139,10 @@ export function CategoryFormTab({
             />
           </Field>
 
-          <Field label="Category image" htmlFor="category-image" hint="Optional">
+          <Field label="Category image" htmlFor={`${noun}-image`} hint="Optional">
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
-                id="category-image"
+                id={`${noun}-image`}
                 placeholder="https://example.com/category-image.jpg"
                 value={categoryImage}
                 onChange={(e) => setCategoryImage(e.target.value)}

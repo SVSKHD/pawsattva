@@ -144,14 +144,37 @@ export default function AdminPanel({
     setBlogJsonOpen(true)
   }
 
+  // Tabs stay mounted once opened (see TabPanel), so their own state survives switching away.
+  // Each tab also gets back the scroll position it was left at.
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([initialTab]))
+  if (!visitedTabs.has(activeTab)) setVisitedTabs(new Set(visitedTabs).add(activeTab))
+  const scrollByTab = useRef<Record<string, number>>({})
+
   const handleTabChange = (tab: string) => {
+    scrollByTab.current[activeTab] = window.scrollY
     startTransition(() => setActiveTab(allowedTabs.has(tab) ? tab : "blog-list"))
   }
 
   useEffect(() => {
+    const top = scrollByTab.current[activeTab] ?? 0
+    const frame = requestAnimationFrame(() => window.scrollTo({ top }))
+    return () => cancelAnimationFrame(frame)
+  }, [activeTab])
+
+  // The open tab lives in the URL (?tab=…), so a reload or a shared link comes back to it
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (url.searchParams.get("tab") === activeTab) return
+    url.search = activeTab === "blog-list" ? "" : `?tab=${activeTab}`
+    window.history.replaceState(window.history.state, "", url)
+  }, [activeTab])
+
+  useEffect(() => {
+    // Wait for the role: until it's known, admin-only tabs from the URL would look forbidden
+    if (authLoading) return
     // eslint-disable-next-line react-hooks/set-state-in-effect -- clamp restored/linked tabs after role changes
     if (!allowedTabs.has(activeTab)) setActiveTab("blog-list")
-  }, [activeTab, allowedTabs])
+  }, [activeTab, allowedTabs, authLoading])
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([])
@@ -1294,8 +1317,7 @@ export default function AdminPanel({
             </>
           )}
 
-          {activeTab === "blog-list" && (
-            <div className="tab-panel">
+          <TabPanel id="blog-list" activeTab={activeTab} visitedTabs={visitedTabs}>
               <BlogListTab
                 blogs={blogs}
                 onCreate={() => { if (editingBlogId) resetBlogForm(); handleTabChange("blog") }}
@@ -1311,17 +1333,15 @@ export default function AdminPanel({
                 handleRejectDeleteRequest={isFullAdmin ? handleRejectDeleteRequest : undefined}
                 isAuthor={isAuthor}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {isFullAdmin && activeTab === "content-goals" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="content-goals" activeTab={activeTab} visitedTabs={visitedTabs}>
               <ContentGoalsTab currentUser={user} />
-            </div>
+            </TabPanel>
           )}
 
-          {activeTab === "blog" && (
-            <div className="tab-panel">
+          <TabPanel id="blog" activeTab={activeTab} visitedTabs={visitedTabs}>
               <BlogFormTab
                 blogTitle={blogTitle}
                 blogSlug={blogSlug} setBlogSlug={setBlogSlug}
@@ -1358,11 +1378,9 @@ export default function AdminPanel({
                 onOpenTips={() => setBlogTipsOpen(true)}
                 currentUserId={userId}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {activeTab === "category-list" && (
-            <div className="tab-panel space-y-4 sm:space-y-6">
+          <TabPanel id="category-list" activeTab={activeTab} visitedTabs={visitedTabs} className="space-y-4 sm:space-y-6">
               <CategoryListTab
                 categories={categories}
                 postCounts={categoryPostCounts}
@@ -1370,11 +1388,9 @@ export default function AdminPanel({
                 onEdit={handleEditCategory}
                 onDelete={handleDeleteCategory}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {activeTab === "category" && (
-            <div className="tab-panel">
+          <TabPanel id="category" activeTab={activeTab} visitedTabs={visitedTabs}>
                 <CategoryFormTab
                   isSubCategory={false}
                   categoryName={categoryName} setCategoryName={setCategoryName}
@@ -1390,11 +1406,9 @@ export default function AdminPanel({
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("category-list") }}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {activeTab === "sub-category-list" && (
-            <div className="tab-panel space-y-4 sm:space-y-6">
+          <TabPanel id="sub-category-list" activeTab={activeTab} visitedTabs={visitedTabs} className="space-y-4 sm:space-y-6">
               <SubCategoryListTab
                 categories={categories}
                 postCounts={categoryPostCounts}
@@ -1402,11 +1416,9 @@ export default function AdminPanel({
                 onEdit={handleEditCategory}
                 onDelete={handleDeleteCategory}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {activeTab === "sub-category" && (
-            <div className="tab-panel">
+          <TabPanel id="sub-category" activeTab={activeTab} visitedTabs={visitedTabs}>
                 <CategoryFormTab
                   isSubCategory={true}
                   categoryName={categoryName} setCategoryName={setCategoryName}
@@ -1422,40 +1434,39 @@ export default function AdminPanel({
                 handleCategorySubmit={handleCategorySubmit}
                 onCancel={() => { resetCategoryForm(); handleTabChange("sub-category-list") }}
               />
-            </div>
-          )}
+            </TabPanel>
 
-          {isFullAdmin && activeTab === "page-seo" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="page-seo" activeTab={activeTab} visitedTabs={visitedTabs}>
               <PageSeoTab />
-            </div>
+            </TabPanel>
           )}
 
-          {isFullAdmin && activeTab === "analytics" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="analytics" activeTab={activeTab} visitedTabs={visitedTabs}>
               <AnalyticsTab
                 users={users}
                 subscribers={subscribers}
                 blogs={blogs}
                 totalPetFeeds={totalPetFeeds}
               />
-            </div>
+            </TabPanel>
           )}
 
-          {isFullAdmin && activeTab === "subscribers" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="subscribers" activeTab={activeTab} visitedTabs={visitedTabs}>
               <SubscribersTab subscribers={subscribers} />
-            </div>
+            </TabPanel>
           )}
 
-          {isFullAdmin && activeTab === "vet-hospitals" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="vet-hospitals" activeTab={activeTab} visitedTabs={visitedTabs}>
               <VetHospitalsTab />
-            </div>
+            </TabPanel>
           )}
 
-          {isFullAdmin && activeTab === "users" && (
-            <div className="tab-panel">
+          {isFullAdmin && (
+            <TabPanel id="users" activeTab={activeTab} visitedTabs={visitedTabs}>
               <UsersTab
                 users={users}
                 filteredUsers={filteredUsers}
@@ -1476,7 +1487,7 @@ export default function AdminPanel({
                 handleToggleUserBlacklist={handleToggleUserBlacklist}
                 currentUserEmail={user?.email ?? undefined}
               />
-            </div>
+            </TabPanel>
           )}
         </div>
       </div>
@@ -1524,6 +1535,32 @@ export default function AdminPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  )
+}
+
+/**
+ * One admin tab. Once opened it stays mounted, only hidden while another tab shows, so whatever
+ * is going on inside it (unsaved edits, the selected item, search and filters, loaded data)
+ * is still there when you come back. Showing it again replays the fade-in.
+ */
+function TabPanel({
+  id,
+  activeTab,
+  visitedTabs,
+  className = "",
+  children,
+}: {
+  id: string
+  activeTab: string
+  visitedTabs: Set<string>
+  className?: string
+  children: React.ReactNode
+}) {
+  if (id !== activeTab && !visitedTabs.has(id)) return null
+  return (
+    <div className={`tab-panel ${className}`} hidden={id !== activeTab}>
+      {children}
     </div>
   )
 }

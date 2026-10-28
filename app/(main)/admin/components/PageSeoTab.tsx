@@ -1,21 +1,27 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { FormEvent } from "react"
+import type { FormEvent, ReactNode } from "react"
 import {
   AlertTriangle,
+  Braces,
   CheckCircle2,
   FileText,
   Globe2,
+  ImageIcon,
+  Link2,
   Loader2,
+  Save,
+  Search,
   SearchCheck,
+  Share2,
   ShieldCheck,
   Sparkles,
   WandSparkles,
+  type LucideIcon,
 } from "lucide-react"
 import { toast } from "sonner"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -41,7 +47,7 @@ import {
   type PageSeoKey,
   type SeoConfigFields,
 } from "@/firebase/firestore"
-import { ActionButton, FilterTabs, PanelBar, TableSearch } from "./DataTable"
+import { ActionButton, FilterTabs, TableSearch } from "./DataTable"
 
 const SITE_URL = "https://pawsattva.com"
 
@@ -436,78 +442,124 @@ export function PageSeoTab() {
     }
   }
 
-  if (loading) {
-    return <div className="flex min-h-64 items-center justify-center"><Loader2 className="h-7 w-7 animate-spin text-orange-500" /></div>
-  }
+  if (loading) return <SeoSkeleton />
+
+  const setField = <K extends keyof SeoConfigFields>(key: K, value: SeoConfigFields[K]) =>
+    setDraft((current) => ({ ...current, [key]: value }))
+
+  // What's saved for the item on screen, to tell whether the editor has unsaved changes
+  const savedSeo = scope === "pages"
+    ? pageRows.find((row) => row.key === selectedPage)?.seo
+    : blogRows.find((row) => row.blog.id === selectedBlogId)?.seo
+  const dirty = Boolean(savedSeo) && seoSignature(workingSeo) !== seoSignature(savedSeo!)
+  const averageScore = summaryRows.length ? Math.round(summaryRows.reduce((sum, row) => sum + row.score, 0) / summaryRows.length) : 0
+  const subjectLabel = scope === "pages" ? selectedPageOption.label : selectedBlog?.title ?? "Choose a post"
+  const subjectUrl = currentSubject?.url ?? SITE_URL
+  const displayUrl = (workingSeo.canonicalUrl || subjectUrl).replace(/^https?:\/\//, "").replace(/\/$/, "").split("/").join(" › ")
+  const socialImage = workingSeo.ogImage || workingSeo.image || ""
+  const checks = [
+    { label: "Title 30–60 chars", ok: titleOk(workingSeo.title) },
+    { label: "Description 120–160 chars", ok: descriptionOk(workingSeo.description) },
+    { label: "3+ keyword phrases", ok: keywords.length >= 3 },
+    { label: "Canonical URL", ok: Boolean(workingSeo.canonicalUrl?.startsWith("http")) },
+    { label: "Social image", ok: Boolean(socialImage) },
+    { label: "Valid Schema.org JSON-LD", ok: schemaValidation.valid },
+  ]
+  const passed = checks.filter((check) => check.ok).length
+  const busy = Boolean(aiBusy) || Boolean(bulk)
 
   return (
     <div className="space-y-6">
-      <PanelBar
-        icon={SearchCheck}
-        title="SEO Command Center"
-        subtitle="Metadata, canonical URLs, robots, social cards and JSON-LD for every page and blog post."
-      >
-        <div
-          aria-disabled={Boolean(bulk) || undefined}
-          title={bulk ? "Wait for the bulk AI fix to finish" : undefined}
-          className={bulk ? "pointer-events-none opacity-50" : undefined}
-        >
-          <FilterTabs<"pages" | "blogs">
-            label="SEO scope"
-            tabs={[
-              { id: "pages", label: "Pages", icon: Globe2 },
-              { id: "blogs", label: "Blogs", icon: FileText },
-            ]}
-            value={scope}
-            onChange={(next) => { if (!bulk) setScope(next) }}
-            counts={{ pages: PAGE_OPTIONS.length, blogs: blogs.length }}
-          />
-        </div>
-      </PanelBar>
+      {/* Hero, like the profile page: gradient rim, title and scope on the left, scores on the right.
+          The bulk AI strip below always takes the same space, whatever it's showing. */}
+      <section className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-400 p-[2px] shadow-xl shadow-orange-500/10">
+        <div className="relative overflow-hidden rounded-[1.9rem] bg-white/95 p-5 backdrop-blur-2xl sm:p-6 dark:bg-black/90">
+          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-orange-400/10 blur-3xl" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-20 -left-16 h-48 w-48 rounded-full bg-amber-400/10 blur-3xl" />
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard label="Ready" value={counts.ready} tone="emerald" />
-        <StatCard label="Incomplete" value={counts.incomplete} tone="amber" />
-        <StatCard label="Critical" value={counts.critical} tone="rose" />
-      </div>
-
-      {/* Bulk AI fix for everything in this scope that isn't Ready */}
-      {(incompleteCount > 0 || bulk) && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          {bulk ? (
-            <>
-              <div className="min-w-0 flex-1">
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
-                  Fixing {Math.min(bulk.done + 1, bulk.total)} of {bulk.total}…
-                  {bulk.failed > 0 && <span className="text-xs text-rose-600">{bulk.failed} failed</span>}
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center">
+            <div className="flex min-w-0 flex-1 items-start gap-4">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-lg shadow-orange-500/30">
+                <SearchCheck className="h-7 w-7" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-2xl font-black tracking-tight sm:text-3xl">SEO Command Center</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Metadata, canonical URLs, robots, social cards and JSON-LD for every page and blog post.
                 </p>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-500/10">
-                  <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(bulk.done / bulk.total) * 100}%` }} />
+                <div
+                  aria-disabled={Boolean(bulk) || undefined}
+                  title={bulk ? "Wait for the bulk AI fix to finish" : undefined}
+                  className={`mt-3 w-fit ${bulk ? "pointer-events-none opacity-50" : ""}`}
+                >
+                  <FilterTabs<"pages" | "blogs">
+                    label="SEO scope"
+                    tabs={[
+                      { id: "pages", label: "Pages", icon: Globe2 },
+                      { id: "blogs", label: "Blogs", icon: FileText },
+                    ]}
+                    value={scope}
+                    onChange={(next) => { if (!bulk) setScope(next) }}
+                    counts={{ pages: PAGE_OPTIONS.length, blogs: blogs.length }}
+                  />
                 </div>
               </div>
-              <ActionButton variant="secondary" onClick={() => { bulkStop.current = true }}>
-                Stop
-              </ActionButton>
-            </>
-          ) : (
-            <>
-              <div>
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  <WandSparkles className="h-4 w-4 text-violet-600" />
-                  {incompleteCount} {scope === "pages" ? (incompleteCount === 1 ? "page" : "pages") : incompleteCount === 1 ? "post" : "posts"} not ready
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  AI drafts the missing titles, descriptions, keywords and social copy; URLs, images and Schema.org are filled from the page itself. Fields that already pass are kept.
-                </p>
+            </div>
+
+            <div className="grid shrink-0 grid-cols-4 gap-2 sm:gap-3">
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-black/5 bg-white/70 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                <ScoreRing score={averageScore} size={52} />
+                <p className="mt-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Average</p>
               </div>
-              <ActionButton variant="primary" icon={WandSparkles} onClick={() => setBulkConfirm(true)}>
-                Fix all with AI
-              </ActionButton>
-            </>
-          )}
+              <StatTile label="Ready" value={counts.ready} tone="emerald" />
+              <StatTile label="Incomplete" value={counts.incomplete} tone="amber" />
+              <StatTile label="Critical" value={counts.critical} tone="rose" />
+            </div>
+          </div>
+
+          <div className="relative mt-5 flex min-h-[4.5rem] flex-col gap-3 rounded-2xl border border-violet-500/20 bg-violet-500/[0.05] px-4 py-3 sm:flex-row sm:items-center">
+            {bulk ? (
+              <>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-sm font-semibold">
+                    <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+                    Fixing {Math.min(bulk.done + 1, bulk.total)} of {bulk.total}…
+                    {bulk.failed > 0 && <span className="text-xs text-rose-600">{bulk.failed} failed</span>}
+                  </p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-violet-500/10">
+                    <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${(bulk.done / bulk.total) * 100}%` }} />
+                  </div>
+                </div>
+                <ActionButton variant="secondary" onClick={() => { bulkStop.current = true }}>
+                  Stop
+                </ActionButton>
+              </>
+            ) : incompleteCount > 0 ? (
+              <>
+                <span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 sm:flex">
+                  <WandSparkles className="h-5 w-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">
+                    {incompleteCount} {scope === "pages" ? (incompleteCount === 1 ? "page" : "pages") : incompleteCount === 1 ? "post" : "posts"} not ready
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    AI drafts the missing titles, descriptions, keywords and social copy; URLs, images and Schema.org come from the page itself. Fields that already pass are kept.
+                  </p>
+                </div>
+                <ActionButton variant="primary" icon={WandSparkles} onClick={() => setBulkConfirm(true)}>
+                  Fix all with AI
+                </ActionButton>
+              </>
+            ) : (
+              <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-5 w-5" />
+                Every {scope === "pages" ? "page" : "blog post"} is ready for search and social.
+              </p>
+            )}
+          </div>
         </div>
-      )}
+      </section>
 
       <AlertDialog open={bulkConfirm} onOpenChange={setBulkConfirm}>
         <AlertDialogContent size="sm">
@@ -524,212 +576,402 @@ export function PageSeoTab() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {scope === "pages" ? (
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          {pageRows.map((page) => (
-            <button
-              key={page.key}
-              type="button"
-              onClick={() => setSelectedPage(page.key)}
-              aria-pressed={selectedPage === page.key}
-              className={`rounded-2xl border p-4 text-left shadow-sm transition ${selectedPage === page.key ? "border-orange-500/60 bg-orange-500/10 ring-1 ring-orange-500/20" : "border-black/10 bg-white/70 hover:border-orange-300 hover:bg-orange-50/60 dark:border-white/10 dark:bg-black/40 dark:hover:bg-orange-500/5"}`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-bold">{page.label}</span>
-                <ScoreBadge score={page.score} />
-              </div>
-              <span className="mt-1 block text-xs text-muted-foreground">{page.pathname}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <TableSearch value={query} onChange={setQuery} placeholder="Search blog title or slug…" label="Search blog posts" />
-            <FilterTabs<"all" | SeoReadinessStatus>
-              label="Filter posts by SEO status"
-              tabs={[
-                { id: "all", label: "All" },
-                { id: "critical", label: "Critical" },
-                { id: "incomplete", label: "Incomplete" },
-                { id: "ready", label: "Ready" },
-              ]}
-              value={statusFilter}
-              onChange={setStatusFilter}
-              counts={{ all: blogRows.length, ...counts }}
-              alert={{ id: "critical", className: "bg-rose-500" }}
+      {/* Library | editor | live previews. Columns are capped (minmax 0), so long URLs and titles
+          never widen them, and the library and previews stay put while the editor scrolls. */}
+      <form
+        onSubmit={save}
+        className="grid items-start gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_19rem]"
+      >
+        <aside className={`${glass} flex max-h-[26rem] flex-col overflow-hidden lg:sticky lg:top-24 lg:max-h-[calc(100dvh-7.5rem)]`}>
+          <div className="border-b border-border/50 px-4 py-3">
+            <SectionTitle
+              icon={scope === "pages" ? Globe2 : FileText}
+              title={scope === "pages" ? "Pages" : "Blog posts"}
+              hint={scope === "pages" ? "Site pages with their own SEO" : `${filteredBlogs.length} of ${blogRows.length} shown`}
             />
           </div>
-
-          <div className="max-h-72 overflow-auto rounded-2xl border border-black/10 bg-white/70 shadow-sm dark:border-white/10 dark:bg-black/40">
-            {filteredBlogs.map(({ blog, score, status }) => (
-              <button
-                key={blog.id}
-                type="button"
-                onClick={() => setSelectedBlogId(blog.id)}
-                aria-pressed={selectedBlogId === blog.id}
-                className={`flex w-full items-center justify-between gap-4 border-b border-border/50 px-4 py-3 text-left last:border-0 ${selectedBlogId === blog.id ? "bg-orange-500/10" : "hover:bg-orange-500/[0.04]"}`}
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-bold">{blog.title}</p>
-                  <p className="truncate text-xs text-muted-foreground">/blog/{blog.slug}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StatusBadge status={status} />
-                  <ScoreBadge score={score} />
-                </div>
-              </button>
-            ))}
+          {scope === "blogs" && (
+            <div className="space-y-2 border-b border-border/50 p-3">
+              <TableSearch value={query} onChange={setQuery} placeholder="Search title or slug…" label="Search blog posts" className="min-w-0" />
+              <div role="tablist" aria-label="Filter posts by SEO status" className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
+                {([
+                  ["all", "All", blogRows.length],
+                  ["critical", "Critical", counts.critical],
+                  ["incomplete", "Partial", counts.incomplete],
+                  ["ready", "Ready", counts.ready],
+                ] as const).map(([id, label, count]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={statusFilter === id}
+                    onClick={() => setStatusFilter(id)}
+                    className={`flex flex-col items-center rounded-lg py-1 text-[10px] font-bold transition ${
+                      statusFilter === id ? "bg-white text-orange-700 shadow-sm dark:bg-zinc-900 dark:text-orange-300" : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="text-sm font-black tabular-nums">{count}</span>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+            {scope === "pages"
+              ? pageRows.map((page) => (
+                  <LibraryRow
+                    key={page.key}
+                    active={selectedPage === page.key}
+                    onSelect={() => setSelectedPage(page.key)}
+                    title={page.label}
+                    subtitle={page.pathname}
+                    score={page.score}
+                    status={page.status}
+                  />
+                ))
+              : filteredBlogs.length
+                ? filteredBlogs.map(({ blog, score, status }) => (
+                    <LibraryRow
+                      key={blog.id}
+                      active={selectedBlogId === blog.id}
+                      onSelect={() => setSelectedBlogId(blog.id)}
+                      title={blog.title}
+                      subtitle={`/blog/${blog.slug}`}
+                      score={score}
+                      status={status}
+                    />
+                  ))
+                : <p className="px-3 py-8 text-center text-sm text-muted-foreground">No posts match.</p>}
           </div>
-        </div>
-      )}
+        </aside>
 
-      <form onSubmit={save} className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-        <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2"><SearchCheck className="h-5 w-5 text-orange-500" /> SEO editor</span>
-              <ScoreBadge score={currentScore} />
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-violet-500/20 bg-violet-500/[0.04] p-3">
-              <WandSparkles className="h-4 w-4 shrink-0 text-violet-600" />
-              <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-                Let AI draft this {scope === "pages" ? "page's" : "post's"} SEO. Nothing is saved until you press Save SEO.
+        {/* The editor. Not overflow-hidden, so its Save bar can stick to the bottom of the screen. */}
+        <div className={`${glass} min-w-0`}>
+          <div className="flex flex-wrap items-center gap-4 border-b border-border/50 px-5 py-4">
+            <ScoreRing score={currentScore} size={56} />
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-orange-600 dark:text-orange-400">
+                {scope === "pages" ? "Page" : "Blog post"} SEO
               </p>
-              <ActionButton
-                variant="primary"
-                onClick={() => void fillWithAi("missing")}
-                disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
-              >
+              <h3 className="truncate text-lg font-black tracking-tight">{subjectLabel}</h3>
+              <p className="truncate text-xs text-muted-foreground">{subjectUrl}</p>
+            </div>
+            <div className="flex shrink-0 gap-2" title="AI fills the editor; nothing is saved until you press Save SEO">
+              <ActionButton variant="primary" onClick={() => void fillWithAi("missing")} disabled={busy || !currentSubject}>
                 {aiBusy === "missing" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 Fill missing
               </ActionButton>
-              <ActionButton
-                variant="secondary"
-                onClick={() => void fillWithAi("all")}
-                disabled={Boolean(aiBusy) || Boolean(bulk) || !currentSubject}
-              >
-                {aiBusy === "all" && <Loader2 className="h-4 w-4 animate-spin" />}
+              <ActionButton variant="secondary" onClick={() => void fillWithAi("all")} disabled={busy || !currentSubject}>
+                {aiBusy === "all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <WandSparkles className="h-4 w-4" />}
                 Rewrite all
               </ActionButton>
             </div>
+          </div>
 
-            <Field label="SEO title" hint={`${workingSeo.title.trim().length}/60`}>
-              <Input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-            </Field>
-
-            <Field label="Meta description" hint={`${workingSeo.description.trim().length}/160`}>
-              <Textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} className="min-h-28" />
-            </Field>
-
-            <Field label="Keywords" hint={`${keywords.length} phrases`}>
-              <Textarea value={keywordText} onChange={(e) => setKeywordText(e.target.value)} placeholder="pet nutrition, dog diet, cat wellness" />
-            </Field>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Canonical URL">
-                <Input value={draft.canonicalUrl || ""} onChange={(e) => setDraft({ ...draft, canonicalUrl: e.target.value })} />
+          <div className="divide-y divide-border/50">
+            <Section icon={Search} title="Search result" hint="What people see on Google">
+              <Field label="SEO title" count={workingSeo.title.trim().length} range={[30, 60]}>
+                <Input value={draft.title} onChange={(e) => setField("title", e.target.value)} />
               </Field>
-              <Field label="Robots">
-                <Input value={draft.robots || ""} onChange={(e) => setDraft({ ...draft, robots: e.target.value })} placeholder="index,follow" />
+              <Field label="Meta description" count={workingSeo.description.trim().length} range={[120, 160]}>
+                <Textarea value={draft.description} onChange={(e) => setField("description", e.target.value)} className={`${fixedText} h-24`} />
               </Field>
-            </div>
+              <Field label="Keywords" hint={`${keywords.length} phrases`} ok={keywords.length >= 3}>
+                <Textarea
+                  value={keywordText}
+                  onChange={(e) => setKeywordText(e.target.value)}
+                  placeholder="pet nutrition, dog diet, cat wellness"
+                  className={`${fixedText} h-20`}
+                />
+              </Field>
+            </Section>
 
-            <Field label="Primary / fallback image">
-              <Input value={draft.image || ""} onChange={(e) => setDraft({ ...draft, image: e.target.value })} placeholder="https://…" />
-            </Field>
+            <Section icon={Link2} title="Indexing" hint="Which URL counts, and whether search engines may index it">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Canonical URL">
+                  <Input value={draft.canonicalUrl || ""} onChange={(e) => setField("canonicalUrl", e.target.value)} />
+                </Field>
+                <Field label="Robots">
+                  <Input value={draft.robots || ""} onChange={(e) => setField("robots", e.target.value)} placeholder="index,follow" />
+                </Field>
+              </div>
+              <Field label="Primary / fallback image">
+                <Input value={draft.image || ""} onChange={(e) => setField("image", e.target.value)} placeholder="https://…" />
+              </Field>
+            </Section>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Open Graph title"><Input value={draft.ogTitle || ""} onChange={(e) => setDraft({ ...draft, ogTitle: e.target.value })} /></Field>
-              <Field label="Twitter title"><Input value={draft.twitterTitle || ""} onChange={(e) => setDraft({ ...draft, twitterTitle: e.target.value })} /></Field>
-              <Field label="Open Graph description"><Textarea value={draft.ogDescription || ""} onChange={(e) => setDraft({ ...draft, ogDescription: e.target.value })} /></Field>
-              <Field label="Twitter description"><Textarea value={draft.twitterDescription || ""} onChange={(e) => setDraft({ ...draft, twitterDescription: e.target.value })} /></Field>
-              <Field label="Open Graph image"><Input value={draft.ogImage || ""} onChange={(e) => setDraft({ ...draft, ogImage: e.target.value })} /></Field>
-              <Field label="Twitter image"><Input value={draft.twitterImage || ""} onChange={(e) => setDraft({ ...draft, twitterImage: e.target.value })} /></Field>
-            </div>
+            <Section icon={Share2} title="Social cards" hint="How links look on WhatsApp, Facebook and X">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Open Graph title"><Input value={draft.ogTitle || ""} onChange={(e) => setField("ogTitle", e.target.value)} /></Field>
+                <Field label="Twitter title"><Input value={draft.twitterTitle || ""} onChange={(e) => setField("twitterTitle", e.target.value)} /></Field>
+                <Field label="Open Graph description">
+                  <Textarea value={draft.ogDescription || ""} onChange={(e) => setField("ogDescription", e.target.value)} className={`${fixedText} h-24`} />
+                </Field>
+                <Field label="Twitter description">
+                  <Textarea value={draft.twitterDescription || ""} onChange={(e) => setField("twitterDescription", e.target.value)} className={`${fixedText} h-24`} />
+                </Field>
+                <Field label="Open Graph image"><Input value={draft.ogImage || ""} onChange={(e) => setField("ogImage", e.target.value)} /></Field>
+                <Field label="Twitter image"><Input value={draft.twitterImage || ""} onChange={(e) => setField("twitterImage", e.target.value)} /></Field>
+              </div>
+            </Section>
 
-            <Field label="Schema.org JSON-LD" hint={schemaValidation.message}>
+            <Section
+              icon={Braces}
+              title="Structured data"
+              hint="Schema.org JSON-LD for rich results"
+              right={
+                <span
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold ${
+                    schemaValidation.valid
+                      ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                      : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                  }`}
+                >
+                  {schemaValidation.valid ? <ShieldCheck className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                  {schemaValidation.message}
+                </span>
+              }
+            >
               <Textarea
                 value={draft.schemaJson || ""}
-                onChange={(e) => setDraft({ ...draft, schemaJson: e.target.value })}
-                className="min-h-72 font-mono text-xs"
+                onChange={(e) => setField("schemaJson", e.target.value)}
+                className={`${fixedText} h-64 font-mono text-xs`}
                 placeholder={'{\n  "@context": "https://schema.org",\n  "@type": "WebPage"\n}'}
               />
-            </Field>
+            </Section>
+          </div>
 
-            <div className={`flex items-center gap-2 rounded-2xl border p-3 text-sm font-semibold ${schemaValidation.valid ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
-              {schemaValidation.valid ? <ShieldCheck className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-              {schemaValidation.message}
-            </div>
-
-            <ActionButton type="submit" variant="primary" disabled={saving} className="h-10 px-6">
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          {/* Save bar: sticks to the bottom of the screen while the editor is in view */}
+          <div className="sticky bottom-3 z-10 m-3 flex items-center gap-3 rounded-2xl border border-black/10 bg-white/90 px-4 py-3 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-zinc-900/90">
+            {dirty ? (
+              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                </span>
+                <span className="truncate">Unsaved changes</span>
+              </span>
+            ) : (
+              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                <span className="truncate">All changes saved</span>
+              </span>
+            )}
+            <ActionButton type="submit" variant="primary" disabled={saving || !dirty} className="ml-auto h-10 px-6">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               Save SEO
             </ActionButton>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <div className="space-y-6">
-          <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-            <CardHeader><CardTitle>Google preview</CardTitle></CardHeader>
-            <CardContent>
-              <p className="truncate text-sm text-emerald-700">{workingSeo.canonicalUrl || SITE_URL}</p>
-              <p className="mt-1 text-xl font-medium text-blue-700">{workingSeo.title || "SEO title preview"}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-600">{workingSeo.description || "Meta description preview."}</p>
-            </CardContent>
-          </Card>
+        {/* Live previews: fixed heights, so typing never makes them grow and push things around */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-start-2 xl:sticky xl:top-24 xl:col-start-auto xl:grid-cols-1">
+          <PreviewCard icon={Search} title="Google preview">
+            <div className="flex items-center gap-2">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-orange-500/10 text-[11px] font-black text-orange-600">P</span>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-xs font-semibold">Paw Sattva</p>
+                <p className="truncate text-[11px] text-muted-foreground">{displayUrl}</p>
+              </div>
+            </div>
+            <p className="mt-2 truncate text-lg font-medium text-blue-700 dark:text-blue-400">{workingSeo.title || "SEO title preview"}</p>
+            <p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-slate-600 dark:text-slate-400">
+              {workingSeo.description || "Meta description preview."}
+            </p>
+          </PreviewCard>
 
-          <Card className="rounded-2xl border border-black/10 bg-white/70 shadow-sm ring-0 backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-            <CardHeader><CardTitle>Readiness checks</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              <Check label="Title 30–60 chars" ok={workingSeo.title.trim().length >= 30 && workingSeo.title.trim().length <= 60} />
-              <Check label="Description 120–160 chars" ok={workingSeo.description.trim().length >= 120 && workingSeo.description.trim().length <= 160} />
-              <Check label="3+ keyword phrases" ok={keywords.length >= 3} />
-              <Check label="Canonical URL" ok={Boolean(workingSeo.canonicalUrl?.startsWith("http"))} />
-              <Check label="Social image" ok={Boolean(workingSeo.ogImage || workingSeo.image)} />
-              <Check label="Valid Schema.org JSON-LD" ok={schemaValidation.valid} />
-            </CardContent>
-          </Card>
+          <PreviewCard icon={Share2} title="Social card">
+            <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10">
+              <div
+                className="flex aspect-[1.91/1] items-center justify-center bg-gradient-to-br from-orange-100 to-amber-50 bg-cover bg-center text-orange-400 dark:from-orange-950/40 dark:to-amber-950/20"
+                style={socialImage ? { backgroundImage: `url("${encodeURI(socialImage)}")` } : undefined}
+              >
+                {!socialImage && <ImageIcon className="h-8 w-8" />}
+              </div>
+              <div className="space-y-0.5 bg-black/[0.02] px-3 py-2 dark:bg-white/[0.03]">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">pawsattva.com</p>
+                <p className="truncate text-sm font-bold">{workingSeo.ogTitle || workingSeo.title || "Open Graph title"}</p>
+                <p className="line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
+                  {workingSeo.ogDescription || workingSeo.description || "Open Graph description."}
+                </p>
+              </div>
+            </div>
+          </PreviewCard>
+
+          <PreviewCard icon={ShieldCheck} title="Readiness" right={<span className="text-xs font-bold tabular-nums text-muted-foreground">{passed}/{checks.length} passed</span>}>
+            <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10">
+              <div
+                className={`h-full rounded-full transition-[width,background-color] duration-500 ${currentScore >= 90 ? "bg-emerald-500" : currentScore >= 60 ? "bg-amber-500" : "bg-rose-500"}`}
+                style={{ width: `${currentScore}%` }}
+              />
+            </div>
+            <div className="space-y-2">
+              {checks.map((check) => (
+                <Check key={check.label} label={check.label} ok={check.ok} />
+              ))}
+            </div>
+          </PreviewCard>
         </div>
       </form>
     </div>
   )
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+const glass = "rounded-[1.75rem] border border-white/40 bg-white/60 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/40"
+// Text areas keep their height as text is filled in (the shared Textarea grows with its content)
+const fixedText = "field-sizing-fixed resize-none overflow-y-auto"
+
+const SEO_KEYS = [
+  "title", "description", "keywords", "canonicalUrl", "robots", "image", "ogTitle", "ogDescription", "ogImage",
+  "twitterTitle", "twitterDescription", "twitterImage", "schemaJson",
+] as const
+
+/** The SEO fields alone, in a fixed order, to compare the editor with what's saved */
+const seoSignature = (seo: SeoConfigFields) =>
+  JSON.stringify(SEO_KEYS.map((key) => (key === "keywords" ? seo.keywords : seo[key] ?? "")))
+
+function SeoSkeleton() {
   return (
-    <div className="space-y-2">
-      <Label className="flex items-center justify-between gap-3">
-        <span>{label}</span>
-        {hint && <span className="text-xs font-medium text-muted-foreground">{hint}</span>}
-      </Label>
+    <div className="space-y-6" aria-busy="true" aria-label="Loading SEO command center">
+      <div className="h-[15rem] animate-pulse rounded-[2rem] bg-gradient-to-br from-orange-500/15 via-amber-500/10 to-yellow-400/10" />
+      <div className="grid gap-6 lg:grid-cols-[17rem_minmax(0,1fr)] xl:grid-cols-[16rem_minmax(0,1fr)_19rem]">
+        <div className="h-[26rem] animate-pulse rounded-[1.75rem] bg-black/[0.04] dark:bg-white/[0.05]" />
+        <div className="h-[40rem] animate-pulse rounded-[1.75rem] bg-black/[0.04] dark:bg-white/[0.05]" />
+        <div className="hidden h-[30rem] animate-pulse rounded-[1.75rem] bg-black/[0.04] xl:block dark:bg-white/[0.05]" />
+      </div>
+    </div>
+  )
+}
+
+function SectionTitle({ icon: Icon, title, hint, right }: { icon: LucideIcon; title: string; hint?: string; right?: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-orange-600 ring-1 ring-orange-500/15 dark:text-orange-300">
+        <Icon className="h-4 w-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <h4 className="truncate text-sm font-black tracking-tight">{title}</h4>
+        {hint && <p className="truncate text-xs text-muted-foreground">{hint}</p>}
+      </div>
+      {right}
+    </div>
+  )
+}
+
+function Section({ icon, title, hint, right, children }: { icon: LucideIcon; title: string; hint?: string; right?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-4 px-5 py-5">
+      <SectionTitle icon={icon} title={title} hint={hint} right={right} />
+      {children}
+    </section>
+  )
+}
+
+function PreviewCard({ icon, title, right, children }: { icon: LucideIcon; title: string; right?: ReactNode; children: ReactNode }) {
+  return (
+    <div className={`${glass} p-4`}>
+      <div className="mb-3">
+        <SectionTitle icon={icon} title={title} right={right} />
+      </div>
       {children}
     </div>
   )
 }
 
-function ScoreBadge({ score }: { score: number }) {
-  const tone = score >= 90 ? "bg-emerald-500/10 text-emerald-700" : score >= 60 ? "bg-amber-500/10 text-amber-700" : "bg-rose-500/10 text-rose-700"
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-black ${tone}`}>{score}%</span>
+/**
+ * A labelled field. With `range`, the counter shows length / max and a thin meter fills under the
+ * input: green inside the range, amber outside it. Everything is a fixed size, so nothing shifts.
+ */
+function Field({
+  label, hint, ok, count, range, children,
+}: { label: string; hint?: string; ok?: boolean; count?: number; range?: [number, number]; children: ReactNode }) {
+  const state = range && count !== undefined
+    ? count === 0 ? "empty" : count >= range[0] && count <= range[1] ? "ok" : "warn"
+    : ok === undefined ? "empty" : ok ? "ok" : "warn"
+  const tone = state === "ok" ? "text-emerald-600 dark:text-emerald-400" : state === "warn" ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"
+  return (
+    <div className="space-y-2">
+      <Label className="flex items-center justify-between gap-3">
+        <span>{label}</span>
+        {(hint || range) && <span className={`text-xs font-semibold tabular-nums ${tone}`}>{range ? `${count} / ${range[1]}` : hint}</span>}
+      </Label>
+      {children}
+      {range && (
+        <div className="h-1 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10">
+          <div
+            className={`h-full rounded-full transition-[width,background-color] duration-300 ${state === "ok" ? "bg-emerald-500" : state === "warn" ? "bg-amber-500" : "bg-transparent"}`}
+            style={{ width: `${Math.min(100, ((count ?? 0) / range[1]) * 100)}%` }}
+          />
+        </div>
+      )}
+    </div>
+  )
 }
 
-function StatusBadge({ status }: { status: SeoReadinessStatus }) {
-  const tone = status === "ready" ? "bg-emerald-500/10 text-emerald-700" : status === "incomplete" ? "bg-amber-500/10 text-amber-700" : "bg-rose-500/10 text-rose-700"
-  return <span className={`hidden rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide sm:inline ${tone}`}>{status}</span>
+function LibraryRow({
+  active, onSelect, title, subtitle, score, status,
+}: { active: boolean; onSelect: () => void; title: string; subtitle: string; score: number; status: SeoReadinessStatus }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-3 rounded-2xl px-2.5 py-2 text-left transition ${
+        active ? "bg-orange-500/10 ring-1 ring-orange-500/25" : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+      }`}
+    >
+      <ScoreRing score={score} size={36} />
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-sm font-bold ${active ? "text-orange-800 dark:text-orange-200" : ""}`}>{title}</span>
+        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+      </span>
+      <span
+        title={status}
+        className={`h-2 w-2 shrink-0 rounded-full ${status === "ready" ? "bg-emerald-500" : status === "incomplete" ? "bg-amber-500" : "bg-rose-500"}`}
+      />
+    </button>
+  )
+}
+
+/** The score as a ring that fills (and changes colour) as the SEO improves */
+function ScoreRing({ score, size = 44 }: { score: number; size?: number }) {
+  const stroke = size >= 50 ? 5 : 3.5
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const color = score >= 90 ? "text-emerald-500" : score >= 60 ? "text-amber-500" : "text-rose-500"
+  return (
+    <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }} role="img" aria-label={`SEO score ${score}%`}>
+      <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" strokeWidth={stroke} className="stroke-black/[0.07] dark:stroke-white/10" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - score / 100)}
+          className={`${color} transition-[stroke-dashoffset] duration-700 ease-out`}
+        />
+      </svg>
+      <span className={`absolute font-black tabular-nums ${size >= 50 ? "text-sm" : "text-[10px]"}`}>{score}</span>
+    </span>
+  )
 }
 
 function Check({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      {ok ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 text-amber-600" />}
-      <span>{label}</span>
+      {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />}
+      <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
     </div>
   )
 }
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
+function StatTile({ label, value, tone }: { label: string; value: number; tone: "emerald" | "amber" | "rose" }) {
   const style = tone === "emerald"
     ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
     : tone === "amber"
@@ -737,14 +979,12 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
       : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
   const Icon = tone === "emerald" ? CheckCircle2 : AlertTriangle
   return (
-    <div className="rounded-2xl border border-black/10 bg-white/70 p-4 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-black/40">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${style}`}>
-          <Icon className="h-4 w-4" />
-        </span>
-      </div>
-      <p className="mt-2 text-3xl font-black tabular-nums">{value}</p>
+    <div className="flex min-w-[4.75rem] flex-col items-center justify-center rounded-2xl border border-black/5 bg-white/70 p-3 transition-transform hover:scale-[1.03] dark:border-white/10 dark:bg-white/[0.04]">
+      <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${style}`}>
+        <Icon className="h-4 w-4" />
+      </span>
+      <p className="mt-1 text-2xl font-black tabular-nums leading-none">{value}</p>
+      <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
     </div>
   )
 }

@@ -21,7 +21,9 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const requestedTab = first(params.tab);
-  const initialTab = requestedTab === "blog" ? "blog" : "blog-list";
+  // Any tab can be linked or reloaded (?tab=page-seo); the panel falls back to the blog list
+  // when it isn't one this person's role can open.
+  const initialTab = /^[a-z-]{1,40}$/.test(requestedTab) ? requestedTab : "blog-list";
 
   return (
     <AdminPanel
